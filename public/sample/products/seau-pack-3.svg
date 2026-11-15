@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-hidden="true">
+<defs><filter id="blur" x="-30%" y="-300%" width="160%" height="700%"><feGaussianBlur stdDeviation="9"/></filter><radialGradient id="g" cx="50%" cy="45%" r="80%"><stop offset="0" stop-color="#e2eaef"/><stop offset="1" stop-color="#c2cdd4"/></radialGradient></defs>
+<rect width="800" height="800" fill="url(#g)"/><g transform="translate(-30 -10) scale(2.15)">
+    <path d="M110 150Q200 30 290 150" stroke="#23455c" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <path d="M100 152H300L270 388Q268 400 254 400H146Q132 400 130 388Z" fill="#3f7da8"/>
+    <path d="M118 270H282M122 330H278" stroke="#316283" stroke-width="6" opacity=".4"/>
+    <rect x="90" y="140" width="220" height="20" rx="10" fill="#316283"/>
+    <rect x="160" y="196" width="80" height="48" rx="6" fill="#c5d8e5" opacity=".9"/><rect x="172" y="210" width="56" height="7" rx="3" fill="#316283"/></g>
+</svg>

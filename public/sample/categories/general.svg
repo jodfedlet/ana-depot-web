@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-hidden="true">
+<defs><filter id="blur" x="-30%" y="-300%" width="160%" height="700%"><feGaussianBlur stdDeviation="9"/></filter><radialGradient id="g" cx="50%" cy="40%" r="80%"><stop offset="0" stop-color="#f4efe6"/><stop offset="1" stop-color="#ece4d6"/></radialGradient></defs>
+<rect width="800" height="600" fill="url(#g)"/><rect y="500" width="800" height="100" fill="#ded6c9"/><ellipse cx="400" cy="506" rx="150" ry="13.5" fill="#000" opacity=".22" filter="url(#blur)"/><g transform="translate(190 80) scale(1.05)">
+    <path d="M320 196L384 142V348L320 400Z" fill="#614c32" opacity=".6"/>
+    <rect x="72" y="196" width="248" height="204" rx="4" fill="#b08a5a"/>
+    <path d="M72 196L136 142H384L320 196Z" fill="#ccb394"/>
+    <rect x="174" y="196" width="46" height="204" fill="#e7dcce" opacity=".75"/><path d="M174 196L238 142H284L220 196Z" fill="#e7dcce" opacity=".6"/>
+    <rect x="100" y="286" width="62" height="46" rx="3" fill="#fff" opacity=".9"/><rect x="108" y="298" width="40" height="6" rx="3" fill="#896c46"/><rect x="108" y="312" width="26" height="6" rx="3" fill="#ccb394"/></g>
+</svg>

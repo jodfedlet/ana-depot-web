@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-hidden="true">
+<defs><filter id="blur" x="-30%" y="-300%" width="160%" height="700%"><feGaussianBlur stdDeviation="9"/></filter></defs>
+<rect width="800" height="800" fill="#dfe6ea"/>
+     <path d="M110 640V300a190 190 0 0 1 380 0V640Z" fill="#edf1f3"/>
+     <circle cx="620" cy="210" r="78" fill="#c4cace"/>
+     <rect y="640" width="800" height="160" fill="#cdd4d7"/>
+     <rect x="520" y="560" width="190" height="80" rx="8" fill="#b7bdc0"/>
+     <ellipse cx="300" cy="652" rx="195.49999999999997" ry="17.594999999999995" fill="#000" opacity=".22" filter="url(#blur)"/><g transform="translate(70.00000000000003 185.00000000000006) scale(1.15)">
+    <rect x="76" y="320" width="248" height="80" rx="8" fill="#8aa1b8"/>
+    <rect x="86" y="244" width="228" height="80" rx="8" fill="#b3c2d1"/>
+    <rect x="98" y="168" width="204" height="80" rx="8" fill="#8aa1b8"/>
+    <g fill="#4c5965" opacity=".45">
+      <rect x="76" y="346" width="248" height="9"/><rect x="76" y="368" width="248" height="4"/>
+      <rect x="86" y="270" width="228" height="9"/><rect x="86" y="292" width="228" height="4"/>
+      <rect x="98" y="194" width="204" height="9"/><rect x="98" y="216" width="204" height="4"/></g>
+    <g stroke="#6c7e90" stroke-width="3" stroke-linecap="round"><path d="M324 326h14"/><path d="M324 331.2h14"/><path d="M324 336.4h14"/><path d="M324 341.6h14"/><path d="M324 346.8h14"/><path d="M324 352h14"/><path d="M324 357.2h14"/><path d="M324 362.4h14"/><path d="M324 367.6h14"/><path d="M324 372.8h14"/><path d="M324 378h14"/><path d="M324 383.2h14"/><path d="M324 388.4h14"/><path d="M324 393.6h14"/></g></g>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-hidden="true">
+<defs><filter id="blur" x="-30%" y="-300%" width="160%" height="700%"><feGaussianBlur stdDeviation="9"/></filter><radialGradient id="g" cx="50%" cy="45%" r="80%"><stop offset="0" stop-color="#ede4d9"/><stop offset="1" stop-color="#d1c5b4"/></radialGradient></defs>
+<rect width="800" height="800" fill="url(#g)"/><g transform="translate(-30 -10) scale(2.15)">
+    
+      <rect x="103" y="50" width="30" height="350" rx="4" fill="#a99480"/>
+      <rect x="109" y="56" width="6" height="334" rx="3" fill="#fff" opacity=".35"/>
+      <ellipse cx="118" cy="50" rx="15" ry="6" fill="#5f462f"/><ellipse cx="118" cy="50" rx="9" ry="3.5" fill="#433221"/>
+      <rect x="137" y="30" width="30" height="370" rx="4" fill="#7a5a3c"/>
+      <rect x="143" y="36" width="6" height="354" rx="3" fill="#fff" opacity=".35"/>
+      <ellipse cx="152" cy="30" rx="15" ry="6" fill="#5f462f"/><ellipse cx="152" cy="30" rx="9" ry="3.5" fill="#433221"/>
+      <rect x="171" y="64" width="30" height="336" rx="4" fill="#a99480"/>
+      <rect x="177" y="70" width="6" height="320" rx="3" fill="#fff" opacity=".35"/>
+      <ellipse cx="186" cy="64" rx="15" ry="6" fill="#5f462f"/><ellipse cx="186" cy="64" rx="9" ry="3.5" fill="#433221"/>
+      <rect x="205" y="40" width="30" height="360" rx="4" fill="#7a5a3c"/>
+      <rect x="211" y="46" width="6" height="344" rx="3" fill="#fff" opacity=".35"/>
+      <ellipse cx="220" cy="40" rx="15" ry="6" fill="#5f462f"/><ellipse cx="220" cy="40" rx="9" ry="3.5" fill="#433221"/>
+      <rect x="239" y="58" width="30" height="342" rx="4" fill="#a99480"/>
+      <rect x="245" y="64" width="6" height="326" rx="3" fill="#fff" opacity=".35"/>
+      <ellipse cx="254" cy="58" rx="15" ry="6" fill="#5f462f"/><ellipse cx="254" cy="58" rx="9" ry="3.5" fill="#433221"/>
+      <rect x="273" y="36" width="30" height="364" rx="4" fill="#7a5a3c"/>
+      <rect x="279" y="42" width="6" height="348" rx="3" fill="#fff" opacity=".35"/>
+      <ellipse cx="288" cy="36" rx="15" ry="6" fill="#5f462f"/><ellipse cx="288" cy="36" rx="9" ry="3.5" fill="#433221"/>
+    <rect x="96" y="250" width="214" height="12" rx="3" fill="#433221" opacity=".75"/><rect x="96" y="150" width="214" height="12" rx="3" fill="#433221" opacity=".75"/></g>
+</svg>
