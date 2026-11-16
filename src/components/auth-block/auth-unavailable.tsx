@@ -16,8 +16,8 @@ export function AuthUnavailable({ locale }: { locale: Locale }) {
         <CardDescription>{t("auth.unavailable.text")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <ButtonLink href="/products" full>{t("auth.unavailable.shop")}</ButtonLink>
-        <ButtonLink href="/cart" variant="outline" full>{t("auth.unavailable.cart")}</ButtonLink>
+        <ButtonLink href="/products" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.unavailable.shop")}</ButtonLink>
+        <ButtonLink href="/cart" variant="outline" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.unavailable.cart")}</ButtonLink>
       </CardContent>
     </Card>
   );

@@ -42,7 +42,7 @@ export function UpdatePasswordForm() {
         <CardHeader><CardTitle>{t("auth.update.title")}</CardTitle></CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-body">{t("auth.update.noSession")}</p>
-          <ButtonLink href="/auth/forgot-password" full>{t("auth.update.requestNew")}</ButtonLink>
+          <ButtonLink href="/auth/forgot-password" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.update.requestNew")}</ButtonLink>
         </CardContent>
       </Card>
     );

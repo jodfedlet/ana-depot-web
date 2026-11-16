@@ -4,7 +4,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/states";
 import type { Locale } from "@/i18n/config";
 import { getT } from "@/i18n/server";
-import { LogIn, ShieldAlert, ServerCrash, Settings2 } from "lucide-react";
+import { ShieldAlert, ServerCrash, Settings2 } from "lucide-react";
 import { AdminSignOutButton } from "./admin-actions";
 import { AdminIdentityProvider } from "./admin-identity";
 import { AdminShell } from "./admin-shell";
@@ -39,7 +39,7 @@ export async function AdminGate({ locale, children }: { locale: Locale; children
       ? { icon: <ShieldAlert aria-hidden />, title: t("admin.guard.forbiddenTitle"), text: t("admin.guard.forbiddenText", { email: access.email }), action: <AdminSignOutButton label={t("admin.guard.forbiddenAction")} /> }
       : access.state === "backend_unreachable"
         ? { icon: <ServerCrash aria-hidden />, title: t("admin.guard.unreachableTitle"), text: t("admin.guard.unreachableText"), action: <ButtonLink href="/admin">{t("admin.guard.retry")}</ButtonLink> }
-        : { icon: <Settings2 aria-hidden />, title: t("admin.guard.notConfiguredTitle"), text: t("admin.guard.notConfiguredText"), action: <ButtonLink href="/auth/login" variant="outline"><LogIn aria-hidden className="size-4" />{t("admin.signIn.submit")}</ButtonLink> };
+        : { icon: <Settings2 aria-hidden />, title: t("admin.guard.notConfiguredTitle"), text: t("admin.guard.notConfiguredText"), action: null }; // nothing to sign in to: authentication is not configured on this deployment
   return (
     <div className="grid min-h-dvh place-items-center bg-sand-50 p-4">
       <main id="main" className="w-full max-w-lg rounded-card border border-line bg-surface p-4">

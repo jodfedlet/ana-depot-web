@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { GuestLink } from "@/components/auth-block/guest-link";
 import { AuthPage } from "@/components/auth-block/auth-page";
 import { LoginForm } from "@/components/auth-block/login-form";
+import { getSupabaseConfig } from "@/lib/auth/config";
 import { isLocale } from "@/i18n/config";
 import { getT } from "@/i18n/server";
 
@@ -16,7 +17,7 @@ async function Content({ locale, searchParams }: { locale: "fr" | "ht"; searchPa
   return (
     <>
       <AuthPage locale={locale}><LoginForm status={status === "expired" || status === "signed_out" ? status : undefined} /></AuthPage>
-      <GuestLink locale={locale} />
+      {getSupabaseConfig() && <GuestLink locale={locale} />}
     </>
   );
 }

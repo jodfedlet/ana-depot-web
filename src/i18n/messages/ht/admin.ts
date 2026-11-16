@@ -48,13 +48,6 @@ export const admin: typeof frAdmin = {
     notConfiguredText: "Otantifikasyon an pa konfigire sou deplwaman sa a: pa ka aksede administrasyon an.",
     backToStore: "Retounen nan magazen an",
   },
-  signIn: {
-    title: "Administrasyon",
-    subtitle: "Konekte pou w jere rezèvasyon yo.",
-    submit: "Konekte",
-    errorTitle: "Nou pa t ka konekte w",
-    staffOnly: "Sa a se pou anplwaye ki gen otorizasyon sèlman. Pa gen kont administrasyon ki kreye isit la: se pwopriyetè magazen an ki bay yo.",
-  },
   dashboard: {
     title: "Tablo bò",
     subtitle: "Apèsi sou rezèvasyon yo.",

@@ -24,9 +24,9 @@ async function Content({ locale, searchParams }: { locale: Locale; searchParams:
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {reason === "reset"
-            ? <ButtonLink href="/auth/forgot-password" full>{t("auth.error.resetAgain")}</ButtonLink>
-            : <ButtonLink href="/auth/login" full>{t("auth.error.verifyAgain")}</ButtonLink>}
-          <ButtonLink href="/" variant="outline" full>{t("auth.error.backToStore")}</ButtonLink>
+            ? <ButtonLink href="/auth/forgot-password" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.error.resetAgain")}</ButtonLink>
+            : <ButtonLink href="/auth/login" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.error.verifyAgain")}</ButtonLink>}
+          <ButtonLink href="/" variant="outline" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.error.backToStore")}</ButtonLink>
         </CardContent>
       </Card>
     </AuthShell>

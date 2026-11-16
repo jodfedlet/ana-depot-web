@@ -45,13 +45,6 @@ export const admin = {
     notConfiguredText: "L'authentification n'est pas configurée sur ce déploiement : l'administration est inaccessible.",
     backToStore: "Retour à la boutique",
   },
-  signIn: {
-    title: "Administration",
-    subtitle: "Connectez-vous pour gérer les réservations.",
-    submit: "Se connecter",
-    errorTitle: "Connexion impossible",
-    staffOnly: "Réservé au personnel autorisé. Les comptes d'administration ne se créent pas ici : ils sont attribués par le propriétaire du magasin.",
-  },
   dashboard: {
     title: "Tableau de bord",
     subtitle: "Vue d'ensemble des réservations.",
