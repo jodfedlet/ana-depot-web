@@ -79,7 +79,7 @@ summarised in the final "Vérification" section with anchors. Tables (products, 
 ## Administration: honesty and access patterns
 - **"Not connected to the server" notice** (`DemoNotice`, `admin.connection.*`) sits at the top of every admin page while its data is browser-local demo data. Remove it per
   module only when that module talks to the API.
-- **Access states** (`AdminGate`): sign-in redirect, "expired session" notice on the sign-in card, and full-page access states (denied / cannot verify / not configured)
+- **Access states** (`AdminGate`): sign-in redirect, "expired session" notice on the login card (`/auth/login`), and full-page access states (denied / cannot verify / not configured)
   built from `EmptyState` — they contain no admin markup.
 - **Money in the admin** is always one figure per currency (`MoneyTotals`/`MoneyRows`, or HTG and USD as separate table columns). Reservation value, payments received,
   outstanding balance and collected value are separate, labelled measures; uncollected reservations are never presented as revenue.

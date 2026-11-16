@@ -24,13 +24,13 @@ Languages: French (`/fr`, default) and Haitian Creole (`/ht`). Launch market Hai
 
 ## Customer site (`/fr|/ht/…`)
 `/` · `/products` · `/products/[slug]` · `/search` · `/cart` · `/reserve` (guest, 3 steps) · `/reserve/confirmation/[ref]` ·
-`/reservations` (lookup: reference **+ phone**) · `/reservations/[ref]` · `/sign-in` `/register` `/forgot-password` `/reset-password`
-`/verify-email` (real Supabase flows; accounts are optional — browsing, cart, guest reservations and tracking never need one) ·
+`/reservations` (lookup: reference **+ phone**) · `/reservations/[ref]` · `/auth/login` `/auth/sign-up` `/auth/sign-up-success` `/auth/forgot-password` `/auth/update-password`
+`/auth/error` (the Supabase UI password block, real Supabase flows; accounts are optional — browsing, cart, guest reservations and tracking never need one) ·
 `/account` `/account/reservations` `/account/profile` (server-protected: valid Supabase session required) · `/info/[slug]`.
 
 ## Administration (`/fr|/ht/admin/…`, noindex)
 **Access:** Supabase session **and** `staff: true` from the backend (`GET /api/v1/me`), checked on the server for every `/admin/**` page (deny by default; no public admin registration).
-`/admin/sign-in` · `/admin` dashboard (reservations / payments received / outstanding / collected, HTG and USD apart; quick actions) · `/admin/reservations` (search, status, date, sort, pagination; table → cards on mobile) ·
+`/admin` dashboard (reservations / payments received / outstanding / collected, HTG and USD apart; quick actions) · `/admin/reservations` (search, status, date, sort, pagination; table → cards on mobile) ·
 `/admin/reservations/[ref]` (accept, reject, ready, record payment, collect, cancel, expire, notes, change pickup, history) ·
 `/admin/pickup-settings` (address, contact, hours, bilingual instructions, enable/disable, hold period, preview, history) ·
 `/admin/products` (list, filters, activate/deactivate) · `/admin/products/new` and `/admin/products/[id]` (guided form: category → basics → images →

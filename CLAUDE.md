@@ -14,7 +14,7 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
 
 ## Architecture
 - `src/app/[locale]/…` — every page lives under `/fr` or `/ht` (`src/proxy.ts` redirects bare URLs: cookie → Accept-Language → `fr`).
-  `(store)/` = customer site; `admin/` = administration (`admin/sign-in` standalone, `admin/(app)/` behind the server-side staff gate).
+  `(store)/` = customer site; `admin/` = administration (`admin/(app)/` behind the server-side staff gate; unauthenticated visitors go to `/auth/login?next=/admin`).
 - `src/features/<area>` — screens: `home catalog product cart search reservations account auth info admin` (`admin/products`, `admin/categories` for catalog management).
   `src/components/ui|layout` — shared primitives. `src/lib` — pure logic/types. `src/i18n` — translations & helpers.
 - **API boundary `src/lib/api/*`** (async, typed) is the only thing UI calls. `src/lib/mock/*` is SAMPLE DATA, imported only by
@@ -27,10 +27,12 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
     Layouts do not re-run on client navigation, so the backend must authorize every `/api/v1/admin/**` call itself. Never use `user_metadata` for authorization.
   - The one authorization boundary is `lib/auth/authorization.ts` (`canAccessAdmin`, `hasPermission`). Roles/permissions are an open business decision: do not invent them.
   - The client session mirror is `lib/auth/auth-store.ts` (`useSession()`): "loading" until Supabase confirms; never "signed in" from a raw cookie.
-  - Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public), `NEXT_PUBLIC_API_BASE_URL` (browser + server),
+  - **Auth UI = the Supabase UI "password-based-auth" block, source-copied in `src/components/auth-block/` (routes `/auth/{login,sign-up,sign-up-success,forgot-password,update-password,error,callback}`).**
+    Never write another sign-in/sign-up/recovery form, never add `@supabase/auth-ui-react`, never link to a hosted login or the dashboard. Invalid/missing config renders `AuthUnavailable` (no inputs).
+  - Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public), `NEXT_PUBLIC_API_BASE_URL` (browser + server; all `NEXT_PUBLIC_*` are inlined at BUILD time),
     optional server-only `API_BASE_URL`. The service-role key is never used by this app.
   - Privacy: never show whether an address has an account (sign-up/sign-in/recovery/resend are uniform; `user_already_exists` counts as success). Callback redirects are RELATIVE.
-  - Real-stack check: `npm run e2e:real` (local Supabase + real API; see `docs/authentication.md` and `../ana-depot-api/docs/local-supabase.md`).
+  - Checks: `npm test` (mocked/unit), `npm run e2e:stub` (fake Supabase), `npm run e2e:unavailable` (config missing), `npm run e2e:real` (local Supabase + real API; see `docs/authentication.md` and `../ana-depot-api/docs/local-supabase.md`).
   - Admin modules use browser-local demo data and show a visible "not connected to the server" notice. `src/lib/api/http.ts` is the typed client for the real API.
 
 ## Reservation domain (the part that must stay correct)
