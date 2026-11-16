@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "e2e:real": "node e2e/real-supabase/run.mjs"
+    "e2e:real": "node e2e/real-supabase/run.mjs",
+    "e2e:stub": "node e2e/stub-supabase/run.mjs",
+    "e2e:unavailable": "node e2e/unavailable/run.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
