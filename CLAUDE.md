@@ -14,14 +14,24 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
 
 ## Architecture
 - `src/app/[locale]/…` — every page lives under `/fr` or `/ht` (`src/proxy.ts` redirects bare URLs: cookie → Accept-Language → `fr`).
-  `(store)/` = customer site; `admin/` = administration (`admin/sign-in` standalone, `admin/(app)/` guarded shell).
+  `(store)/` = customer site; `admin/` = administration (`admin/sign-in` standalone, `admin/(app)/` behind the server-side staff gate).
 - `src/features/<area>` — screens: `home catalog product cart search reservations account auth info admin` (`admin/products`, `admin/categories` for catalog management).
   `src/components/ui|layout` — shared primitives. `src/lib` — pure logic/types. `src/i18n` — translations & helpers.
 - **API boundary `src/lib/api/*`** (async, typed) is the only thing UI calls. `src/lib/mock/*` is SAMPLE DATA, imported only by
   `lib/api` and the demo stores. `lib/api/reservations.ts` + `lib/stores/*` are the DEMO "backend" (localStorage); replace the
   bodies with HTTP calls — signatures and error codes are the contract.
-- No Supabase SDK in the frontend. Demo sessions: customer (`session-store`), staff (`admin-session-store`; email `admin@…`).
-  Frontend gating is UX only — the API must authorize every request.
+- **Authentication is real Supabase Auth** (`@supabase/ssr` cookies; `src/lib/auth/*`, `src/lib/api/auth.ts`). There are NO demo sessions any more —
+  never reintroduce a fake sign-in, a "local session", or a success that Supabase did not confirm. Full guide: `docs/authentication.md`.
+  - Identity ≠ authorization. Supabase says WHO; the backend (`GET /api/v1/me` → `staff`) says what they may do. Admin access = verified session + `staff === true`,
+    decided on the SERVER in `features/admin/admin-gate.tsx` (default deny; backend unreachable ⇒ denied). Account pages: `features/account/account-gate.tsx`.
+    Layouts do not re-run on client navigation, so the backend must authorize every `/api/v1/admin/**` call itself. Never use `user_metadata` for authorization.
+  - The one authorization boundary is `lib/auth/authorization.ts` (`canAccessAdmin`, `hasPermission`). Roles/permissions are an open business decision: do not invent them.
+  - The client session mirror is `lib/auth/auth-store.ts` (`useSession()`): "loading" until Supabase confirms; never "signed in" from a raw cookie.
+  - Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public), `NEXT_PUBLIC_API_BASE_URL` (browser + server),
+    optional server-only `API_BASE_URL`. The service-role key is never used by this app.
+  - Privacy: never show whether an address has an account (sign-up/sign-in/recovery/resend are uniform; `user_already_exists` counts as success). Callback redirects are RELATIVE.
+  - Real-stack check: `npm run e2e:real` (local Supabase + real API; see `docs/authentication.md` and `../ana-depot-api/docs/local-supabase.md`).
+  - Admin modules use browser-local demo data and show a visible "not connected to the server" notice. `src/lib/api/http.ts` is the typed client for the real API.
 
 ## Reservation domain (the part that must stay correct)
 - `lib/reservations/workflow.ts` is the single rule engine (pure, tested): pending_review → confirmed → ready_for_pickup → collected;
@@ -55,6 +65,13 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
 - Catalog: `currency` filter; price min/max only with a selected (or the only) currency; price sort groups by currency. Admin reservation list has no amount sort.
 - Money parsing uses decimal-exponent shifting (`majorToMinor`), not `x * 100`.
 - Demo store keys are versioned (`ana.demo.*.vN`): bump when a persisted shape changes.
+
+## Per-currency pricing (one product, many currencies)
+- `ProductRecord.prices: Pricing[]` — at most one per currency (HTG, USD or both), each with its own retail, sale, minimum order and wholesale tiers;
+  `VariantRecord.prices` overrides retail per currency. Stock (`inventory`) is ONE position shared by every currency. A missing currency is never generated.
+- Customer view: `Product.offers` (one per currency; `price/pricing/...` are the primary-currency view) and `lib/catalog/offers.ts#inCurrency` for a single-currency view.
+  The cart keys lines per currency (`lineKey(product, variant, currency)`) and caps the SUM of HTG+USD lines at the stock; `submitReservation` sums demand across currencies.
+- Admin form: one price set per currency (`ProductDraft.prices[currency]`), validation keys `price.<CUR>.*`, `variant.<i>.price.<CUR>`.
 
 ## i18n rules
 - No user-facing literals in components: use `useT()` (client) / `getT(locale)` (server). `fr.ts` defines the shape; `ht.ts` is typed

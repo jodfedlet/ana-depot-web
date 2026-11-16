@@ -76,6 +76,17 @@ Product form = numbered sections (`Section`) with a sticky step list + live prev
 Progressive disclosure: variants and wholesale are opt-in toggles; optional fields say "Facultatif". Errors are inline with `aria-describedby` and
 summarised in the final "Vérification" section with anchors. Tables (products, inventory) are horizontal-scroll-safe on phones; image cards stack on narrow screens.
 
+## Administration: honesty and access patterns
+- **"Not connected to the server" notice** (`DemoNotice`, `admin.connection.*`) sits at the top of every admin page while its data is browser-local demo data. Remove it per
+  module only when that module talks to the API.
+- **Access states** (`AdminGate`): sign-in redirect, "expired session" notice on the sign-in card, and full-page access states (denied / cannot verify / not configured)
+  built from `EmptyState` — they contain no admin markup.
+- **Money in the admin** is always one figure per currency (`MoneyTotals`/`MoneyRows`, or HTG and USD as separate table columns). Reservation value, payments received,
+  outstanding balance and collected value are separate, labelled measures; uncollected reservations are never presented as revenue.
+- **Settings cards** show a status badge: *configured* / *defined* (success), *not configured* (neutral), *decision pending* (warning). No placeholder values.
+- **Per-currency price sets** in the product form: one bordered `fieldset` per currency (retail, sale, minimum order) and one wholesale `fieldset` per enabled currency,
+  with the shared-stock reminder.
+
 ## Internationalization
 Language switch = `FR | KR` pill (single compact button on phones). Layouts must survive Haitian Creole being longer than French in
 places; never truncate status labels. Don't hardcode text: see `src/i18n`.

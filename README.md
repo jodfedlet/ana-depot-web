@@ -1,10 +1,13 @@
 # Ana Dépôt — storefront & administration (`ana-depot-web`)
 
-Next.js 16 · React 19 · TypeScript (strict) · Tailwind CSS v4 · lucide-react. **Frontend foundation only**: the Spring Boot API,
-Supabase Auth/Storage, payments and notifications are not integrated. Everything simulated is labelled in the UI.
+Next.js 16 · React 19 · TypeScript (strict) · Tailwind CSS v4 · lucide-react. **Authentication is real** (Supabase Auth, see
+[docs/authentication.md](docs/authentication.md)); **business data is not yet server-backed**: catalog, stock, reservations, payments and
+pickup settings still live in this browser's `localStorage` as clearly labelled demo data until the Spring Boot API endpoints exist
+(`../ana-depot-api`). Payments, notifications and storage integrations are not implemented. Everything simulated is labelled in the UI.
 
 ```bash
 npm install
+cp .env.example .env.local   # fill in the Supabase URL + public key and NEXT_PUBLIC_API_BASE_URL (see docs/authentication.md)
 npm run dev            # http://localhost:3000  (redirects to /fr or /ht)
 npm run build && npm start
 npm run lint && npm run typecheck && npm test
@@ -22,17 +25,22 @@ Languages: French (`/fr`, default) and Haitian Creole (`/ht`). Launch market Hai
 ## Customer site (`/fr|/ht/…`)
 `/` · `/products` · `/products/[slug]` · `/search` · `/cart` · `/reserve` (guest, 3 steps) · `/reserve/confirmation/[ref]` ·
 `/reservations` (lookup: reference **+ phone**) · `/reservations/[ref]` · `/sign-in` `/register` `/forgot-password` `/reset-password`
-`/verify-email` · `/account` `/account/reservations` `/account/profile` · `/info/[slug]`.
+`/verify-email` (real Supabase flows; accounts are optional — browsing, cart, guest reservations and tracking never need one) ·
+`/account` `/account/reservations` `/account/profile` (server-protected: valid Supabase session required) · `/info/[slug]`.
 
 ## Administration (`/fr|/ht/admin/…`, noindex)
-`/admin/sign-in` · `/admin` dashboard · `/admin/reservations` (search, status, date, sort, pagination; table → cards on mobile) ·
+**Access:** Supabase session **and** `staff: true` from the backend (`GET /api/v1/me`), checked on the server for every `/admin/**` page (deny by default; no public admin registration).
+`/admin/sign-in` · `/admin` dashboard (reservations / payments received / outstanding / collected, HTG and USD apart; quick actions) · `/admin/reservations` (search, status, date, sort, pagination; table → cards on mobile) ·
 `/admin/reservations/[ref]` (accept, reject, ready, record payment, collect, cancel, expire, notes, change pickup, history) ·
 `/admin/pickup-settings` (address, contact, hours, bilingual instructions, enable/disable, hold period, preview, history) ·
 `/admin/products` (list, filters, activate/deactivate) · `/admin/products/new` and `/admin/products/[id]` (guided form: category → basics → images →
 category attributes → optional variants → price → wholesale tiers → stock → review; save draft / publish) ·
 `/admin/categories` (+ `new`, `[slug]`: bilingual name, image, active, **attribute definitions**) ·
 `/admin/inventory` (on hand / reserved / available, add · reduce · recount with reason, movement history) ·
-`/admin/customers` (+ `[key]`; derived from reservations). "Paramètres du magasin" is listed as "Bientôt" (not built).
+`/admin/customers` (+ `[key]`; derived from reservations) · `/admin/payments` (recorded payments, filter by currency, balances still due per currency) ·
+`/admin/reports` (period + metric tables, HTG and USD columns, reservation value ≠ payments received) · `/admin/settings` (only decided settings are
+editable; everything else is shown "not configured"/"decision pending", nothing invented). **Every admin page carries a "not connected to the server" notice**
+because its data is browser-local demo data.
 
 ## Catalog, pricing and stock model
 - **Categories define attributes** (`AttributeDef`: select / text / number, required, filterable, usable as a variant axis). The product form,
@@ -60,8 +68,8 @@ category attributes → optional variants → price → wholesale tiers → stoc
 |---|---|
 | Data | Everything lives in this browser's `localStorage`: sample reservations in every status **and the catalog** (products, categories, stock movements), so what the seller edits in the admin shows in the storefront of the same browser. Admin menu → "Réinitialiser les données de démonstration" |
 | Sample catalog | 16 invented products (metal, shoes, bedding, furniture, household) with wholesale tiers, variants, a draft, an inactive one, an out-of-stock one and an untracked one. Most are priced in HTG; the sample shoes and bed linen are in USD to demonstrate mixed currencies. Prices and stock are **not real** |
-| Staff sign-in | any email starting `admin@` + any password. Any other email → "Accès refusé". Account menu → "Simuler l'expiration de la session" |
-| Customer sign-in | any valid email/password; password `wrong-password` shows the error state. Sample customer: `alex.sample@example.com` |
+| Sign-in / sign-up / recovery | **Real Supabase Auth** — no demo credentials exist any more. Without Supabase configuration every auth screen says "not configured" instead of pretending |
+| Account reservations | The account page lists browser-local sample reservations whose e-mail matches the signed-in user (demo data, labelled) until the API links reservations to customer profiles |
 | Track a reservation | sample: `ANA-PEND01` + phone `0000 0101` |
 | Notifications | Staff actions say "le client sera notifié (démonstration : aucun message n'est envoyé)" — nothing is sent |
 | Pickup address/hours/phone | **Fake sample values** ("exemple"). Replace in Admin → Lieu de retrait |
@@ -72,13 +80,19 @@ Totals are computed per currency, after validating that the lines being summed s
 (`Money` in `src/lib/money.ts`); HTG and USD both have 2 minor digits. Reservations must snapshot unit, quantity, applied unit price, currency,
 applied wholesale tier and line total (the demo does: `ReservationLine`).
 
+## Replacing the demo stores with the API
+`src/lib/api/http.ts` is the typed HTTP client (bearer token, RFC 9457 problem parsing with `code`, `Idempotency-Key`, `X-Correlation-Id`) — present
+and tested but not yet used by the data paths. Per capability: implement the endpoint in `../ana-depot-api`, then replace the body of the matching
+function in `src/lib/api/*` with a call through the client (keep signatures and error codes), drop its use of the demo store in `src/lib/stores/*`
+and remove the "not connected" notice for that module. Reservation submit, payments and stock adjustments must send an `Idempotency-Key`.
+
 ## Backend contract
 Replace bodies in `src/lib/api/*` with HTTP calls; keep signatures and error codes. `src/lib/reservations/workflow.ts` documents
 the rules the API must enforce; `customer-view.ts` is the shape customer endpoints must return (no internal notes).
 
 ## Not implemented on purpose
 Currency conversion / exchange rates (deliberately absent), price visibility rules (hiding wholesale prices behind an account), wholesale customer accounts, pack/box unit conversions, per-customer prices, delivery,
-online payment, real image storage (uploads are downscaled to data URLs in localStorage), real inventory counts per location, store settings page.
+online payment, real image storage (uploads are downscaled to data URLs in localStorage), real inventory counts per location, server-backed admin data (see "Replacing the demo stores"), customer-profile linking of reservations, registered-vs-guest customer distinction, audit-history screens (need the API), staff roles/permissions (undecided).
 
 ## Decisions needed from the business owner
 _Resolved: the currencies are **HTG and USD** (confirmed). A conversion between them is **not** planned: if ever wanted, it needs an explicitly configured conversion policy kept separate from the original product price._
@@ -98,7 +112,7 @@ _Resolved: the currencies are **HTG and USD** (confirmed). A conversion between 
 13. **Haitian Creole**: have a native speaker review every `ht` string (written carefully, not reviewed) — including the new currency wording ("monnen", "to chanj").
 
 ## Remaining work
-Real APIs (catalog, inventory, reservations) and Supabase-backed auth (customer + staff) with server-side authorization — the API must
+Real APIs (catalog, inventory, reservations) with server-side authorization on `/api/v1/admin/**` — the API must
 re-check price tiers, stock and reservation rules (the frontend only demonstrates them) · real notifications · real image storage ·
 store settings · additional countries/currencies/payment methods (MonCash, NatCash) · SEO (sitemap, structured data) ·
 E2E tests in CI · cache strategy (`use cache`) once data is remote.
