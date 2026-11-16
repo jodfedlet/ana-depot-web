@@ -16,6 +16,8 @@ export const admin: typeof frAdmin = {
     categories: "Kategori",
     inventory: "Envantè",
     customers: "Kliyan",
+    payments: "Peman",
+    reports: "Rapò",
     pickupSettings: "Kote pou pran pwodwi",
     storeSettings: "Paramèt magazen an",
     soon: "Talè konsa",

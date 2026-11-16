@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, MapPin } from "lucide-react";
+import { AlertTriangle, Boxes, MapPin, PackagePlus, Tags, Users, ClipboardList } from "lucide-react";
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import { useReservations } from "@/lib/stores/reservation-store";
 import { useCatalogState } from "@/lib/stores/catalog-store";
 import { stockOf, stockState } from "@/lib/catalog/stock";
 import { recentActivity } from "@/lib/activity";
+import { collectedValue, openValue, outstandingAtPickup, paymentsReceived } from "@/lib/reports/finance";
 import { pick } from "@/lib/localized";
 import { useLocale } from "@/i18n/provider";
 import { cn } from "@/lib/cn";
@@ -65,6 +66,40 @@ export function Dashboard() {
                 <p className="text-caption text-ink-soft group-hover:text-ink">{t(`status.${s}`)}</p>
                 <p className="mt-1 font-display text-3xl tabular-nums">{counts[s]}</p>
               </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section aria-labelledby="quick-title">
+        <h2 id="quick-title" className="text-h3 mb-3">{t("admin.dashboardOps.quickTitle")}</h2>
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          {([
+            { href: "/admin/products/new", icon: PackagePlus, label: t("admin.dashboardOps.createProduct") },
+            { href: "/admin/inventory", icon: Boxes, label: t("admin.dashboardOps.adjustInventory") },
+            { href: "/admin/reservations?status=pending_review", icon: ClipboardList, label: t("admin.dashboardOps.reviewPending") },
+            { href: "/admin/categories", icon: Tags, label: t("admin.dashboardOps.manageCategories") },
+            { href: "/admin/customers", icon: Users, label: t("admin.dashboardOps.viewCustomers") },
+          ]).map(({ href, icon: Icon, label }) => (
+            <li key={href}><Link href={href} className="text-label flex min-h-14 items-center gap-3 rounded-card border border-line bg-surface px-4 py-3 font-semibold hover:border-line-strong"><Icon aria-hidden className="size-5 shrink-0 text-brand-700" />{label}</Link></li>
+          ))}
+        </ul>
+      </section>
+
+      <section aria-labelledby="money-title">
+        <h2 id="money-title" className="text-h3">{t("admin.dashboardOps.moneyTitle")}</h2>
+        <p className="text-caption mt-1 text-ink-soft">{t("admin.dashboardOps.moneyNote")}</p>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {([
+            { key: "open", title: t("admin.dashboardOps.openValue"), note: t("admin.dashboardOps.openValueNote"), figure: openValue(all) },
+            { key: "received", title: t("admin.dashboardOps.received"), note: t("admin.dashboardOps.receivedNote"), figure: paymentsReceived(all) },
+            { key: "outstanding", title: t("admin.dashboardOps.outstanding"), note: t("admin.dashboardOps.outstandingNote"), figure: outstandingAtPickup(all) },
+            { key: "collected", title: t("admin.dashboardOps.collected"), note: t("admin.dashboardOps.collectedNote"), figure: collectedValue(all) },
+          ]).map((m) => (
+            <li key={m.key} className="rounded-card border border-line bg-surface p-4">
+              <p className="text-caption font-medium text-ink-soft">{m.title}</p>
+              <div className="mt-2 min-h-12 text-lg">{m.figure.length === 0 ? <span className="text-ink-muted">{t("admin.dashboardOps.none")}</span> : <MoneyTotals totals={m.figure} align="start" />}</div>
+              <p className="text-caption mt-2 text-ink-muted">{m.note}</p>
             </li>
           ))}
         </ul>

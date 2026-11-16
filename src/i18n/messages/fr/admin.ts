@@ -13,6 +13,8 @@ export const admin = {
     categories: "Catégories",
     inventory: "Inventaire",
     customers: "Clients",
+    payments: "Paiements",
+    reports: "Rapports",
     pickupSettings: "Lieu de retrait",
     storeSettings: "Paramètres du magasin",
     soon: "Bientôt",
