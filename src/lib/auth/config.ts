@@ -23,5 +23,6 @@ export function readSupabaseConfig(env: { url?: string; anonKey?: string }): Sup
 
 /** Null when authentication is not configured: screens then say so instead of pretending to work. */
 export function getSupabaseConfig(): SupabaseConfig | null {
-  return readSupabaseConfig({ url: process.env.NEXT_PUBLIC_SUPABASE_URL, anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY });
+  // The project may use the legacy "anon" key or the newer "publishable" key: both are public. Either variable name works (publishable wins).
+  return readSupabaseConfig({ url: process.env.NEXT_PUBLIC_SUPABASE_URL, anonKey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY });
 }

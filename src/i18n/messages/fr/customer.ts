@@ -275,8 +275,9 @@ export const customer = {
     },
     verify: {
       title: "Vérifiez votre e-mail",
-      sendText: "Nous avons envoyé un lien de vérification à {email}. Ouvrez-le pour activer votre compte.",
-      sendTextNoEmail: "Nous vous avons envoyé un lien de vérification. Ouvrez-le pour activer votre compte.",
+      sendText: "Si cette adresse peut être utilisée pour créer un compte, un message de vérification vient d'être envoyé à {email}. Ouvrez le lien qu'il contient pour activer votre compte.",
+      sendTextNoEmail: "Si cette adresse peut être utilisée pour créer un compte, un message de vérification a été envoyé. Ouvrez le lien qu'il contient pour activer votre compte.",
+      alreadyHaveAccount: "Vous avez déjà un compte ? Connectez-vous, ou réinitialisez votre mot de passe si vous l'avez oublié.",
       resend: "Renvoyer l'e-mail",
       requested: "Un nouvel e-mail de vérification a été envoyé.",
       failed: "Impossible de renvoyer l'e-mail pour le moment.",
@@ -292,7 +293,6 @@ export const customer = {
     errors: {
       invalid_credentials: "L'e-mail ou le mot de passe est incorrect.",
       email_not_confirmed: "Votre adresse e-mail n'est pas encore vérifiée. Ouvrez le lien reçu par e-mail ou demandez-en un nouveau.",
-      already_registered: "Un compte existe déjà avec cette adresse e-mail. Connectez-vous ou réinitialisez votre mot de passe.",
       weak_password: "Ce mot de passe est trop faible. Choisissez-en un plus long et moins courant.",
       same_password: "Le nouveau mot de passe doit être différent de l'ancien.",
       rate_limited: "Trop de tentatives. Patientez quelques minutes avant de réessayer.",

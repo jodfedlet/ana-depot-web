@@ -12,10 +12,12 @@ import { createServerSupabase } from "@/lib/auth/supabase-server";
 export async function GET(request: NextRequest, { params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!isLocale(locale)) return new NextResponse(null, { status: 404 });
-  const { searchParams, origin } = request.nextUrl;
+  const { searchParams } = request.nextUrl;
   const next = safeNextPath(searchParams.get("next"), "/account");
   const failure = next.startsWith("/reset-password") ? "/reset-password?status=expired" : "/verify-email?status=error";
-  const go = (path: string) => NextResponse.redirect(`${origin}/${locale}${path}`);
+  // RELATIVE redirect on purpose: `request.nextUrl.origin` is the server's own hostname (e.g. "localhost" under `next start`), which can differ from
+  // the host the browser used ("127.0.0.1", a proxy, a custom domain). Redirecting to another host would drop the session cookie set just above.
+  const go = (path: string) => new NextResponse(null, { status: 307, headers: { Location: `/${locale}${path}` } });
 
   const supabase = await createServerSupabase();
   if (!supabase) return go(failure);

@@ -36,7 +36,7 @@ export function nextFromLocation(fallback = "/account"): string {
 function NotConfigured() {
   const t = useT();
   if (getSupabaseConfig()) return null;
-  return <Alert tone="danger" title={t("auth.errors.not_configured")} className="mb-5">{t("auth.errors.not_configured")}</Alert>;
+  return <Alert tone="danger" className="mb-5">{t("auth.errors.not_configured")}</Alert>;
 }
 
 /** The message for an auth failure code. */
@@ -151,7 +151,6 @@ export function RegisterForm() {
         {formError && (
           <Alert tone="danger" live="assertive" title={t("auth.register.errorTitle")}>
             {authError(formError)}
-            {formError === "already_registered" && <span className="mt-2 block"><Link href="/sign-in" className={linkCls}>{t("auth.signIn.title")}</Link> · <Link href="/forgot-password" className={linkCls}>{t("auth.signIn.forgot")}</Link></span>}
           </Alert>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -327,6 +326,7 @@ export function VerifyEmailView({ email: knownEmail, status }: { email?: string;
       <div className="text-center">
         <MailCheck aria-hidden className="mx-auto size-10 text-brand-700" />
         <p className="text-body mt-4">{knownEmail ? t("auth.verify.sendText", { email: knownEmail }) : t("auth.verify.sendTextNoEmail")}</p>
+        <p className="text-caption mt-2 text-ink-soft">{t("auth.verify.alreadyHaveAccount")}</p>
       </div>
       {emailField}
       <div className="text-center">

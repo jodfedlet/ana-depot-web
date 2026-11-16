@@ -5,7 +5,6 @@
 export type AuthErrorCode =
   | "invalid_credentials"
   | "email_not_confirmed"
-  | "already_registered"
   | "weak_password"
   | "same_password"
   | "rate_limited"
@@ -25,8 +24,7 @@ interface ErrorLike {
 const BY_CODE: Record<string, AuthErrorCode> = {
   invalid_credentials: "invalid_credentials",
   email_not_confirmed: "email_not_confirmed",
-  user_already_exists: "already_registered",
-  email_exists: "already_registered",
+  // user_already_exists / email_exists are deliberately NOT mapped: sign-up treats them as success (no account-existence disclosure)
   weak_password: "weak_password",
   same_password: "same_password",
   over_request_rate_limit: "rate_limited",
@@ -54,7 +52,6 @@ export function mapAuthError(error: unknown): AuthErrorCode {
   const message = typeof e.message === "string" ? e.message.toLowerCase() : "";
   if (message.includes("invalid login credentials")) return "invalid_credentials";
   if (message.includes("email not confirmed")) return "email_not_confirmed";
-  if (message.includes("already registered")) return "already_registered";
   if (message.includes("failed to fetch") || message.includes("network")) return "network";
   return "unknown";
 }

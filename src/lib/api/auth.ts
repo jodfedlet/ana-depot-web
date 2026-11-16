@@ -30,7 +30,7 @@ export function createAuthApi(getClient: () => SupabaseClient | null, getOrigin:
         return error ? { ok: false, error: mapAuthError(error) } : { ok: true, data: undefined };
       }),
 
-    /** Creates the account and sends the verification e-mail. `needsVerification` is false only if the project does not require it. */
+    /** Creates the account and sends the verification e-mail (if the address is new). `needsVerification` is false only if the project does not require it. */
     register: (input: { firstName: string; lastName: string; email: string; password: string; locale: Locale }) =>
       run<{ needsVerification: boolean }>(async (c) => {
         const { data, error } = await c.auth.signUp({
@@ -41,9 +41,15 @@ export function createAuthApi(getClient: () => SupabaseClient | null, getOrigin:
             data: { first_name: input.firstName.trim(), last_name: input.lastName.trim(), locale: input.locale },
           },
         });
-        if (error) return { ok: false, error: mapAuthError(error) };
-        // With e-mail confirmation on, Supabase answers an already-registered address with a user that has no identities.
-        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return { ok: false, error: "already_registered" };
+        // PRIVACY: an already-registered address must look exactly like a new one. Supabase may answer it with 422 `user_already_exists`
+        // (measured on GoTrue v2.184 with confirmations on, for CONFIRMED accounts) or with a user that has no identities (older/obfuscated
+        // behavior); both are shown as the same "check your e-mail" screen. Our UI never says whether an account exists.
+        if (error) {
+          const code = (error as { code?: unknown }).code;
+          if (code === "user_already_exists" || code === "email_exists") return { ok: true, data: { needsVerification: true } };
+          return { ok: false, error: mapAuthError(error) };
+        }
+        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return { ok: true, data: { needsVerification: true } };
         return { ok: true, data: { needsVerification: !data.session } };
       }),
 

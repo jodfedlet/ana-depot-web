@@ -51,7 +51,7 @@ export function AdminSignIn({ status }: { status?: "expired" | "signed_out" }) {
         <div className="rounded-card border border-line bg-surface p-6 sm:p-8">
           <h1 className="text-h1">{t("admin.signIn.title")}</h1>
           <p className="text-body mt-1 text-ink-soft">{t("admin.signIn.subtitle")}</p>
-          {!getSupabaseConfig() && <Alert tone="danger" className="mt-5" title={t("auth.errors.not_configured")}>{t("auth.errors.not_configured")}</Alert>}
+          {!getSupabaseConfig() && <Alert tone="danger" className="mt-5">{t("auth.errors.not_configured")}</Alert>}
           {status === "expired" && <Alert tone="info" className="mt-5">{t("auth.sessionExpired")}</Alert>}
           {status === "signed_out" && <Alert tone="success" live="polite" className="mt-5">{t("auth.signedOut")}</Alert>}
           <form ref={formRef} onSubmit={submit} noValidate className="mt-6 space-y-5">

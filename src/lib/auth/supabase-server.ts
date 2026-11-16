@@ -1,6 +1,8 @@
 import "server-only";
+import { serverApiBaseUrl } from "@/lib/api/base-url";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { cache } from "react";
 import { type AdminAccess, resolveAdminAccess } from "./admin-access";
 import { getSupabaseConfig } from "./config";
@@ -31,6 +33,9 @@ export async function createServerSupabase() {
  * unverified cookie contents.
  */
 export const getVerifiedUser = cache(async () => {
+  // Session reads are per-request by nature: opt out of (runtime) prerendering before touching the auth client,
+  // whose session initialisation uses the current time.
+  await connection();
   const supabase = await createServerSupabase();
   if (!supabase) return null;
   const { data, error } = await supabase.auth.getUser();
@@ -40,11 +45,14 @@ export const getVerifiedUser = cache(async () => {
 
 /** Admin access for this request (cached per request). Server-side and default-deny; see `resolveAdminAccess`. */
 export const getAdminAccess = cache(async (): Promise<AdminAccess> => {
+  await connection();
   const supabase = await createServerSupabase();
+  const store = await cookies();
   return resolveAdminAccess({
     configured: supabase !== null,
     getVerifiedUser,
+    hadSession: () => store.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token")),
     getAccessToken: async () => (supabase ? ((await supabase.auth.getSession()).data.session?.access_token ?? null) : null),
-    fetchMe: (accessToken) => fetchMe({ apiBaseUrl: process.env.API_BASE_URL, accessToken }),
+    fetchMe: (accessToken) => fetchMe({ apiBaseUrl: serverApiBaseUrl(), accessToken }),
   });
 });

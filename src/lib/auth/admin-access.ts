@@ -13,6 +13,8 @@ export interface AccessDeps {
   configured: boolean;
   /** Verified identity from the auth provider (token validated by Supabase), or null. */
   getVerifiedUser: () => Promise<{ id: string; email: string } | null>;
+  /** True when the request carries an auth cookie at all (so a failed verification means "expired", not "never signed in"). */
+  hadSession?: () => boolean;
   getAccessToken: () => Promise<string | null>;
   fetchMe: (accessToken: string) => Promise<MeResult>;
 }
@@ -25,7 +27,7 @@ export interface AccessDeps {
 export async function resolveAdminAccess(deps: AccessDeps): Promise<AdminAccess> {
   if (!deps.configured) return { state: "not_configured" };
   const user = await deps.getVerifiedUser();
-  if (!user) return { state: "unauthenticated" };
+  if (!user) return deps.hadSession?.() ? { state: "session_invalid" } : { state: "unauthenticated" };
   const token = await deps.getAccessToken();
   if (!token) return { state: "session_invalid" };
   const result = await deps.fetchMe(token);

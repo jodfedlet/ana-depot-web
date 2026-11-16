@@ -17,7 +17,6 @@ import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/cn";
 import { type Reservation, reservationItemCount } from "@/lib/reservations/types";
 import { useProfile } from "@/lib/stores/account-store";
-import { useIsClient } from "@/lib/stores/create-persisted-store";
 import { useReservations } from "@/lib/stores/reservation-store";
 import { useSession } from "@/lib/auth/use-session";
 import { focusFirstInvalid, isBlank, isValidPhone } from "@/lib/validation";

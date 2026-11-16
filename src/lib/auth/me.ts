@@ -1,5 +1,5 @@
 /**
- * The backend's answer to "who is this token?": `GET {API_BASE_URL}/api/v1/me`.
+ * The backend's answer to "who is this token?": `GET {API base URL}/api/v1/me` (see lib/api/base-url.ts).
  * Authentication (Supabase Auth) says WHO someone is; this says what Ana Dépôt lets them do. `staff` is true only for
  * members provisioned in the backend (never derived from user-editable metadata). `permissions` is opaque on purpose:
  * the role model is an open business decision, so the frontend only ever asks the questions in `authorization.ts`.

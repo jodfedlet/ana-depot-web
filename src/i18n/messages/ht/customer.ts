@@ -278,8 +278,9 @@ export const customer: typeof frCustomer = {
     },
     verify: {
       title: "Verifye imèl ou",
-      sendText: "Nou voye yon lyen verifikasyon bay {email}. Louvri l pou w aktive kont ou.",
-      sendTextNoEmail: "Nou voye yon lyen verifikasyon ban ou. Louvri l pou w aktive kont ou.",
+      sendText: "Si adrès sa a ka sèvi pou kreye yon kont, nou fenk voye yon mesaj verifikasyon bay {email}. Louvri lyen ki ladan l pou w aktive kont ou.",
+      sendTextNoEmail: "Si adrès sa a ka sèvi pou kreye yon kont, nou voye yon mesaj verifikasyon. Louvri lyen ki ladan l pou w aktive kont ou.",
+      alreadyHaveAccount: "Ou gen yon kont deja? Konekte, oswa chanje modpas ou si w bliye l.",
       resend: "Voye imèl la ankò",
       requested: "Nou voye yon nouvo imèl verifikasyon.",
       failed: "Pa ka voye imèl la ankò pou kounye a.",
@@ -295,7 +296,6 @@ export const customer: typeof frCustomer = {
     errors: {
       invalid_credentials: "Imèl la oswa modpas la pa bon.",
       email_not_confirmed: "Adrès imèl ou poko verifye. Louvri lyen ou te resevwa pa imèl la oswa mande yon nouvo.",
-      already_registered: "Gen yon kont deja ak adrès imèl sa a. Konekte oswa chanje modpas ou.",
       weak_password: "Modpas sa a two fèb. Chwazi yon modpas ki pi long epi ki pa two komen.",
       same_password: "Nouvo modpas la dwe diferan de ansyen an.",
       rate_limited: "Twòp tantativ. Tann kèk minit anvan w eseye ankò.",

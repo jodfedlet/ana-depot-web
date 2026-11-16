@@ -1,0 +1,115 @@
+# Authentication & authorization (ana-depot-web)
+
+Ana Dépôt uses **Supabase Auth** as its identity provider. The old demonstration sign-in (any password created a local
+session, `admin@…` meant "staff", `wrong-password` showed an error) has been **removed**. What is real and what is not:
+
+| | Status |
+|---|---|
+| Customer sign-up, e-mail verification, sign-in, sign-out, password recovery/reset, session persistence/refresh | **Real** (Supabase Auth through `@supabase/supabase-js` + `@supabase/ssr`) |
+| Protected customer account pages (`/account/**`) | **Real** (server-side session check) |
+| Staff sign-in and admin protection (`/admin/**`) | **Real** (Supabase session **and** backend `staff: true`, checked on the server) |
+| Backend JWT validation, `GET /api/v1/me`, staff provisioning | Implemented in `../ana-depot-api` — see `../ana-depot-api/docs/auth.md` |
+| Admin **data** (products, stock, reservations, payments, pickup settings) | **Demo**: browser `localStorage`, labelled "not connected to the server" |
+| Linking account ↔ reservations | **Demo**: the account page lists browser-local sample reservations whose e-mail matches |
+
+## Concepts (keep them apart)
+1. **Supabase user identity** — who signed in (`auth.users`). Created by sign-up; e-mail verified by Supabase.
+2. **Ana Dépôt customer profile** — optional business record linked to that identity (`customerProfileId` in `/me`), owned by the backend.
+3. **Staff membership** — a backend record (`staff_members`) created by a trusted administrative process, **never** by registration and never from `user_metadata`.
+4. **Store permissions** — what a staff member may do. The role model/permission matrix is an **open business decision**; the frontend only asks
+   `canAccessAdmin(me)` (`src/lib/auth/authorization.ts`) and carries `permissions` opaquely for later.
+
+Registering an account never makes anyone staff. An authenticated customer opening `/admin` gets "access denied".
+
+## Configuration
+Copy `.env.example` to `.env.local`:
+
+| Variable | Where | Meaning |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | browser + server | Project URL (`https://<ref>.supabase.co`, or `http://127.0.0.1:54321` for the local CLI) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` **or** `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser + server | The project's **public** key. Use whichever name your project uses; the publishable one wins if both are set |
+| `NEXT_PUBLIC_API_BASE_URL` | browser + server | Public base URL of the Spring Boot API (the typed client in `src/lib/api/client.ts` calls it from the browser) |
+| `API_BASE_URL` | server only (optional) | Server-side override (e.g. an internal address). Server Components call `GET /api/v1/me` with the user's bearer token at `API_BASE_URL`, falling back to `NEXT_PUBLIC_API_BASE_URL` |
+
+Which calls are made from where: **browser -> Supabase Auth** (sign-in/up, recovery, refresh) and, once screens are connected, **browser -> API** through `browserApiClient()`
+(bearer token read from the current Supabase session on every call; never logged). **Server (Next) -> API**: only `GET /api/v1/me` for the admin gate and the account gate.
+`NEXT_PUBLIC_*` values are inlined at **build** time: change them and rebuild.
+
+The **service-role key is not used by this app** and must never be added to the web project or exposed to the browser. Never commit real values
+(`.env*` is git-ignored; only `.env.example` with placeholders is tracked). If the two Supabase variables are missing, every auth screen
+says "not configured" and `/admin` is denied — nothing pretends to work.
+
+### Supabase project settings (dashboard → Authentication)
+- **Email provider** enabled with **Confirm email** ON (the UI assumes verification is required; if it is off, sign-up signs the user in directly and the UI handles that).
+- **E-mail templates** (Authentication -> Emails): use the **server-side token_hash links**, not the default links. Confirm signup:
+  `<a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=signup">...</a>`; Reset password: same with `type=recovery`. `{{ .RedirectTo }}` is the
+  `/{locale}/auth/callback?next=...` URL this app sends. Reference templates (fr/ht, selected by `{{ .Data.locale }}`) are in `../ana-depot-api/dev/supabase/templates/`.
+  **Why:** the default confirmation link of a *resent* verification e-mail uses the implicit flow (tokens in the URL fragment, which a server route cannot read) so the person
+  sees "invalid link" although the address was verified; token_hash links work for sign-up, resend and recovery, and in any browser/device (no PKCE verifier cookie needed).
+- **Site URL** = the deployed origin; **Redirect URLs** must include `https://<origin>/fr/auth/callback`, `https://<origin>/ht/auth/callback` (and `http://localhost:3000/...` for dev).
+- Auth e-mails use PKCE links that return to `/{locale}/auth/callback?code=…&next=…`. Open the link in the **same browser** that requested it
+  (the PKCE verifier is stored in a cookie); otherwise the screen says the link is invalid/expired and offers a resend.
+- Consider password strength policy and CAPTCHA in the dashboard; the app maps `weak_password`, `over_*_rate_limit`, `invalid_credentials`,
+  `email_not_confirmed`, `user_already_exists` to translated messages.
+
+### Local development with the Supabase CLI
+A ready local stack (real GoTrue, ES256 signing keys, Mailpit, templates above) lives in `../ana-depot-api/dev/supabase`; start/stop/reset and findings are in
+`../ana-depot-api/docs/local-supabase.md`. Put its API URL and publishable key in `.env.local` together with `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8080`.
+
+## How sessions work
+- `@supabase/ssr` stores the session in **cookies** (chunked), not in `localStorage`; no password is ever stored by this app.
+- `src/proxy.ts` keeps the locale redirect **and** refreshes the session for visitors that have an auth cookie (`getClaims()` verifies the token and rotates it
+  when needed). It is **not** an authorization layer.
+- Server Components use `createServerSupabase()` + `getUser()` (token verified by Supabase) — never the unverified cookie contents.
+- The browser mirror (`src/lib/auth/auth-store.ts`, `useSession()`) starts as `loading` and becomes `signed_in` only after `getUser()` succeeds; it follows
+  `onAuthStateChange` (sign-out in another tab, revoked/expired session ⇒ `signed_out`; the admin shell then returns to sign-in with an "expired" notice).
+
+## Admin protection (server-side, deny by default)
+`app/[locale]/admin/(app)/layout.tsx` → `AdminGate` (`features/admin/admin-gate.tsx`) runs **before any admin UI renders** (inside `<Suspense>` because it reads cookies):
+
+| Situation | Result |
+|---|---|
+| Auth not configured | "Connection not configured" page |
+| No session | redirect to `/admin/sign-in` |
+| Invalid/expired session, or backend answers 401, or `/me` describes another user | redirect to `/admin/sign-in?status=expired` |
+| Signed in, `staff: false` | "Access denied" page (no admin markup or data) |
+| Backend unreachable / malformed answer | "Cannot verify your permissions": **denied** |
+| Signed in, `staff: true` | admin shell renders |
+
+Caveat: layouts do not re-run on client-side navigations, and admin pages currently read local demo data. The real protection for data is the backend, which
+authorizes every `/api/v1/admin/**` request from the bearer token; the gate decides what the first render shows. Hiding links is never the mechanism.
+
+## Provisioning the first administrator
+There is **no** UI or public endpoint for it, by design, and no hard-coded credentials. The process (details in `../ana-depot-api/docs/auth.md`): the owner
+creates (or invites) the user in Supabase Auth, then a trusted operator inserts that user's Supabase `sub` into the backend's `staff_members` table using the documented
+one-off administrative procedure. Until that row exists the user is just a customer.
+
+## Customer UX covered (French + Haitian Creole)
+Sign-in, registration, verification pending/success/failure with resend, password recovery and reset (incl. expired link), expired session, invalid credentials,
+account already registered, weak password, rate limiting, network errors, "not configured", sign-out confirmation, unauthorized admin access.
+Guests are never asked to register: browsing, cart, guest reservation and tracking (reference + phone) are untouched.
+
+## Security decisions
+- No custom password/session code; Supabase owns credentials and refresh-token rotation.
+- Signed-in state is shown only after Supabase confirms; failures are returned as codes and translated, never as simulated success.
+- Open-redirect protection on `?next=` (`safeNextPath`) and in the callback route. The callback redirects with a **relative** `Location`: `request.nextUrl.origin` is the
+  server's own hostname (`localhost` under `next start`), and redirecting to another host than the browser used drops the session cookie (found against the real stack).
+- `user_metadata` (first name) is used for **display only**; it is user-editable and never used for authorization.
+- **Account enumeration (privacy).** Our screens never say whether an address has an account: sign-up shows the same "if this address can be used, a message was sent" screen for new and
+  existing addresses (`user_already_exists`/`email_exists`/no-identities are all treated as success); sign-in answers wrong password and unknown address with the same message;
+  recovery and resend always show the same neutral confirmation. **What remains observable, measured on GoTrue v2.184 (confirmations on):** the provider API itself, called directly with the
+  public key, answers `POST /auth/v1/signup` for a **confirmed** account with `422 user_already_exists` (not obfuscated), and sign-in/recovery responses differ in timing (known account
+  ~330 ms/~100 ms vs unknown ~40 ms/~30 ms). Hiding it in the UI does not close that; closing it needs sign-up to go through a server we control (disable public sign-up in Supabase and
+  create users from the backend after rate limiting/CAPTCHA) - a product decision, not implemented.
+- Sign-out uses `scope: "local"` (this browser). A "sign out everywhere" action is a possible later addition.
+- Staff access is deny-by-default and fails closed when the backend cannot be reached.
+
+## Tests
+- **REAL local-stack suite** (`npm run e2e:real`, `e2e/real-supabase/run.mjs`): drives the built app against a LOCAL Supabase stack (real GoTrue + Mailpit) and the real Spring Boot API: registration, verification
+  link read from the mail catcher, unverified sign-in rejection, resend, sign-in, persistence across reload, cookie session (no token in localStorage), revoked session, sign-out, wrong password, forgot/reset
+  (old password rejected, used link rejected), already-registered privacy, admin gating with a real customer vs a real staff member vs anonymous, guest pages. Requires the env listed in the file header.
+  It is **not** a hosted-Supabase test.
+- Unit tests use a **mocked** Supabase client and mocked `fetch` (`src/lib/auth/auth.test.ts`, `src/lib/api/http.test.ts`): they prove our logic (error mapping, access
+  decisions, request shapes, store transitions). They **do not** prove a real Supabase project accepts the calls.
+- Stub-based browser checks (Playwright, run from the harness, not part of the repo) use a local **stub** of the Supabase Auth endpoints and of `/api/v1/me` living only in the test harness
+  (never in app code): they cover route protection and the visible flows without any infrastructure. **They are mocks**; the real-stack suite above is what proves behavior against real GoTrue.
