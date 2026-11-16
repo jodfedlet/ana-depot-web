@@ -64,15 +64,14 @@ const uniq = () => `e2e-${Date.now()}-${Math.floor(Math.random() * 1e4)}@example
 const PW = "Str0ng-pass-1", PW2 = "N3w-strong-pass-2";
 
 async function register(page, email, loc = "fr") {
-  await page.goto(`${WEB}/${loc}/register`); await page.waitForLoadState("networkidle");
-  await page.getByLabel("Prénom").fill("Real"); await page.getByLabel("Nom", { exact: true }).fill("Utilisateur");
+  await page.goto(`${WEB}/${loc}/auth/sign-up`); await page.waitForLoadState("networkidle");
   await page.getByLabel("E-mail").fill(email); await page.getByLabel("Mot de passe", { exact: true }).fill(PW); await page.getByLabel("Confirmer le mot de passe").fill(PW);
   await page.getByRole("button", { name: "Créer le compte" }).click();
 }
 async function signIn(page, email, pw, loc = "fr") {
-  await page.goto(`${WEB}/${loc}/sign-in`); await page.waitForLoadState("networkidle");
+  await page.goto(`${WEB}/${loc}/auth/login`); await page.waitForLoadState("networkidle");
   await page.getByLabel("E-mail").fill(email); await page.getByLabel("Mot de passe", { exact: true }).fill(pw);
-  await page.getByRole("button", { name: "Se connecter", exact: true }).last().click();
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
 }
 
 const email = uniq();
@@ -82,11 +81,11 @@ let sinceMail = Date.now() - 2000;
 await run("registration", async () => {
   const { ctx, page } = await newPage();
   await register(page, email);
-  await page.waitForURL(/verify-email/, { timeout: 20000 });
+  await page.waitForURL(/auth\/sign-up-success/, { timeout: 20000 });
   const t = await text(page);
   check("REAL: registration lands on the verification-pending screen", /Vérifiez votre e-mail/.test(t));
   check("REAL: pending copy does not claim an account exists/was created for this address", /Si cette adresse peut être utilisée/.test(t) && !/existe déjà|already/i.test(t));
-  const m = await mailFor(email, "Confirm", sinceMail);
+  const m = await mailFor(email, "Confirmation", sinceMail);
   check("REAL: Supabase sent a verification e-mail (read from Mailpit)", !!m, m?.Subject);
 
   // unverified sign-in
@@ -95,7 +94,7 @@ await run("registration", async () => {
   await b.page.getByText("pas encore vérifiée").waitFor({ timeout: 15000 });
   check("REAL: sign-in before verification is rejected with the translated 'not verified' message", true);
   await b.page.getByRole("button", { name: "Renvoyer l'e-mail de vérification" }).click();
-  await b.page.getByText("Un nouvel e-mail de vérification a été envoyé.").waitFor({ timeout: 15000 });
+  await b.page.getByText("il vient d'être renvoyé").first().waitFor({ timeout: 15000 });
   check("REAL: resend verification shows success", true);
   await sleep(1500);
   await b.ctx.close();
@@ -112,7 +111,7 @@ await run("registration", async () => {
   const latest = mails.messages.filter((x) => x.To.some((a) => a.Address === email)).sort((a, c) => new Date(c.Created) - new Date(a.Created))[0];
   const link = linkOf(await (await fetch(`${MAIL}/api/v1/message/${latest.ID}`)).json());
   await page.goto(link); await page.waitForLoadState("networkidle");
-  check("REAL: verification link (same browser) ends on a signed-in / verified screen", /\/fr\/(verify-email|account)/.test(page.url()), page.url());
+  check("REAL: verification link (token_hash, resent mail) ends on a signed-in / verified screen", /\/fr\/account/.test(page.url()), page.url());
   await ctx.close();
 });
 
@@ -123,7 +122,7 @@ await run("session", async () => {
   await page.waitForURL(/\/fr\/account/, { timeout: 20000 });
   check("REAL: sign-in with the real account reaches /fr/account", true);
   await page.reload(); await page.waitForLoadState("networkidle");
-  check("REAL: session persists across a reload (cookie session)", /\/fr\/account/.test(page.url()) && !/Se connecter\b.*Mot de passe/s.test(await text(page).then((t) => t.slice(0, 400))));
+  check("REAL: session persists across a reload (cookie session)", /\/fr\/account/.test(page.url()) && (await page.getByLabel("Mot de passe", { exact: true }).count()) === 0);
   const cookies = await ctx.cookies();
   const authCookies = cookies.filter((c) => /^sb-.*-auth-token/.test(c.name));
   check("REAL: the session lives in cookies (not a password): sb-*-auth-token present", authCookies.length > 0, authCookies.map((c) => c.name).join(","));
@@ -136,19 +135,45 @@ await run("session", async () => {
   const out = await fetch(`${SB}/auth/v1/logout?scope=global`, { method: "POST", headers: { apikey: KEY, Authorization: `Bearer ${tok}` } });
   check("REAL: Supabase revoked the session (global logout)", out.status === 204, out.status);
   await page.goto(`${WEB}/fr/account`); await page.waitForLoadState("networkidle");
-  check("REAL: a revoked session can no longer open /fr/account (redirected to sign-in)", /\/fr\/sign-in/.test(page.url()), page.url());
+  check("REAL: a revoked session can no longer open /fr/account (redirected to /fr/auth/login)", /\/fr\/auth\/login/.test(page.url()), page.url());
   await ctx.close();
 
   const c2 = await newPage(); await signIn(c2.page, email, PW); await c2.page.waitForURL(/\/fr\/account/);
   await c2.page.getByRole("button", { name: "Se déconnecter" }).first().click();
-  await c2.page.waitForURL(/sign-in/, { timeout: 15000 });
+  await c2.page.waitForURL(/auth\/login/, { timeout: 15000 });
   check("REAL: sign-out returns to sign-in with the confirmation", /Vous êtes déconnecté/.test(await text(c2.page)));
   await c2.page.goto(`${WEB}/fr/account`); await c2.page.waitForLoadState("networkidle");
-  check("REAL: after sign-out the account page is protected", /\/fr\/sign-in/.test(c2.page.url()));
+  check("REAL: after sign-out the account page is protected", /\/fr\/auth\/login/.test(c2.page.url()));
   await c2.ctx.close();
   const anon = await newPage(); await anon.page.goto(`${WEB}/fr/account/profile`); await anon.page.waitForLoadState("networkidle");
-  check("REAL: anonymous visitor on a protected account page is sent to sign-in", /sign-in/.test(anon.page.url()));
+  check("REAL: anonymous visitor on a protected account page is sent to sign-in", /auth\/login/.test(anon.page.url()));
   await anon.ctx.close();
+});
+
+// ---------------- 2b. session refresh (expired access token + valid refresh token) ----------------
+await run("refresh", async () => {
+  const { ctx, page } = await newPage();
+  await signIn(page, email, PW); await page.waitForURL(/\/fr\/account/, { timeout: 20000 });
+  const readSession = async () => {
+    const cs = (await ctx.cookies()).filter((c) => /^sb-.*-auth-token/.test(c.name)).sort((a, b) => a.name.localeCompare(b.name));
+    const raw = decodeURIComponent(cs.map((c) => c.value).join(""));
+    return { cs, session: JSON.parse(raw.startsWith("base64-") ? Buffer.from(raw.slice(7), "base64").toString() : raw) };
+  };
+  const before = await readSession();
+  // make the app believe the access token has expired (the refresh token stays valid at Supabase)
+  const aged = { ...before.session, expires_at: Math.floor(Date.now() / 1000) - 120 };
+  const enc = "base64-" + Buffer.from(JSON.stringify(aged)).toString("base64url");
+  await ctx.clearCookies();
+  await ctx.addCookies([{ name: before.cs[0].name.replace(/\.\d+$/, ""), value: encodeURIComponent(enc), domain: "127.0.0.1", path: "/", sameSite: "Lax" }]);
+  const r = await page.goto(`${WEB}/fr/account`); await page.waitForLoadState("networkidle");
+  check("REAL: an expired access token with a valid refresh token still opens /fr/account (proxy refreshes the session)", /\/fr\/account/.test(page.url()) && r.status() === 200, page.url());
+  const after = await readSession();
+  check("REAL: Supabase issued a NEW access and refresh token (cookie rotated)", after.session.access_token !== before.session.access_token && after.session.refresh_token !== before.session.refresh_token);
+  check("REAL: the new session is no longer expired", after.session.expires_at > Math.floor(Date.now() / 1000) + 60, String(after.session.expires_at - Math.floor(Date.now() / 1000)));
+  // the OLD refresh token has been rotated out: replaying it must fail at Supabase (reuse detection or invalid)
+  const replay = await fetch(`${SB}/auth/v1/token?grant_type=refresh_token`, { method: "POST", headers: { apikey: KEY, "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: before.session.refresh_token }) });
+  console.log(`INFO  replaying the previous refresh token immediately after rotation: HTTP ${replay.status} (GoTrue keeps a short reuse window; recorded, not asserted)`);
+  await ctx.close();
 });
 
 // ---------------- 3. wrong password, forgot / reset ----------------
@@ -161,23 +186,24 @@ await run("recovery", async () => {
 
   const r = await newPage();
   const t0 = Date.now() - 1000;
-  await r.page.goto(`${WEB}/fr/forgot-password`); await r.page.waitForLoadState("networkidle");
+  await r.page.goto(`${WEB}/fr/auth/forgot-password`); await r.page.waitForLoadState("networkidle");
   await r.page.getByLabel("E-mail").fill(email); await r.page.getByRole("button", { name: "Envoyer le lien" }).click();
   await r.page.getByText("Consultez vos e-mails").waitFor({ timeout: 15000 });
   check("REAL: forgot-password shows the neutral confirmation", true);
-  const rec = await mailFor(email, "Reset", t0); check("REAL: recovery e-mail delivered (Mailpit)", !!rec, rec?.Subject);
+  const rec = await mailFor(email, "Mot de passe", t0); check("REAL: recovery e-mail delivered (Mailpit)", !!rec, rec?.Subject);
   // an UNKNOWN address gets the identical screen (no enumeration in our UI)
-  const u = await newPage(); await u.page.goto(`${WEB}/fr/forgot-password`); await u.page.waitForLoadState("networkidle");
+  const u = await newPage(); await u.page.goto(`${WEB}/fr/auth/forgot-password`); await u.page.waitForLoadState("networkidle");
   await u.page.getByLabel("E-mail").fill("nobody-" + email); await u.page.getByRole("button", { name: "Envoyer le lien" }).click();
   await u.page.getByText("Consultez vos e-mails").waitFor({ timeout: 15000 });
   check("REAL: unknown address gets the identical neutral confirmation", true); await u.ctx.close();
 
+  await r.ctx.close(); Object.assign(r, await newPage()); // a DIFFERENT browser context: the server-side token_hash link must not need the requesting browser
   await r.page.goto(linkOf(rec)); await r.page.waitForLoadState("networkidle");
-  check("REAL: recovery link (same browser) lands on the reset-password form", /reset-password/.test(r.page.url()) && (await r.page.getByLabel("Nouveau mot de passe", { exact: true }).count()) === 1, r.page.url());
-  await r.page.getByLabel("Nouveau mot de passe", { exact: true }).fill(PW2); await r.page.getByLabel("Confirmer le nouveau mot de passe").fill(PW2);
-  await r.page.getByRole("button", { name: "Mettre à jour le mot de passe" }).click();
-  await r.page.getByText("Mot de passe mis à jour").waitFor({ timeout: 15000 });
-  check("REAL: password reset succeeds", true);
+  check("REAL: recovery link opened in a DIFFERENT browser lands on the update-password block", /auth\/update-password/.test(r.page.url()) && (await r.page.getByLabel("Nouveau mot de passe", { exact: true }).count()) === 1, r.page.url());
+  await r.page.getByLabel("Nouveau mot de passe", { exact: true }).fill(PW2);
+  await r.page.getByRole("button", { name: "Enregistrer le nouveau mot de passe" }).click();
+  await r.page.waitForURL(/\/fr\/account/, { timeout: 20000 });
+  check("REAL: password reset succeeds and signs the person in (/fr/account)", true);
   await r.ctx.close();
 
   const old = await newPage(); await signIn(old.page, email, PW); await old.page.getByText("L'e-mail ou le mot de passe est incorrect.").waitFor({ timeout: 15000 });
@@ -186,7 +212,7 @@ await run("recovery", async () => {
   check("REAL: the NEW password works", true); await nw.ctx.close();
   // reused recovery link
   const again = await newPage(); await again.page.goto(linkOf(rec)); await again.page.waitForLoadState("networkidle");
-  check("REAL: a used recovery link shows the expired-link screen, not the form", (await again.page.getByLabel("Nouveau mot de passe", { exact: true }).count()) === 0 && /expiré|invalide/i.test(await text(again.page)), again.page.url());
+  check("REAL: a used recovery link lands on /auth/error, not on the form", /auth\/error/.test(again.page.url()) && (await again.page.getByLabel("Nouveau mot de passe", { exact: true }).count()) === 0 && /Ce lien ne fonctionne pas/.test(await text(again.page)), again.page.url());
   await again.ctx.close();
 });
 
@@ -194,7 +220,7 @@ await run("recovery", async () => {
 await run("privacy", async () => {
   const { ctx, page } = await newPage();
   await register(page, email); // this address is CONFIRMED and has an account
-  await page.waitForURL(/verify-email/, { timeout: 20000 });
+  await page.waitForURL(/auth\/sign-up-success/, { timeout: 20000 });
   const t = await text(page);
   check("REAL: signing up with an already-registered address shows the SAME pending screen", /Vérifiez votre e-mail/.test(t) && /Si cette adresse peut être utilisée/.test(t) && !/déjà un compte existe|already registered/i.test(t));
   await ctx.close();
@@ -205,7 +231,7 @@ await run("privacy", async () => {
 // ---------------- 5. admin gating against the REAL backend ----------------
 await run("admin", async () => {
   const anon = await newPage(); await anon.page.goto(`${WEB}/fr/admin`); await anon.page.waitForLoadState("networkidle");
-  check("REAL: anonymous /fr/admin redirects to the admin sign-in", /\/fr\/admin\/sign-in/.test(anon.page.url()), anon.page.url());
+  check("REAL: anonymous /fr/admin redirects to /fr/auth/login?next=/admin", /\/fr\/auth\/login\?next=%2Fadmin/.test(anon.page.url()), anon.page.url());
   const bodyAnon = await text(anon.page); check("REAL: no admin data in the anonymous response", !/Réservations\b.*Produits\b.*Inventaire/s.test(bodyAnon)); await anon.ctx.close();
 
   const cust = await newPage(); await signIn(cust.page, email, PW2); await cust.page.waitForURL(/\/fr\/account/, { timeout: 20000 });
@@ -215,9 +241,9 @@ await run("admin", async () => {
   check("REAL: no admin navigation is rendered for the customer", !/Inventaire/.test(tc)); await cust.ctx.close();
 
   const staff = await newPage();
-  await staff.page.goto(`${WEB}/fr/admin/sign-in`); await staff.page.waitForLoadState("networkidle");
+  await staff.page.goto(`${WEB}/fr/admin`); await staff.page.waitForLoadState("networkidle"); // redirected to the block login with next=/admin
   await staff.page.getByLabel("E-mail").fill(process.env.STAFF_EMAIL); await staff.page.getByLabel("Mot de passe", { exact: true }).fill(process.env.STAFF_PASSWORD);
-  await staff.page.getByRole("button", { name: /Se connecter|Connexion/ }).last().click();
+  await staff.page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await staff.page.waitForURL(/\/fr\/admin$/, { timeout: 20000 });
   await staff.page.getByText("Tableau de bord").first().waitFor({ timeout: 15000 });
   const ts = await text(staff.page);
@@ -225,12 +251,38 @@ await run("admin", async () => {
   await staff.ctx.close();
 });
 
-// ---------------- 6. guests are unaffected ----------------
+// ---------------- 6. old custom forms / routes are gone; the block is rendered; requests go to the configured Supabase ----------------
+await run("block", async () => {
+  const { ctx, page } = await newPage();
+  const sbCalls = [];
+  page.on("request", (rq) => { if (/\/auth\/v1\//.test(rq.url())) sbCalls.push(rq.url()); });
+  for (const p of ["login", "sign-up", "forgot-password", "update-password"]) {
+    await page.goto(`${WEB}/fr/auth/${p}`); await page.waitForLoadState("networkidle");
+    const labels = await page.locator("label").allInnerTexts();
+    check(`REAL: /fr/auth/${p} shows no OLD-form field (Prénom, Nom, Confirmer le nouveau mot de passe)`, !labels.some((l) => /^(Prénom|Nom)$|Confirmer le nouveau/.test(l.trim())), labels.join("|"));
+    check(`REAL: /fr/auth/${p} renders the block (a form with labelled inputs) and no demo notice`, (await page.locator("form input").count()) > 0 && !/démo|demo/i.test(await text(page).then((t) => t.slice(0, 600))));
+  }
+  const guest = page.getByRole("link", { name: "Continuer sans compte" });
+  await page.goto(`${WEB}/fr/auth/login`); await page.waitForLoadState("networkidle");
+  check("REAL: 'Continuer sans compte' is a plain link OUTSIDE the form", (await guest.count()) === 1 && (await page.locator("form a", { hasText: "Continuer sans compte" }).count()) === 0);
+  await page.getByLabel("E-mail").fill("nobody@example.test"); await page.getByLabel("Mot de passe", { exact: true }).fill("Wrong-pass-9");
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await page.getByText("L'e-mail ou le mot de passe est incorrect.").waitFor({ timeout: 15000 });
+  check("REAL: the sign-in request goes to the configured Supabase URL", sbCalls.some((u) => u.startsWith(`${SB}/auth/v1/token`)), sbCalls.slice(0, 2).join(","));
+  check("REAL: every Supabase request targets the configured host only", sbCalls.every((u) => u.startsWith(SB)));
+  for (const [from, to] of [["/login", "/fr/auth/login"], ["/fr/sign-in", "/fr/auth/login"], ["/fr/register", "/fr/auth/sign-up"], ["/fr/forgot-password", "/fr/auth/forgot-password"], ["/fr/reset-password", "/fr/auth/update-password"], ["/fr/admin/sign-in", "/fr/auth/login"]]) {
+    await page.goto(`${WEB}${from}`); await page.waitForLoadState("networkidle");
+    check(`REAL: legacy ${from} redirects to ${to}`, page.url().includes(to), page.url());
+  }
+  await ctx.close();
+});
+
+// ---------------- 7. guests are unaffected ----------------
 await run("guest", async () => {
   const { ctx, page } = await newPage();
   for (const p of ["/fr", "/fr/products", "/fr/cart", "/fr/reserve", "/fr/reservations"]) {
     const r = await page.goto(`${WEB}${p}`); await page.waitForLoadState("networkidle");
-    check(`REAL: guest can open ${p} without any account (HTTP ${r.status()})`, r.status() === 200 && !/sign-in/.test(page.url()));
+    check(`REAL: guest can open ${p} without any account (HTTP ${r.status()})`, r.status() === 200 && !/auth\/login/.test(page.url()));
   }
   await ctx.close();
 });
