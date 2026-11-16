@@ -3,7 +3,7 @@ import { createAuthApi } from "../api/auth";
 import { resolveAdminAccess } from "./admin-access";
 import { canAccessAdmin, hasPermission } from "./authorization";
 import { createAuthStore } from "./auth-store";
-import { readSupabaseConfig } from "./config";
+import { readSupabaseConfig, validateSupabaseConfig } from "./config";
 import { mapAuthError } from "./errors";
 import { fetchMe, parseMe } from "./me";
 import { safeNextPath } from "./safe-next";
@@ -15,14 +15,33 @@ import { safeNextPath } from "./safe-next";
  */
 const me = { userId: "u1", email: "a@b.co", emailVerified: true, staff: false, permissions: [] as string[], customerProfileId: null };
 
-describe("config (mocked env)", () => {
-  it("is null unless both values exist and the URL is https (or localhost)", () => {
-    expect(readSupabaseConfig({})).toBeNull();
-    expect(readSupabaseConfig({ url: "https://x.supabase.co" })).toBeNull();
-    expect(readSupabaseConfig({ url: "http://evil.example", anonKey: "k" })).toBeNull();
-    expect(readSupabaseConfig({ url: "not a url", anonKey: "k" })).toBeNull();
-    expect(readSupabaseConfig({ url: "https://x.supabase.co", anonKey: "k" })).toEqual({ url: "https://x.supabase.co", anonKey: "k" });
-    expect(readSupabaseConfig({ url: "http://127.0.0.1:54321", anonKey: "k" })).not.toBeNull();
+const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+const jwtWithRole = (role: string) => `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ iss: "supabase", role })}.${"s".repeat(20)}`;
+const PUB = `sb_publishable_${"a1B2c3D4".repeat(3)}`;
+
+describe("config validation (mocked env; values are never echoed)", () => {
+  it("accepts https or localhost URLs with a publishable key or a legacy anon JWT", () => {
+    expect(validateSupabaseConfig({ url: "https://x.supabase.co", anonKey: PUB })).toEqual({ ok: true, config: { url: "https://x.supabase.co", anonKey: PUB } });
+    expect(validateSupabaseConfig({ url: "http://127.0.0.1:54321", anonKey: PUB }).ok).toBe(true);
+    expect(validateSupabaseConfig({ url: "http://localhost:54321", anonKey: jwtWithRole("anon") }).ok).toBe(true);
+  });
+  it("reports missing, malformed and insecure values as problem codes only", () => {
+    expect(validateSupabaseConfig({})).toEqual({ ok: false, problems: ["url_missing", "key_missing"] });
+    expect(validateSupabaseConfig({ url: "not a url", anonKey: PUB })).toEqual({ ok: false, problems: ["url_malformed"] });
+    expect(validateSupabaseConfig({ url: "ftp://x.supabase.co", anonKey: PUB })).toEqual({ ok: false, problems: ["url_malformed"] });
+    expect(validateSupabaseConfig({ url: "http://evil.example", anonKey: PUB })).toEqual({ ok: false, problems: ["url_insecure"] });
+    expect(validateSupabaseConfig({ url: "https://x.supabase.co", anonKey: "k" })).toEqual({ ok: false, problems: ["key_malformed"] });
+    expect(validateSupabaseConfig({ url: "https://x.supabase.co", anonKey: "sb_publishable_short" })).toEqual({ ok: false, problems: ["key_malformed"] });
+    expect(JSON.stringify(validateSupabaseConfig({ url: "https://x.supabase.co", anonKey: "super-secret-looking-value" }))).not.toContain("super-secret");
+  });
+  it("refuses anything that looks like a secret/service-role key so it can never reach a browser", () => {
+    expect(validateSupabaseConfig({ url: "https://x.supabase.co", anonKey: "sb_secret_" + "x".repeat(24) })).toEqual({ ok: false, problems: ["key_is_secret"] });
+    expect(validateSupabaseConfig({ url: "https://x.supabase.co", anonKey: jwtWithRole("service_role") })).toEqual({ ok: false, problems: ["key_is_secret"] });
+    expect(validateSupabaseConfig({ url: "https://x.supabase.co", anonKey: jwtWithRole("authenticated") })).toEqual({ ok: false, problems: ["key_malformed"] });
+  });
+  it("readSupabaseConfig is null for any invalid configuration", () => {
+    expect(readSupabaseConfig({ url: "https://x.supabase.co", anonKey: "k" })).toBeNull();
+    expect(readSupabaseConfig({ url: "https://x.supabase.co", anonKey: PUB })).not.toBeNull();
   });
 });
 
@@ -186,7 +205,7 @@ describe("auth API (mocked Supabase client)", () => {
   it("is 'not_configured' without a client: never a fake success", async () => {
     const a = createAuthApi(() => null, () => "https://x");
     expect(await a.signIn("a@b.co", "pw")).toEqual({ ok: false, error: "not_configured" });
-    expect(await a.register({ firstName: "A", lastName: "B", email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: false, error: "not_configured" });
+    expect(await a.register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: false, error: "not_configured" });
     expect(await a.requestPasswordReset("a@b.co", "fr")).toEqual({ ok: false, error: "not_configured" });
   });
   it("signIn passes credentials to Supabase and returns its error codes (invalid credentials, unverified e-mail)", async () => {
@@ -200,29 +219,29 @@ describe("auth API (mocked Supabase client)", () => {
     const down = fakeClient({ signInWithPassword: vi.fn(async () => { throw new TypeError("Failed to fetch"); }) });
     expect(await api(down).signIn("a@b.co", "x")).toEqual({ ok: false, error: "network" });
   });
-  it("register: verification redirect + metadata for display, needsVerification, no account-existence disclosure", async () => {
+  it("register: verification redirect + locale metadata, needsVerification, no account-existence disclosure", async () => {
     const f = fakeClient();
-    const r = await api(f).register({ firstName: " Ana ", lastName: "Depot", email: "a@b.co", password: "12345678", locale: "ht" });
+    const r = await api(f).register({ email: "a@b.co", password: "12345678", locale: "ht" });
     expect(r).toEqual({ ok: true, data: { needsVerification: true } });
     const arg = (f.auth.signUp.mock.calls[0] as unknown as [{ email: string; options: { emailRedirectTo: string; data: Record<string, string> } }])[0];
-    expect(arg.options.emailRedirectTo).toBe("https://shop.example/ht/auth/callback?next=%2Fverify-email%3Fstatus%3Dsuccess");
-    expect(arg.options.data).toEqual({ first_name: "Ana", last_name: "Depot", locale: "ht" });
+    expect(arg.options.emailRedirectTo).toBe("https://shop.example/ht/auth/callback?next=%2Faccount");
+    expect(arg.options.data).toEqual({ locale: "ht" });
     const dup = fakeClient({ signUp: vi.fn(async () => ({ data: { user: { identities: [] }, session: null }, error: null })) });
     // already-registered addresses look EXACTLY like new ones, whichever way the provider reports them
-    expect(await api(dup).register({ firstName: "A", lastName: "B", email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: true } });
+    expect(await api(dup).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: true } });
     const exists422 = fakeClient({ signUp: vi.fn(async () => ({ data: {}, error: { code: "user_already_exists", status: 422, message: "User already registered" } })) });
-    expect(await api(exists422).register({ firstName: "A", lastName: "B", email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: true } });
+    expect(await api(exists422).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: true } });
     const emailExists = fakeClient({ signUp: vi.fn(async () => ({ data: {}, error: { code: "email_exists", status: 422 } })) });
-    expect(await api(emailExists).register({ firstName: "A", lastName: "B", email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: true } });
+    expect(await api(emailExists).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: true } });
     const instant = fakeClient({ signUp: vi.fn(async () => ({ data: { user: { identities: [{}] }, session: { access_token: "t" } }, error: null })) });
-    expect(await api(instant).register({ firstName: "A", lastName: "B", email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: false } });
+    expect(await api(instant).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: false } });
     const weak = fakeClient({ signUp: vi.fn(async () => ({ data: {}, error: { code: "weak_password" } })) });
-    expect(await api(weak).register({ firstName: "A", lastName: "B", email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: false, error: "weak_password" });
+    expect(await api(weak).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: false, error: "weak_password" });
   });
   it("recovery: reset e-mail redirects through the callback; updating the password needs a recovery session", async () => {
     const f = fakeClient();
     await api(f).requestPasswordReset("a@b.co", "fr");
-    expect(f.auth.resetPasswordForEmail).toHaveBeenCalledWith("a@b.co", { redirectTo: "https://shop.example/fr/auth/callback?next=%2Freset-password" });
+    expect(f.auth.resetPasswordForEmail).toHaveBeenCalledWith("a@b.co", { redirectTo: "https://shop.example/fr/auth/callback?next=%2Fauth%2Fupdate-password" });
     expect(await api(f).resetPassword("new-password-1")).toEqual({ ok: true, data: undefined });
     expect(f.auth.updateUser).toHaveBeenCalledWith({ password: "new-password-1" });
     const noSession = fakeClient({ getSession: vi.fn(async () => ({ data: { session: null } })) });
@@ -234,7 +253,7 @@ describe("auth API (mocked Supabase client)", () => {
   it("resend uses the signup flow with the callback redirect", async () => {
     const f = fakeClient();
     expect(await api(f).resendVerification("a@b.co", "fr")).toEqual({ ok: true, data: undefined });
-    expect(f.auth.resend).toHaveBeenCalledWith({ type: "signup", email: "a@b.co", options: { emailRedirectTo: "https://shop.example/fr/auth/callback?next=%2Fverify-email%3Fstatus%3Dsuccess" } });
+    expect(f.auth.resend).toHaveBeenCalledWith({ type: "signup", email: "a@b.co", options: { emailRedirectTo: "https://shop.example/fr/auth/callback?next=%2Faccount" } });
     const limited = fakeClient({ resend: vi.fn(async () => ({ error: { code: "over_email_send_rate_limit" } })) });
     expect(await api(limited).resendVerification("a@b.co", "fr")).toEqual({ ok: false, error: "rate_limited" });
   });
@@ -244,12 +263,12 @@ describe("Supabase key env names (mocked env)", () => {
   it("accepts the publishable key or the legacy anon key, publishable first", async () => {
     const { vi: v } = await import("vitest");
     v.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
-    v.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    v.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", jwtWithRole("anon"));
     v.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
     const { getSupabaseConfig } = await import("./config");
-    expect(getSupabaseConfig()?.anonKey).toBe("anon-key");
-    v.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "pub-key");
-    expect(getSupabaseConfig()?.anonKey).toBe("pub-key");
+    expect(getSupabaseConfig()?.anonKey).toBe(jwtWithRole("anon"));
+    v.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", PUB);
+    expect(getSupabaseConfig()?.anonKey).toBe(PUB);
     v.unstubAllEnvs();
   });
 });

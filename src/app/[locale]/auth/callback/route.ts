@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!isLocale(locale)) return new NextResponse(null, { status: 404 });
   const { searchParams } = request.nextUrl;
   const next = safeNextPath(searchParams.get("next"), "/account");
-  const failure = next.startsWith("/reset-password") ? "/reset-password?status=expired" : "/verify-email?status=error";
+  const failure = `/auth/error?reason=${next.startsWith("/auth/update-password") ? "reset" : "verify"}`;
   // RELATIVE redirect on purpose: `request.nextUrl.origin` is the server's own hostname (e.g. "localhost" under `next start`), which can differ from
   // the host the browser used ("127.0.0.1", a proxy, a custom domain). Redirecting to another host would drop the session cookie set just above.
   const go = (path: string) => new NextResponse(null, { status: 307, headers: { Location: `/${locale}${path}` } });

@@ -31,14 +31,14 @@ export function createAuthApi(getClient: () => SupabaseClient | null, getOrigin:
       }),
 
     /** Creates the account and sends the verification e-mail (if the address is new). `needsVerification` is false only if the project does not require it. */
-    register: (input: { firstName: string; lastName: string; email: string; password: string; locale: Locale }) =>
+    register: (input: { email: string; password: string; locale: Locale }) =>
       run<{ needsVerification: boolean }>(async (c) => {
         const { data, error } = await c.auth.signUp({
           email: input.email.trim(),
           password: input.password,
           options: {
-            emailRedirectTo: callback(input.locale, "/verify-email?status=success"),
-            data: { first_name: input.firstName.trim(), last_name: input.lastName.trim(), locale: input.locale },
+            emailRedirectTo: callback(input.locale, "/account"),
+            data: { locale: input.locale }, // the template picks the e-mail language from this
           },
         });
         // PRIVACY: an already-registered address must look exactly like a new one. Supabase may answer it with 422 `user_already_exists`
@@ -55,13 +55,13 @@ export function createAuthApi(getClient: () => SupabaseClient | null, getOrigin:
 
     resendVerification: (email: string, locale: Locale) =>
       run(async (c) => {
-        const { error } = await c.auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo: callback(locale, "/verify-email?status=success") } });
+        const { error } = await c.auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo: callback(locale, "/account") } });
         return error ? { ok: false, error: mapAuthError(error) } : { ok: true, data: undefined };
       }),
 
     requestPasswordReset: (email: string, locale: Locale) =>
       run(async (c) => {
-        const { error } = await c.auth.resetPasswordForEmail(email.trim(), { redirectTo: callback(locale, "/reset-password") });
+        const { error } = await c.auth.resetPasswordForEmail(email.trim(), { redirectTo: callback(locale, "/auth/update-password") });
         return error ? { ok: false, error: mapAuthError(error) } : { ok: true, data: undefined };
       }),
 
