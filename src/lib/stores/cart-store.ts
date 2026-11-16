@@ -4,8 +4,8 @@ import { useCallback, useMemo } from "react";
 import { type CartAction, type CartLine, cartItemCount, cartReducer, cartSubtotals } from "../cart";
 import { createPersistedStore, useIsClient } from "./create-persisted-store";
 
-// v2: cart lines carry their pricing currency (v1 snapshots had none).
-const store = createPersistedStore<CartLine[]>("ana.demo.cart.v2", []);
+// v3: lines are keyed per currency (the same item in HTG and USD are separate lines).
+const store = createPersistedStore<CartLine[]>("ana.demo.cart.v3", []);
 
 export function useCart() {
   const lines = store.useStore();

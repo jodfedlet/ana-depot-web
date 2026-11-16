@@ -30,26 +30,35 @@ export interface CartLine {
   maxQuantity?: number;
 }
 
-export const lineKey = (productId: string, variantId?: string) => (variantId ? `${productId}:${variantId}` : productId);
+/** One cart line per product/variant AND currency: the same item in HTG and in USD are two lines (two prices), sharing one stock. */
+export const lineKey = (productId: string, variantId: string | undefined, currency: string) => `${variantId ? `${productId}:${variantId}` : productId}@${currency}`;
+
+const sameItem = (a: Pick<CartLine, "productId" | "variantId">, b: Pick<CartLine, "productId" | "variantId">) => a.productId === b.productId && a.variantId === b.variantId;
+/** Units of the same stock position already taken by the OTHER currency lines of this item. */
+const takenByOthers = (lines: CartLine[], line: CartLine) => lines.filter((l) => l.key !== line.key && sameItem(l, line)).reduce((n, l) => n + l.quantity, 0);
 
 export const variantLabel = (variant: ProductVariant): string =>
   Object.entries(variant.optionValues).map(([k, v]) => `${k} : ${v}`).join(" · ");
 
-const clampQty = (line: Pick<CartLine, "pricing" | "maxQuantity">, q: number) =>
-  Math.max(line.pricing.minQty, Math.min(line.maxQuantity ?? MAX_QUANTITY, Math.floor(Number.isFinite(q) ? q : 1)));
+const clampQty = (line: Pick<CartLine, "pricing" | "maxQuantity">, q: number, cap = line.maxQuantity) =>
+  Math.max(line.pricing.minQty, Math.min(cap ?? MAX_QUANTITY, Math.floor(Number.isFinite(q) ? q : 1)));
 
-function priced(line: CartLine, quantity: number): CartLine {
-  const q = clampQty(line, quantity);
+function priced(line: CartLine, quantity: number, cap = line.maxQuantity): CartLine {
+  const q = clampQty(line, quantity, cap);
   const p = unitPriceFor(line.pricing, q);
   // The price keeps the currency of the product's pricing snapshot: re-pricing by quantity never changes currency.
   return { ...line, quantity: q, unitPrice: { amount: p.unitPrice, currency: line.pricing.currency }, priceKind: p.kind };
 }
 
+/** Stock still free for this line once the other-currency lines of the same item are counted (undefined = no limit). */
+const shareCap = (lines: CartLine[], line: CartLine): number | undefined => (line.maxQuantity === undefined ? undefined : Math.max(0, line.maxQuantity - takenByOthers(lines, line)));
+export const sharedRoom = shareCap;
+
 export function buildCartLine(product: Product, variant: ProductVariant | undefined, quantity: number): CartLine {
   const imageIndex = variant?.imageIndex ?? 0;
   const pricing = snapshotFor(product.pricing, variant?.price?.amount);
   const base: CartLine = {
-    key: lineKey(product.id, variant?.id), productId: product.id, variantId: variant?.id, slug: product.slug, name: product.name,
+    key: lineKey(product.id, variant?.id, pricing.currency), productId: product.id, variantId: variant?.id, slug: product.slug, name: product.name,
     variantLabel: variant ? variantLabel(variant) : undefined, image: product.images[imageIndex] ?? product.images[0], unit: product.unit, unitNote: product.unitNote,
     pricing, unitPrice: { amount: pricing.base, currency: pricing.currency }, priceKind: "retail", quantity: 1,
     availability: variant?.availability ?? product.availability, maxQuantity: variant?.availableQty ?? product.availableQty,
@@ -70,12 +79,12 @@ export function cartReducer(lines: CartLine[], action: CartAction): CartLine[] {
       if (existing) {
         // Refresh pricing/stock from the newest snapshot, then add the quantity and re-price.
         const merged: CartLine = { ...action.line, quantity: existing.quantity };
-        return lines.map((l) => (l.key === existing.key ? priced(merged, existing.quantity + action.line.quantity) : l));
+        return lines.map((l) => (l.key === existing.key ? priced(merged, existing.quantity + action.line.quantity, shareCap(lines, merged)) : l));
       }
-      return [...lines, priced(action.line, action.line.quantity)];
+      return [...lines, priced(action.line, action.line.quantity, shareCap(lines, action.line))];
     }
     case "setQuantity":
-      return lines.map((l) => (l.key === action.key ? priced(l, action.quantity) : l));
+      return lines.map((l) => (l.key === action.key ? priced(l, action.quantity, shareCap(lines, l)) : l));
     case "remove":
       return lines.filter((l) => l.key !== action.key);
     case "clear":

@@ -21,13 +21,16 @@ const field = "text-label min-h-11 rounded-control border border-line-strong bg-
 const PAGE = 10;
 const statusTone: Record<ProductStatus, "neutral" | "success" | "warning"> = { draft: "warning", active: "success", inactive: "neutral" };
 
-/** Retail price, or the range across variants that carry their own price. */
-function priceText(p: ProductRecord, locale: string): string {
-  const prices = hasVariantsRecord(p) ? p.variants.filter((v) => v.active).map((v) => v.price ?? p.pricing.retail) : [p.pricing.retail];
-  const lo = Math.min(...prices), hi = Math.max(...prices);
-  const f = (n: number) => formatMoney({ amount: n, currency: p.pricing.currency }, locale);
-  return !p.pricing.retail && !prices.some(Boolean) ? "—" : lo === hi ? f(lo) : `${f(lo)} – ${f(hi)}`;
+/** One line per currency the product is sold in: its retail price, or the range across variants with their own price. Never summed. */
+function priceLines(p: ProductRecord, locale: string): string[] {
+  return p.prices.map((pr) => {
+    const own = hasVariantsRecord(p) ? p.variants.filter((v) => v.active).map((v) => v.prices?.[pr.currency] ?? pr.retail) : [pr.retail];
+    const lo = Math.min(...own), hi = Math.max(...own);
+    const f = (n: number) => formatMoney({ amount: n, currency: pr.currency }, locale);
+    return lo === hi ? f(lo) : `${f(lo)} – ${f(hi)}`;
+  });
 }
+const priceText = (p: ProductRecord, locale: string) => { const lines = priceLines(p, locale); return lines.length ? <span className="flex flex-col">{lines.map((l) => <span key={l}>{l}</span>)}</span> : "—"; };
 
 export function ProductList() {
   const t = useT();
@@ -90,7 +93,10 @@ export function ProductList() {
       </div>
     </div>
   );
-  const wholesaleCell = (p: ProductRecord) => p.pricing.wholesale.enabled && p.pricing.wholesale.tiers.length ? <Badge tone="accent">{t("admin.products.wholesaleFrom", { qty: Math.min(...p.pricing.wholesale.tiers.map((x) => x.minQty)) })}</Badge> : <span className="text-ink-muted">—</span>;
+  const wholesaleCell = (p: ProductRecord) => {
+    const tiered = p.prices.filter((pr) => pr.wholesale.enabled && pr.wholesale.tiers.length > 0);
+    return tiered.length ? <span className="flex flex-col items-start gap-1">{tiered.map((pr) => <Badge key={pr.currency} tone="accent">{pr.currency} · {t("admin.products.wholesaleFrom", { qty: Math.min(...pr.wholesale.tiers.map((x) => x.minQty)) })}</Badge>)}</span> : <span className="text-ink-muted">—</span>;
+  };
 
   return (
     <div className="space-y-4">

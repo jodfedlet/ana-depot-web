@@ -9,5 +9,5 @@ import { createPersistedStore } from "./create-persisted-store";
  * administration screens can show one consistent lifecycle. It is NOT persistence: nothing
  * is sent anywhere. The Spring Boot API replaces it; screens only talk to `lib/api/reservations`.
  */
-export const reservationStore = createPersistedStore<Reservation[]>("ana.demo.reservations.v3", sampleReservations);
+export const reservationStore = createPersistedStore<Reservation[]>("ana.demo.reservations.v4", sampleReservations);
 export const useReservations = () => reservationStore.useStore();

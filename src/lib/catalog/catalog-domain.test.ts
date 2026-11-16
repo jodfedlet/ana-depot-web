@@ -3,13 +3,14 @@ import { seedCategories, seedMovements, seedProducts } from "../mock/catalog-see
 import { sampleReservations } from "../mock/reservations";
 import { toProduct } from "./localize";
 import { emptyCategory, validateCategory, attributeKey } from "./category";
-import { type ProductDraft, draftToRecord, emptyDraft, generateVariants, recordToDraft, slugify, uniqueSlug, validateDraft } from "./draft";
+import { type DraftPrice, type ProductDraft, draftToRecord, emptyDraft, emptyDraftPrice, generateVariants, recordToDraft, slugify, uniqueSlug, validateDraft } from "./draft";
 import { reservedQty, stockOf, stockState, availabilityOf } from "./stock";
 import { L } from "../localized";
 
 const cat = (slug: string) => seedCategories.find((c) => c.slug === slug)!;
 const prod = (slug: string) => seedProducts.find((p) => p.slug === slug)!;
-const valid = (over: Partial<ProductDraft> = {}): ProductDraft => ({ ...emptyDraft("household"), nameFr: "Seau", sku: "SEA-1", retail: "1500", unit: "unit", onHand: "10", ...over });
+const htg = (over: Partial<DraftPrice> = {}): ProductDraft["prices"] => ({ HTG: { ...emptyDraftPrice(true), retail: "1500", ...over }, USD: emptyDraftPrice() });
+const valid = (over: Partial<ProductDraft> = {}): ProductDraft => ({ ...emptyDraft("household"), nameFr: "Seau", sku: "SEA-1", prices: htg(), unit: "unit", onHand: "10", ...over });
 
 describe("seed catalog is internally consistent", () => {
   it("every product points at a real category and uses only that category's attributes/options", () => {
@@ -31,8 +32,8 @@ describe("seed catalog is internally consistent", () => {
     expect(seedProducts.some((p) => p.variants.length > 0)).toBe(true);
     expect(seedProducts.some((p) => p.variants.length === 0)).toBe(true);
     for (const u of ["unit", "pair", "pack", "box", "set", "meter"]) expect(seedProducts.some((p) => p.unit === u), u).toBe(true);
-    expect(seedProducts.some((p) => p.pricing.wholesale.enabled)).toBe(true);
-    expect(seedProducts.some((p) => !p.pricing.wholesale.enabled)).toBe(true);
+    expect(seedProducts.some((p) => p.prices.some((x) => x.wholesale.enabled))).toBe(true);
+    expect(seedProducts.some((p) => p.prices.some((x) => !x.wholesale.enabled))).toBe(true);
     expect(seedProducts.some((p) => !p.inventory.tracked)).toBe(true);
     expect(seedProducts.map((p) => p.status)).toEqual(expect.arrayContaining(["draft", "active", "inactive"]));
     expect(cat("general").attributes).toEqual([]);
@@ -117,7 +118,7 @@ describe("product validation", () => {
   });
   it("requires category, SKU and a valid retail price to publish", () => {
     const e = validateDraft({ ...emptyDraft(), nameFr: "Seau" }, undefined, [], "publish");
-    expect(e).toMatchObject({ category: "categoryRequired", sku: "skuRequired", retail: "retailInvalid" });
+    expect(e).toMatchObject({ category: "categoryRequired", sku: "skuRequired", "price.HTG.retail": "retailInvalid" });
     expect(validateDraft(valid(), cat("household"), [], "publish")).toEqual({});
   });
   it("flags duplicate SKUs (product vs others, variant vs variant)", () => {
@@ -136,10 +137,10 @@ describe("product validation", () => {
     expect(validateDraft(valid({ categorySlug: "general" }), cat("general"), [], "publish")).toEqual({});
   });
   it("validates wholesale tiers only when enabled, and reports row-level problems", () => {
-    expect(validateDraft(valid({ tiers: [{ minQty: "1", unitPrice: "9999" }] }), cat("household"), [], "publish")).toEqual({});
-    const e = validateDraft(valid({ wholesaleEnabled: true, tiers: [{ minQty: "10", unitPrice: "1300" }, { minQty: "5", unitPrice: "1400" }] }), cat("household"), [], "publish");
-    expect(e["tier.1.tierOrder"]).toBe("tierOrder");
-    expect(validateDraft(valid({ wholesaleEnabled: true, tiers: [] }), cat("household"), [], "publish").tiers).toBe("tiersEmpty");
+    expect(validateDraft(valid({ prices: htg({ tiers: [{ minQty: "1", unitPrice: "9999" }] }) }), cat("household"), [], "publish")).toEqual({});
+    const e = validateDraft(valid({ prices: htg({ wholesaleEnabled: true, tiers: [{ minQty: "10", unitPrice: "1300" }, { minQty: "5", unitPrice: "1400" }] }) }), cat("household"), [], "publish");
+    expect(e["price.HTG.tier.1.tierOrder"]).toBe("tierOrder");
+    expect(validateDraft(valid({ prices: htg({ wholesaleEnabled: true, tiers: [] }) }), cat("household"), [], "publish")["price.HTG.tiers"]).toBe("tiersEmpty");
   });
   it("needs at least one variant when variants are on, and valid stock numbers", () => {
     const e = validateDraft(valid({ hasVariants: true, options: [{ key: "s", fr: "T", ht: "T", values: [{ id: "a", fr: "A", ht: "A" }] }] }), cat("household"), [], "publish");
@@ -153,8 +154,8 @@ describe("draft ↔ record", () => {
   it("round-trips every sample product without losing data", () => {
     for (const p of seedProducts) {
       const back = draftToRecord(recordToDraft(p), { id: p.id, slug: p.slug, now: p.updatedAt, createdAt: p.createdAt, featuredRank: p.featuredRank, isNew: p.isNew, relatedIds: p.relatedIds, isSample: p.isSample });
-      expect(back.pricing, p.slug).toEqual({ ...p.pricing, sale: p.pricing.sale, minOrderQty: p.pricing.minOrderQty });
-      expect(back.variants.map((v) => [v.sku, v.price, v.onHand]), p.slug).toEqual(p.variants.map((v) => [v.sku, v.price, v.onHand]));
+      expect(back.prices, p.slug).toEqual(p.prices.map((x) => ({ ...x, sale: x.sale, minOrderQty: x.minOrderQty })));
+      expect(back.variants.map((v) => [v.sku, v.prices, v.onHand]), p.slug).toEqual(p.variants.map((v) => [v.sku, v.prices, v.onHand]));
       expect(back.attributes, p.slug).toEqual(p.attributes);
       expect(back.name).toEqual(p.name);
       expect(back.unit).toBe(p.unit);
@@ -167,11 +168,11 @@ describe("draft ↔ record", () => {
     ];
     const first = generateVariants(options, [], "TS");
     expect(first).toHaveLength(4);
-    first[0].price = "900";
+    first[0].prices.HTG = "900";
     first[0].onHand = "7";
     const again = generateVariants([{ ...options[0], values: [...options[0].values, { id: "l", fr: "L", ht: "L" }] }, options[1]], first, "TS");
     expect(again).toHaveLength(6);
-    expect(again.find((v) => v.optionValues.size === "s" && v.optionValues.color === "red")).toMatchObject({ price: "900", onHand: "7" });
+    expect(again.find((v) => v.optionValues.size === "s" && v.optionValues.color === "red")).toMatchObject({ prices: { HTG: "900" }, onHand: "7" });
   });
   it("builds readable unique slugs", () => {
     expect(slugify("Matelas à mousse 16 cm !")).toBe("matelas-a-mousse-16-cm");

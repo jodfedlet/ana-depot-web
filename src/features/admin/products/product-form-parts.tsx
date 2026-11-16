@@ -17,6 +17,7 @@ import { readImageFile, sampleImageLibrary } from "@/lib/catalog/images";
 import type { AttributeDef, CategoryRecord } from "@/lib/catalog/model";
 import { snapshotFor, unitPriceFor } from "@/lib/catalog/pricing";
 import { cn } from "@/lib/cn";
+import { type CurrencyCode, SUPPORTED_CURRENCIES } from "@/lib/money";
 
 export type Errors = Record<string, string>;
 export type SetDraft = (fn: (d: ProductDraft) => ProductDraft) => void;
@@ -194,7 +195,7 @@ export function VariantsEditor({ draft, setDraft, category, errors, lockedVarian
                   <caption className="sr-only">{t("admin.products.form.variants.list")}</caption>
                   <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr>
                     <th scope="col" className="px-3 py-2 font-medium">{t("admin.products.form.variants.col.variant")}</th><th scope="col" className="px-3 py-2 font-medium">SKU</th>
-                    <th scope="col" className="px-3 py-2 font-medium">{t("admin.products.form.variants.col.price")}</th>{draft.tracked && <th scope="col" className="px-3 py-2 font-medium">{t("admin.products.form.variants.col.stock")}</th>}
+                    {enabledCurrencies(draft).map((c) => <th key={c} scope="col" className="px-3 py-2 font-medium">{t("admin.products.form.variants.col.priceIn", { currency: c })}</th>)}{draft.tracked && <th scope="col" className="px-3 py-2 font-medium">{t("admin.products.form.variants.col.stock")}</th>}
                     <th scope="col" className="px-3 py-2 font-medium">{t("admin.products.form.variants.col.active")}</th></tr></thead>
                   <tbody className="divide-y divide-line">
                     {draft.variants.map((v, i) => {
@@ -205,7 +206,9 @@ export function VariantsEditor({ draft, setDraft, category, errors, lockedVarian
                         <tr key={v.id} className="text-label align-top font-normal">
                           <th scope="row" className="px-3 py-2 font-medium">{label || "—"}</th>
                           <td className="px-3 py-2"><input aria-label={`SKU — ${label}`} value={v.sku} onChange={(e) => setVariant(i, { sku: e.target.value })} aria-invalid={errors[`variant.${i}.sku`] ? true : undefined} className={cn(input, errors[`variant.${i}.sku`] ? "border-danger-fg" : "border-line-strong")} />{errText(t, errors, `variant.${i}.sku`) && <p className="text-caption mt-1 font-medium text-danger-fg">{errText(t, errors, `variant.${i}.sku`)}</p>}</td>
-                          <td className="px-3 py-2"><input aria-label={`${t("admin.products.form.variants.col.price")} — ${label}`} inputMode="decimal" placeholder={t("admin.products.form.variants.priceHint")} value={v.price} onChange={(e) => setVariant(i, { price: e.target.value })} aria-invalid={errors[`variant.${i}.price`] ? true : undefined} className={cn(input, errors[`variant.${i}.price`] ? "border-danger-fg" : "border-line-strong")} />{errText(t, errors, `variant.${i}.price`) && <p className="text-caption mt-1 font-medium text-danger-fg">{errText(t, errors, `variant.${i}.price`)}</p>}</td>
+                          {enabledCurrencies(draft).map((c) => (
+                            <td key={c} className="px-3 py-2"><input aria-label={`${t("admin.products.form.variants.col.priceIn", { currency: c })} — ${label}`} inputMode="decimal" placeholder={t("admin.products.form.variants.priceHint")} value={v.prices[c] ?? ""} onChange={(e) => setVariant(i, { prices: { ...v.prices, [c]: e.target.value } })} aria-invalid={errors[`variant.${i}.price.${c}`] ? true : undefined} className={cn(input, errors[`variant.${i}.price.${c}`] ? "border-danger-fg" : "border-line-strong")} />{errText(t, errors, `variant.${i}.price.${c}`) && <p className="text-caption mt-1 font-medium text-danger-fg">{errText(t, errors, `variant.${i}.price.${c}`)}</p>}</td>
+                          ))}
                           {draft.tracked && <td className="px-3 py-2"><input aria-label={`${t("admin.products.form.variants.col.stock")} — ${label}`} inputMode="numeric" value={v.onHand} disabled={locked} onChange={(e) => setVariant(i, { onHand: e.target.value })} aria-invalid={errors[`variant.${i}.onHand`] ? true : undefined} className={cn(input, "disabled:bg-sand-50 disabled:text-ink-muted", errors[`variant.${i}.onHand`] ? "border-danger-fg" : "border-line-strong")} />{locked && <p className="text-caption mt-1 text-ink-muted">{t("admin.products.form.variants.stockLocked")}</p>}</td>}
                           <td className="px-3 py-2"><input type="checkbox" aria-label={`${t("admin.products.form.variants.col.active")} — ${label}`} checked={v.active} onChange={(e) => setVariant(i, { active: e.target.checked })} className="mt-2 size-5 accent-brand-700" /></td>
                         </tr>
@@ -222,47 +225,86 @@ export function VariantsEditor({ draft, setDraft, category, errors, lockedVarian
   );
 }
 
-// ---------------- wholesale ----------------
-export function WholesaleEditor({ draft, setDraft, errors }: { draft: ProductDraft; setDraft: SetDraft; errors: Errors }) {
+// ---------------- prices per currency ----------------
+type DraftPriceSet = ProductDraft["prices"][CurrencyCode];
+const patchPrice = (setDraft: SetDraft, cur: CurrencyCode, patch: Partial<DraftPriceSet>) => setDraft((d) => ({ ...d, prices: { ...d.prices, [cur]: { ...d.prices[cur], ...patch } } }));
+export const enabledCurrencies = (draft: ProductDraft): CurrencyCode[] => SUPPORTED_CURRENCIES.filter((c) => draft.prices[c]?.enabled);
+
+/**
+ * One product, independent price sets: the seller chooses which currencies the product is sold in (HTG, USD or both) and
+ * gives each its own retail, sale and minimum order. Nothing is converted or generated from another currency, and the
+ * stock below is shared by all of them.
+ */
+export function PriceSetsEditor({ draft, setDraft, errors }: { draft: ProductDraft; setDraft: SetDraft; errors: Errors }) {
   const t = useT();
+  return (
+    <div className="space-y-5">
+      {errText(t, errors, "prices") && <p role="alert" className="text-caption font-medium text-danger-fg">{errText(t, errors, "prices")}</p>}
+      {SUPPORTED_CURRENCIES.map((cur) => {
+        const dp = draft.prices[cur];
+        return (
+          <fieldset key={cur} className="min-w-0 rounded-card border border-line p-4">
+            <legend className="px-1 text-label font-semibold">{cur}</legend>
+            <Checkbox label={t("admin.products.form.pricing.sellIn", { currency: cur })} description={t("admin.products.form.pricing.sellInHint", { currency: cur })} checked={dp.enabled}
+              onChange={(e) => patchPrice(setDraft, cur, { enabled: e.target.checked })} />
+            {dp.enabled && (
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <TextField label={t("admin.products.form.pricing.retail", { currency: cur })} inputMode="decimal" hint={t("admin.products.form.pricing.retailHint")} value={dp.retail} onChange={(e) => patchPrice(setDraft, cur, { retail: e.target.value })} error={errText(t, errors, `price.${cur}.retail`)} />
+                <TextField label={t("admin.products.form.pricing.sale", { currency: cur })} inputMode="decimal" optional hint={t("admin.products.form.pricing.saleHint")} value={dp.sale} onChange={(e) => patchPrice(setDraft, cur, { sale: e.target.value })} error={errText(t, errors, `price.${cur}.sale`)} />
+                <TextField label={t("admin.products.form.pricing.minOrderIn", { currency: cur })} inputMode="numeric" optional hint={t("admin.products.form.pricing.minOrderHint")} value={dp.minOrderQty} onChange={(e) => patchPrice(setDraft, cur, { minOrderQty: e.target.value })} error={errText(t, errors, `price.${cur}.minOrderQty`)} />
+              </div>
+            )}
+          </fieldset>
+        );
+      })}
+      <p className="text-caption text-ink-muted">{t("admin.products.form.pricing.sharedStock")}</p>
+    </div>
+  );
+}
+
+// ---------------- wholesale (per currency) ----------------
+export function WholesaleEditor({ draft, setDraft, errors, currency: cur }: { draft: ProductDraft; setDraft: SetDraft; errors: Errors; currency: CurrencyCode }) {
+  const t = useT();
+  const dp = draft.prices[cur];
   const unitLabel = (n: number) => t(`units.${draft.unit}`, { count: n });
   const [tryQty, setTryQty] = useState("12");
-  const setTier = (i: number, patch: Partial<{ minQty: string; unitPrice: string }>) => setDraft((d) => ({ ...d, tiers: d.tiers.map((x, n) => (n === i ? { ...x, ...patch } : x)) }));
-  const rowErrors = (i: number) => Object.entries(errors).filter(([k]) => k.startsWith(`tier.${i}.`)).map(([, code]) => t(`admin.products.errors.${code}` as MessageKey));
+  const setTier = (i: number, patch: Partial<{ minQty: string; unitPrice: string }>) => patchPrice(setDraft, cur, { tiers: dp.tiers.map((x, n) => (n === i ? { ...x, ...patch } : x)) });
+  const rowErrors = (i: number) => Object.entries(errors).filter(([k]) => k.startsWith(`price.${cur}.tier.${i}.`)).map(([, code]) => t(`admin.products.errors.${code}` as MessageKey));
+  const tierErr = (i: number, ...codes: string[]) => codes.some((c) => errors[`price.${cur}.tier.${i}.${c}`]);
 
-  // Preview: what customers will see, computed from the values currently typed (ignored while invalid).
-  const cur = draft.currency;
-  const retail = parseMoney(draft.retail, cur);
-  const tiers = draft.tiers.map((x) => ({ minQty: parseInteger(x.minQty), unitPrice: parseMoney(x.unitPrice, cur) })).filter((x): x is { minQty: number; unitPrice: number } => !!x.minQty && Number.isFinite(x.minQty) && !!x.unitPrice && Number.isFinite(x.unitPrice));
+  // Preview: what customers will see in THIS currency, computed from the values currently typed (ignored while invalid).
+  const retail = parseMoney(dp.retail, cur);
+  const tiers = dp.tiers.map((x) => ({ minQty: parseInteger(x.minQty), unitPrice: parseMoney(x.unitPrice, cur) })).filter((x): x is { minQty: number; unitPrice: number } => !!x.minQty && Number.isFinite(x.minQty) && !!x.unitPrice && Number.isFinite(x.unitPrice));
   const previewOk = !!retail && Number.isFinite(retail) && retail > 0 && tiers.length > 0;
-  const sale = parseMoney(draft.sale, cur);
-  const snap = previewOk ? snapshotFor({ currency: cur, retail: retail as number, sale: sale && Number.isFinite(sale) ? sale : undefined, wholesale: { enabled: true, tiers }, minOrderQty: parseInteger(draft.minOrderQty) }) : null;
+  const sale = parseMoney(dp.sale, cur);
+  const snap = previewOk ? snapshotFor({ currency: cur, retail: retail as number, sale: sale && Number.isFinite(sale) ? sale : undefined, wholesale: { enabled: true, tiers }, minOrderQty: parseInteger(dp.minOrderQty) }) : null;
   const q = Math.max(1, Math.floor(Number(tryQty) || 1));
   const up = snap ? unitPriceFor(snap, q) : null;
 
   return (
-    <>
-      <Checkbox label={t("admin.products.form.wholesale.toggle")} description={t("admin.products.form.wholesale.toggleHint")} checked={draft.wholesaleEnabled}
-        onChange={(e) => setDraft((d) => ({ ...d, wholesaleEnabled: e.target.checked, tiers: e.target.checked && d.tiers.length === 0 ? [{ minQty: "5", unitPrice: "" }] : d.tiers }))} />
-      {!draft.wholesaleEnabled && <p className="text-caption text-ink-muted">{t("admin.products.form.wholesale.off")}</p>}
-      {draft.wholesaleEnabled && (
-        <div className="grid gap-6 border-t border-line pt-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+    <fieldset className="min-w-0 rounded-card border border-line p-4">
+      <legend className="px-1 text-label font-semibold">{t("admin.products.form.wholesale.inCurrency", { currency: cur })}</legend>
+      <Checkbox label={t("admin.products.form.wholesale.toggle")} description={t("admin.products.form.wholesale.toggleHint")} checked={dp.wholesaleEnabled}
+        onChange={(e) => patchPrice(setDraft, cur, { wholesaleEnabled: e.target.checked, tiers: e.target.checked && dp.tiers.length === 0 ? [{ minQty: "5", unitPrice: "" }] : dp.tiers })} />
+      {!dp.wholesaleEnabled && <p className="text-caption mt-2 text-ink-muted">{t("admin.products.form.wholesale.off")}</p>}
+      {dp.wholesaleEnabled && (
+        <div className="mt-4 grid gap-6 border-t border-line pt-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           <div>
             <p className="text-label mb-2 font-semibold">{t("admin.products.form.wholesale.tierTitle")}</p>
-            {errText(t, errors, "tiers") && <p role="alert" className="text-caption mb-2 font-medium text-danger-fg">{errText(t, errors, "tiers")}</p>}
+            {errText(t, errors, `price.${cur}.tiers`) && <p role="alert" className="text-caption mb-2 font-medium text-danger-fg">{errText(t, errors, `price.${cur}.tiers`)}</p>}
             <ul className="space-y-3">
-              {draft.tiers.map((x, i) => (
+              {dp.tiers.map((x, i) => (
                 <li key={i} className="rounded-card border border-line p-3">
                   <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
-                    <TextField label={i === 0 ? t("admin.products.form.wholesale.minQty") : t("admin.products.form.wholesale.tierMin")} inputMode="numeric" value={x.minQty} onChange={(e) => setTier(i, { minQty: e.target.value })} error={errors[`tier.${i}.tierQtyInvalid`] || errors[`tier.${i}.tierOrder`] ? " " : undefined} />
-                    <TextField label={t("admin.products.form.wholesale.tierPrice", { currency: cur })} inputMode="decimal" value={x.unitPrice} onChange={(e) => setTier(i, { unitPrice: e.target.value })} error={errors[`tier.${i}.tierPriceInvalid`] || errors[`tier.${i}.tierAboveBase`] || errors[`tier.${i}.tierPriceOrder`] ? " " : undefined} />
-                    <Button variant="ghost" size="sm" className="mb-1" onClick={() => setDraft((d) => ({ ...d, tiers: d.tiers.filter((_, n) => n !== i) }))} aria-label={t("admin.products.form.wholesale.remove")}><Trash2 aria-hidden className="size-4" /></Button>
+                    <TextField label={i === 0 ? t("admin.products.form.wholesale.minQty") : t("admin.products.form.wholesale.tierMin")} inputMode="numeric" value={x.minQty} onChange={(e) => setTier(i, { minQty: e.target.value })} error={tierErr(i, "tierQtyInvalid", "tierOrder") ? " " : undefined} />
+                    <TextField label={t("admin.products.form.wholesale.tierPrice", { currency: cur })} inputMode="decimal" value={x.unitPrice} onChange={(e) => setTier(i, { unitPrice: e.target.value })} error={tierErr(i, "tierPriceInvalid", "tierAboveBase", "tierPriceOrder") ? " " : undefined} />
+                    <Button variant="ghost" size="sm" className="mb-1" onClick={() => patchPrice(setDraft, cur, { tiers: dp.tiers.filter((_, n) => n !== i) })} aria-label={t("admin.products.form.wholesale.remove")}><Trash2 aria-hidden className="size-4" /></Button>
                   </div>
                   {rowErrors(i).map((m) => <p key={m} role="alert" className="text-caption mt-1.5 font-medium text-danger-fg">{m}</p>)}
                 </li>
               ))}
             </ul>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => setDraft((d) => { const last = Math.max(0, ...d.tiers.map((x) => Number(x.minQty) || 0)); return { ...d, tiers: [...d.tiers, { minQty: String(last ? last * 2 : 5), unitPrice: "" }] }; })}><Plus aria-hidden className="size-4" />{t("admin.products.form.wholesale.add")}</Button>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => { const last = Math.max(0, ...dp.tiers.map((x) => Number(x.minQty) || 0)); patchPrice(setDraft, cur, { tiers: [...dp.tiers, { minQty: String(last ? last * 2 : 5), unitPrice: "" }] }); }}><Plus aria-hidden className="size-4" />{t("admin.products.form.wholesale.add")}</Button>
             <p className="text-caption mt-3 text-ink-muted">{t("admin.products.form.wholesale.variantNote")}</p>
           </div>
           <div className="rounded-card border border-dashed border-line-strong bg-sand-50 p-4">
@@ -279,6 +321,6 @@ export function WholesaleEditor({ draft, setDraft, errors }: { draft: ProductDra
           </div>
         </div>
       )}
-    </>
+    </fieldset>
   );
 }

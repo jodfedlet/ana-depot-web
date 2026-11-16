@@ -17,8 +17,10 @@ export interface ProductVariant {
   sku: string;
   /** option name -> value label (localized) */
   optionValues: Record<string, string>;
-  /** Overrides the product retail price. */
+  /** Own price in the product's primary currency (see `prices` for every currency). */
   price?: Money;
+  /** Own retail price per currency, when it differs from the product's. */
+  prices?: Record<string, Money>;
   availability: Availability;
   /** Units a customer can still reserve (only when stock is tracked). */
   availableQty?: number;
@@ -33,6 +35,19 @@ export interface AttributeValue {
   name: string;
 }
 
+/** One currency a product is sold in, with everything needed to price it. */
+export interface ProductOffer {
+  currency: string;
+  /** Unit price below any wholesale tier (sale price if set, else retail). */
+  price: Money;
+  compareAtPrice?: Money;
+  pricing: Pricing;
+  minOrderQty: number;
+  hasWholesale: boolean;
+  /** Variant id -> that variant's own retail price in this currency. */
+  variantPrices: Record<string, Money>;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -42,10 +57,12 @@ export interface Product {
   categorySlug: string;
   categoryName: string;
   brand?: string;
-  /** Unit price below any wholesale tier (sale price if set, else retail). */
+  /** PRIMARY-currency view: unit price below any wholesale tier (sale price if set, else retail). See `offers` for every currency. */
   price: Money;
-  /** Retail price shown struck through when a promotion applies. */
+  /** Retail price shown struck through when a promotion applies (primary currency). */
   compareAtPrice?: Money;
+  /** Every currency this product is sold in (one product, independent prices). The first is the primary one. */
+  offers: ProductOffer[];
   images: ProductImage[];
   availability: Availability;
   /** Units still reservable, when stock is tracked. */
@@ -62,7 +79,7 @@ export interface Product {
   relatedIds?: string[];
   unit: UnitId;
   unitNote?: string;
-  /** Raw pricing in minor units (tiers, minimum order). */
+  /** Raw pricing in minor units (tiers, minimum order) — primary currency. */
   pricing: Pricing;
   minOrderQty: number;
   hasWholesale: boolean;

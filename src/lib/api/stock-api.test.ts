@@ -5,7 +5,7 @@ import { stockOf } from "../catalog/stock";
 import { hasVariantsRecord } from "../catalog/model";
 import { adjustStock, saveCategory, saveProduct, setProductStatus } from "./catalog-admin";
 import { resetDemoData, runReservationAction, submitReservation } from "./reservations";
-import { emptyDraft } from "../catalog/draft";
+import { emptyDraft, emptyDraftPrice } from "../catalog/draft";
 import type { ReservationLine } from "../reservations/types";
 
 const customer = { firstName: "Test", lastName: "Client", dialCode: "+509", phone: "0000 1111" };
@@ -42,8 +42,9 @@ describe("reservation service enforces stock", () => {
 
   it("refuses quantities below the product's minimum order", async () => {
     const p = product("p-002");
-    expect(p.pricing.minOrderQty).toBeGreaterThan(1);
-    expect(await submit([lineFor("p-002", p.pricing.minOrderQty! - 1, p.variants[0]?.id)])).toMatchObject({ ok: false, error: "below_minimum" });
+    const min = p.prices[0].minOrderQty!;
+    expect(min).toBeGreaterThan(1);
+    expect(await submit([lineFor("p-002", min - 1, p.variants[0]?.id)])).toMatchObject({ ok: false, error: "below_minimum" });
   });
 
   it("collecting a reservation deducts physical stock once, with a traceable movement", async () => {
@@ -88,20 +89,20 @@ describe("inventory adjustments", () => {
 describe("catalog administration", () => {
   it("saves a draft without publishing; activation re-validates and then shows it to customers", async () => {
     const category = catalogStore.getSnapshot().categories.find((c) => c.slug === "general")!;
-    const draft = { ...emptyDraft(), categorySlug: category.slug, nameFr: "Article test", sku: "", retail: "" };
+    const draft = { ...emptyDraft(), categorySlug: category.slug, nameFr: "Article test", sku: "" };
     const saved = await saveProduct(draft, "draft", "Test");
     expect(saved.ok).toBe(true);
     if (!saved.ok) return;
     expect(product(saved.data.id).status).toBe("draft");
     expect(await setProductStatus(saved.data.id, "active")).toMatchObject({ ok: false, error: "validation" });
-    expect(await saveProduct({ ...draft, id: saved.data.id, sku: "TST-1", retail: "500" }, "active", "Test")).toMatchObject({ ok: true });
+    expect(await saveProduct({ ...draft, id: saved.data.id, sku: "TST-1", prices: { ...draft.prices, HTG: { ...draft.prices.HTG, retail: "500" } } }, "active", "Test")).toMatchObject({ ok: true });
     expect(product(saved.data.id).status).toBe("active");
     expect(await setProductStatus(saved.data.id, "inactive")).toMatchObject({ ok: true });
     expect(await submit([{ ...lineFor("p-009", 1), productId: saved.data.id }])).toMatchObject({ ok: false, error: "product_unavailable" });
   });
 
   it("refuses a duplicate SKU and a select attribute without options", async () => {
-    const dup = await saveProduct({ ...emptyDraft(), categorySlug: "general", nameFr: "Doublon", sku: product("p-009").sku, retail: "100" }, "active", "Test");
+    const dup = await saveProduct({ ...emptyDraft(), categorySlug: "general", nameFr: "Doublon", sku: product("p-009").sku, prices: { ...emptyDraft().prices, HTG: { ...emptyDraftPrice(true), retail: "100" } } }, "active", "Test");
     expect(dup).toMatchObject({ ok: false, error: "validation" });
     const cat = { ...catalogStore.getSnapshot().categories[0], slug: "peinture", attributes: [{ id: "a1", key: "finish", label: { fr: "Finition", ht: "Fini" }, type: "select" as const, options: [], required: false, filterable: false, variantAxis: false }] };
     expect(await saveCategory({ ...cat, name: { fr: "Peinture", ht: "Penti" } }, true)).toMatchObject({ ok: false });

@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { Checkbox, SelectField, TextAreaField, TextField } from "@/components/ui/field";
-import { market } from "@/config/market";
 import Image from "@/components/ui/smart-image";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
@@ -26,7 +25,7 @@ import { useIsClient } from "@/lib/stores/create-persisted-store";
 import { focusFirstInvalid } from "@/lib/validation";
 import { useUnsavedChanges } from "../admin-shell";
 import { AttributeEditor } from "../categories/attribute-editor";
-import { AttributesFields, ImagesEditor, Section, VariantsEditor, WholesaleEditor, errText } from "./product-form-parts";
+import { AttributesFields, ImagesEditor, PriceSetsEditor, Section, VariantsEditor, WholesaleEditor, enabledCurrencies, errText } from "./product-form-parts";
 
 const STEPS = ["category", "basics", "images", "attributes", "variants", "pricing", "wholesale", "stock", "review"] as const;
 type Step = (typeof STEPS)[number];
@@ -37,8 +36,8 @@ function sectionOf(key: string): Step {
   if (key === "name" || key === "sku") return "basics";
   if (key.startsWith("attr.")) return "attributes";
   if (key === "options" || key === "variants" || key.startsWith("variant.")) return "variants";
-  if (key === "retail" || key === "sale" || key === "minOrderQty") return "pricing";
-  if (key === "tiers" || key.startsWith("tier.")) return "wholesale";
+  if (key === "prices" || /^price\.[A-Z]{3}\.(retail|sale|minOrderQty)$/.test(key)) return "pricing";
+  if (/^price\.[A-Z]{3}\.(tiers|tier\.)/.test(key)) return "wholesale";
   return "stock";
 }
 
@@ -82,7 +81,7 @@ function ProductForm({ existing }: { existing?: ProductRecord }) {
   const lockedVariantIds = existing?.variants.map((v) => v.id) ?? [];
   const editing = !!existing;
   const issueCount = (step: Step) => Object.keys(publishIssues).filter((k) => sectionOf(k) === step).length;
-  const retail = parseMoney(draft.retail, draft.currency);
+  const previewPrices = enabledCurrencies(draft).map((c) => ({ currency: c, amount: parseMoney(draft.prices[c].retail, c) })).filter((x): x is { currency: typeof x.currency; amount: number } => !!x.amount && Number.isFinite(x.amount));
   const previewName = draft.nameFr || draft.nameHt || t("admin.products.untitled");
 
   const submit = async (target: ProductStatus) => {
@@ -161,24 +160,22 @@ function ProductForm({ existing }: { existing?: ProductRecord }) {
             <VariantsEditor draft={draft} setDraft={setDraft} category={category} errors={errors} lockedVariantIds={lockedVariantIds} />
           </Section>
 
-          <Section id="sec-pricing" step={6} title={t("admin.products.form.steps.pricing")}>
+          <Section id="sec-pricing" step={6} title={t("admin.products.form.steps.pricing")} hint={t("admin.products.form.pricing.intro")}>
             <div className="grid gap-4 sm:grid-cols-2">
               <SelectField label={t("admin.products.form.pricing.unit")} value={draft.unit} onChange={(e) => patch({ unit: e.target.value as ProductDraft["unit"] })}>
                 {unitIds.map((u) => <option key={u} value={u}>{t(`units.${u}`, { count: 1 })}</option>)}
               </SelectField>
-              <SelectField label={t("admin.products.form.pricing.currency")} hint={t("admin.products.form.pricing.currencyHint")} value={draft.currency} onChange={(e) => patch({ currency: e.target.value as ProductDraft["currency"] })} error={errText(t, errors, "currency")}>
-                {market.currencies.map((c) => <option key={c} value={c}>{c}</option>)}
-              </SelectField>
+              <div />
               <TextField label={t("admin.products.form.pricing.unitNoteFr")} lang="fr" optional hint={t("admin.products.form.pricing.unitNoteHint")} value={draft.unitNoteFr} onChange={(e) => patch({ unitNoteFr: e.target.value })} />
               <TextField label={t("admin.products.form.pricing.unitNoteHt")} lang="ht" optional value={draft.unitNoteHt} onChange={(e) => patch({ unitNoteHt: e.target.value })} />
-              <TextField label={t("admin.products.form.pricing.retail", { currency: draft.currency })} inputMode="decimal" hint={t("admin.products.form.pricing.retailHint")} value={draft.retail} onChange={(e) => patch({ retail: e.target.value })} error={errText(t, errors, "retail")} />
-              <TextField label={t("admin.products.form.pricing.sale", { currency: draft.currency })} inputMode="decimal" optional hint={t("admin.products.form.pricing.saleHint")} value={draft.sale} onChange={(e) => patch({ sale: e.target.value })} error={errText(t, errors, "sale")} />
-              <TextField label={t("admin.products.form.pricing.minOrder")} inputMode="numeric" optional hint={t("admin.products.form.pricing.minOrderHint")} value={draft.minOrderQty} onChange={(e) => patch({ minOrderQty: e.target.value })} error={errText(t, errors, "minOrderQty")} />
             </div>
+            <PriceSetsEditor draft={draft} setDraft={setDraft} errors={errors} />
           </Section>
 
           <Section id="sec-wholesale" step={7} title={t("admin.products.form.steps.wholesale")} badge={<Badge>{t("common.optional")}</Badge>}>
-            <WholesaleEditor draft={draft} setDraft={setDraft} errors={errors} />
+            {enabledCurrencies(draft).length === 0
+              ? <Alert tone="info">{t("admin.products.form.wholesale.needCurrency")}</Alert>
+              : enabledCurrencies(draft).map((c) => <WholesaleEditor key={c} draft={draft} setDraft={setDraft} errors={errors} currency={c} />)}
           </Section>
 
           <Section id="sec-stock" step={8} title={t("admin.products.form.steps.stock")}>
@@ -231,7 +228,7 @@ function ProductForm({ existing }: { existing?: ProductRecord }) {
               <p className="text-eyebrow mb-2 text-ink-muted">{t("admin.products.form.preview")}</p>
               <div className="relative aspect-square overflow-hidden rounded-control bg-sand-100"><Image src={draft.images[0]?.src ?? "/sample/placeholder.svg"} alt="" fill sizes="240px" className="object-cover" /></div>
               <p className="text-label mt-2 font-semibold">{previewName}</p>
-              <p className="text-caption text-ink-soft">{retail && Number.isFinite(retail) ? `${formatMoney({ amount: retail, currency: draft.currency }, locale)} / ${t(`units.${draft.unit}`, { count: 1 })}` : "—"}</p>
+              <p className="text-caption text-ink-soft">{previewPrices.length ? previewPrices.map((x) => `${formatMoney({ amount: x.amount, currency: x.currency }, locale)} / ${t(`units.${draft.unit}`, { count: 1 })}`).join(" · ") : "—"}</p>
               {existing?.status === "active" && <Link href={`/products/${existing.slug}`} className="text-caption mt-2 inline-flex items-center gap-1 font-semibold text-brand-700 underline" ><ExternalLink aria-hidden className="size-3" />{t("admin.products.form.viewInStore")}</Link>}
             </div>
           </div>

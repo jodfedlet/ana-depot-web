@@ -5,7 +5,9 @@
 import type { Locale } from "@/i18n/config";
 import { seedCategories, seedProducts } from "./catalog-seed";
 import { toProduct } from "../catalog/localize";
+import { pricingIn } from "../catalog/model";
 import { snapshotFor, unitPriceFor } from "../catalog/pricing";
+import type { CurrencyCode } from "../money";
 import { previousSampleLocation, sampleInstructions, sampleLocation } from "./pickup";
 import { noteTemplates } from "../reservations/templates";
 import { pick } from "../localized";
@@ -21,12 +23,14 @@ const currentSnapshot = (at: string): PickupSnapshot => ({ location: sampleLocat
 const oldSnapshot = (at: string): PickupSnapshot => ({ location: previousSampleLocation, instructions: sampleInstructions, capturedAt: at, origin: "default" });
 
 /** Builds a reservation line exactly as the storefront would: variant, tier price and unit snapshot. */
-function line(slug: string, quantity: number, locale: Locale, variantIds?: Record<string, string>): ReservationLine {
+function line(slug: string, quantity: number, locale: Locale, variantIds?: Record<string, string>, currency?: CurrencyCode): ReservationLine {
   const rec = seedProducts.find((x) => x.slug === slug)!;
   const display = toProduct(rec, seedCategories.find((c) => c.slug === rec.categorySlug), locale, []);
   const variant = variantIds ? rec.variants.find((v) => Object.entries(variantIds).every(([k, id]) => v.optionValues[k] === id)) : undefined;
   const shown = variant ? display.variants.find((v) => v.id === variant.id) : undefined;
-  const price = unitPriceFor(snapshotFor(rec.pricing, variant?.price), quantity);
+  // The line is priced in ONE of the product's currencies (the first one unless a currency is given).
+  const pricing = (currency ? pricingIn(rec, currency) : rec.prices[0])!;
+  const price = unitPriceFor(snapshotFor(pricing, variant?.prices?.[pricing.currency]), quantity);
   return {
     productId: rec.id,
     variantId: variant?.id,
@@ -34,7 +38,7 @@ function line(slug: string, quantity: number, locale: Locale, variantIds?: Recor
     name: display.name,
     variantLabel: shown ? Object.entries(shown.optionValues).map(([k, v]) => `${k} : ${v}`).join(" · ") : undefined,
     quantity,
-    unitPrice: { amount: price.unitPrice, currency: rec.pricing.currency },
+    unitPrice: { amount: price.unitPrice, currency: pricing.currency },
     unit: rec.unit,
     priceKind: price.kind,
     tierMinQty: price.tier?.minQty,

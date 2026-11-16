@@ -192,6 +192,7 @@ export const store = {
     per: "/ {unit}",
   },
   pricing: {
+    alsoIn: "Aussi à",
     tiersTitle: "Prix selon la quantité",
     quantityCol: "Quantité",
     priceCol: "Prix par unité",
@@ -221,6 +222,8 @@ export const store = {
     addedQty: "{qty} {unit} × {name} ajouté au panier",
     sku: "Référence : {sku}",
     skuLabel: "Référence",
+    currencyChoice: "Devise de la réservation",
+    currencyHint: "Choisissez la devise dans laquelle vous voulez réserver ce produit. Chaque devise a son propre prix ; aucun taux de change n'est appliqué.",
     unitLabel: "Vendu par",
     viewCart: "Voir le panier",
     reserveNow: "Réserver maintenant",

@@ -12,7 +12,7 @@ import { EmptyState, Skeleton } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { Link } from "@/i18n/link";
 import { useLocale, useT } from "@/i18n/provider";
-import { type CartLine, lineTotal } from "@/lib/cart";
+import { type CartLine, lineTotal, sharedRoom } from "@/lib/cart";
 import { unitPriceFor } from "@/lib/catalog/pricing";
 import { useStorefront } from "@/lib/catalog/hooks";
 import { formatMoney } from "@/lib/money";
@@ -26,6 +26,9 @@ export function useCartIssues(lines: CartLine[]): Record<string, Issue> {
   return useMemo(() => {
     const out: Record<string, Issue> = {};
     if (!ready) return out;
+    // Stock is shared by every currency: HTG and USD lines of the same item are compared with the stock together.
+    const demand = new Map<string, number>();
+    for (const l of lines) demand.set(`${l.productId}:${l.variantId ?? ""}`, (demand.get(`${l.productId}:${l.variantId ?? ""}`) ?? 0) + l.quantity);
     for (const l of lines) {
       const p = products.find((x) => x.id === l.productId);
       const v = l.variantId ? p?.variants.find((x) => x.id === l.variantId) : undefined;
@@ -33,7 +36,7 @@ export function useCartIssues(lines: CartLine[]): Record<string, Issue> {
       const availability = v?.availability ?? p.availability;
       const available = v?.availableQty ?? p.availableQty;
       if (availability === "out_of_stock") out[l.key] = { kind: "unavailable" };
-      else if (available !== undefined && l.quantity > available) out[l.key] = { kind: "insufficient", available };
+      else if (available !== undefined && (demand.get(`${l.productId}:${l.variantId ?? ""}`) ?? l.quantity) > available) out[l.key] = { kind: "insufficient", available };
     }
     return out;
   }, [lines, products, ready]);
@@ -68,7 +71,8 @@ export function CartView() {
           {cart.lines.map((line) => {
             const issue = issues[line.key];
             const next = unitPriceFor(line.pricing, line.quantity).next;
-            const max = issue?.kind === "insufficient" ? Math.max(line.pricing.minQty, issue.available) : line.maxQuantity;
+            const room = sharedRoom(cart.lines, { ...line, maxQuantity: issue?.kind === "insufficient" ? issue.available : line.maxQuantity });
+            const max = room === undefined ? undefined : Math.max(line.pricing.minQty, room);
             return (
               <li key={line.key} className="grid grid-cols-[5.5rem_1fr] gap-x-4 gap-y-3 py-5 sm:grid-cols-[7rem_1fr_auto]">
                 <Link href={`/products/${line.slug}`} className="relative block aspect-square overflow-hidden rounded-control bg-sand-100">

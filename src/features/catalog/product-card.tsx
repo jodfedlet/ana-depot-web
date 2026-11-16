@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Price, useUnitLabel } from "@/components/ui/price";
+import { MoneyText, Price, useUnitLabel } from "@/components/ui/price";
 import { ProductImage } from "@/components/ui/product-image";
 import { Link } from "@/i18n/link";
 import { useT } from "@/i18n/provider";
@@ -17,7 +17,9 @@ export function ProductCard({ product, priority = false }: { product: Product; p
   const t = useT();
   const unitLabel = useUnitLabel();
   const { price, from } = displayPrice(product);
-  const firstTier = product.hasWholesale ? [...product.pricing.wholesale.tiers].sort((a, b) => a.minQty - b.minQty)[0] : undefined;
+  // The wholesale hint comes from the first currency that has tiers (each currency has its own tiers).
+  const tiered = product.offers.find((o) => o.hasWholesale);
+  const firstTier = tiered ? [...tiered.pricing.wholesale.tiers].sort((a, b) => a.minQty - b.minQty)[0] : undefined;
   const pct = discountPercent(product.price, product.compareAtPrice);
   const soldOut = product.availability === "out_of_stock";
   const showAvailability = product.availability === "low_stock" || product.availability === "preorder";
@@ -46,10 +48,11 @@ export function ProductCard({ product, priority = false }: { product: Product; p
           </Link>
         </h3>
         <Price price={price} compareAt={from ? undefined : product.compareAtPrice} from={from} unit={product.unit} className="mt-1.5" />
-        {firstTier && <p className="text-caption mt-1 font-medium text-accent-700">{t("pricing.wholesaleFrom", { qty: firstTier.minQty, unit: unitLabel(product.unit, firstTier.minQty) })}</p>}
+        {product.offers.slice(1).map((o) => <p key={o.currency} className="text-caption mt-0.5 text-ink-soft">{t("pricing.alsoIn")} <MoneyText value={o.price} /></p>)}
+        {firstTier && <p className="text-caption mt-1 font-medium text-accent-700">{t("pricing.wholesaleFrom", { qty: firstTier.minQty, unit: unitLabel(product.unit, firstTier.minQty) })}{product.offers.length > 1 && tiered ? ` (${tiered.currency})` : ""}</p>}
         {showAvailability && <p className="text-caption mt-1 font-medium text-warning-fg">{t(`availability.${product.availability}`)}</p>}
         <div className="relative z-10 mt-auto pt-3">
-          <QuickAdd product={product} withOptions={hasVariants(product)} />
+          <QuickAdd product={product} withOptions={hasVariants(product) || product.offers.length > 1} />
         </div>
       </div>
     </article>

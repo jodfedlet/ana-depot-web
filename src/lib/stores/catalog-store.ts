@@ -12,5 +12,5 @@ export const seedCatalog = (): CatalogState => ({ categories: structuredClone(se
  * DEMO catalog database (browser localStorage). The storefront and the administration both read it, so a product
  * the seller registers really appears to customers. NOT persistence: the Spring Boot API replaces it.
  */
-export const catalogStore = createPersistedStore<CatalogState>("ana.demo.catalog.v2", seedCatalog());
+export const catalogStore = createPersistedStore<CatalogState>("ana.demo.catalog.v3", seedCatalog());
 export const useCatalogState = () => catalogStore.useStore();

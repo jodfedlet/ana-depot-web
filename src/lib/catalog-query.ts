@@ -9,6 +9,7 @@ import type {
 import { sortKeys } from "./catalog-types";
 import { SUPPORTED_CURRENCIES, isSupportedCurrency, majorToMinor, sumByCurrency } from "./money";
 import { market } from "@/config/market";
+import { inCurrency } from "./catalog/offers";
 
 export const DEFAULT_PAGE_SIZE = 12;
 
@@ -110,18 +111,21 @@ export function deriveFacets(products: Product[], minProducts = 3): FacetGroup[]
 }
 
 export function queryCatalog(
-  allProducts: Product[],
+  everyProduct: Product[],
   query: CatalogQuery,
   categoryNames: Record<string, string> = {},
 ): CatalogResult {
   const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
+  // A product sold in several currencies is ONE product with several offers. When a currency is selected each product is
+  // shown as sold in that currency (and products not sold in it drop out): a missing currency is never converted.
+  const allProducts = query.currency ? everyProduct.map((p) => inCurrency(p, query.currency as string)).filter((p): p is Product => p !== null) : everyProduct;
   const scoped = allProducts.filter(
     (p) =>
       (!query.category || p.categorySlug === query.category) &&
       (!query.q || matchesText(p, query.q, categoryNames[p.categorySlug] ?? "")),
   );
 
-  const currencies = sumCounts(scoped);
+  const currencies = offerCounts(everyProduct.filter((p) => (!query.category || p.categorySlug === query.category) && (!query.q || matchesText(p, query.q, categoryNames[p.categorySlug] ?? ""))));
   // Price ranges only make sense inside one currency: the selected one, or the only one in scope.
   const priceCurrency = query.currency ?? (currencies.length === 1 ? currencies[0].code : undefined);
 
@@ -132,7 +136,7 @@ export function queryCatalog(
       if (query.maxPrice !== undefined && p.price.amount > query.maxPrice) return false;
     }
     if (query.inStockOnly && p.availability === unavailable) return false;
-    if (query.wholesaleOnly && !p.hasWholesale) return false;
+    if (query.wholesaleOnly && !(query.currency ? p.hasWholesale : p.offers.some((o) => o.hasWholesale))) return false;
     if (query.brands?.length && !(p.brand && query.brands.includes(p.brand))) return false;
     for (const [key, values] of Object.entries(query.attributes ?? {})) {
       if (values.length && !values.includes(p.attributes[key]?.id ?? "")) return false;
@@ -163,9 +167,9 @@ export function queryCatalog(
   };
 }
 
-/** Product counts per currency, in launch order. */
-function sumCounts(products: Product[]): { code: string; count: number }[] {
-  const totals = sumByCurrency(products.map((p) => ({ amount: 1, currency: p.price.currency })));
+/** How many products are sold in each currency (a product sold in both counts in both), in launch order. */
+function offerCounts(products: Product[]): { code: string; count: number }[] {
+  const totals = sumByCurrency(products.flatMap((p) => p.offers.map((o) => ({ amount: 1, currency: o.currency }))));
   return totals.map((t) => ({ code: t.currency, count: t.amount }));
 }
 

@@ -82,11 +82,11 @@ function variantsOf(sku: string, options: VariantOption[], fn: (ids: Record<stri
   return combos.map((c, i) => ({ id: `${sku.toLowerCase()}-v${i + 1}`, sku: `${sku}-${Object.values(c).join("-").toUpperCase()}`, optionValues: c, active: true, ...fn(c, i) }));
 }
 
-const base = (id: string, slug: string, sku: string, name: LText, description: LText, categorySlug: string, rest: Omit<Partial<ProductRecord>, "pricing"> & { pricing: Omit<Pricing, "currency"> & { currency?: CurrencyCode } }): ProductRecord => ({
+const base = (id: string, slug: string, sku: string, name: LText, description: LText, categorySlug: string, rest: Omit<Partial<ProductRecord>, "prices"> & { prices: (Omit<Pricing, "currency"> & { currency?: CurrencyCode })[] }): ProductRecord => ({
   id, slug, sku, name, description, categorySlug, images: img(slug), status: "active", unit: "unit", unitNote: L("", ""), attributes: {}, options: [], variants: [],
   inventory: { tracked: true, onHand: 0, manualAvailability: "in_stock" }, createdAt: "2026-09-10T10:00:00Z", updatedAt: "2026-10-05T10:00:00Z", featuredRank: 99, isSample: true, ...rest,
-  // A product is HTG unless its pricing says otherwise (sample shoes and bed linen are USD to demonstrate mixed currencies).
-  pricing: { currency: "HTG", ...rest.pricing },
+  // A price set is HTG unless it says otherwise. Sample shoes and bed linen are USD-only; the foam mattress is sold in BOTH currencies (one product, two independent price sets, one stock).
+  prices: rest.prices.map((p) => ({ currency: "HTG" as CurrencyCode, ...p })),
 });
 const wh = (tiers: PriceTier[]) => ({ enabled: true, tiers: tiers.map((t) => ({ minQty: t.minQty, unitPrice: htg(t.unitPrice) })) });
 const off = { enabled: false, tiers: [] as PriceTier[] };
@@ -104,69 +104,73 @@ const tableSize = optAxis("size", "Taille", "Gwosè", [["p4", "4 places", "4 pla
 /** `featuredRank` orders the home page: the first eight alternate categories so no single category dominates the storefront. */
 export const seedProducts: ProductRecord[] = [
   base("p-001", "tube-rond-galva", "TUB-RND", L("Tube rond galvanisé 6 m", "Tib won galvanize 6 m"), L("Tube rond en acier galvanisé, longueur 6 m. Description d'exemple.", "Tib won an asye galvanize, longè 6 m. Deskripsyon egzanp."), "metal", {
-    pricing: { retail: htg(1800), wholesale: wh([{ minQty: 10, unitPrice: 1650 }, { minQty: 50, unitPrice: 1500 }]) }, featuredRank: 2, relatedIds: ["p-002", "p-003"],
+    prices: [{ retail: htg(1800), wholesale: wh([{ minQty: 10, unitPrice: 1650 }, { minQty: 50, unitPrice: 1500 }]) }], featuredRank: 2, relatedIds: ["p-002", "p-003"],
     attributes: { material: "galv", length: "6", thickness: "2" }, options: [diam],
-    variants: variantsOf("TUB-RND", [diam], (c) => ({ price: c.diameter === "d32" ? htg(2400) : c.diameter === "d40" ? htg(3200) : undefined, onHand: c.diameter === "d25" ? 140 : c.diameter === "d32" ? 90 : 6 })),
+    variants: variantsOf("TUB-RND", [diam], (c) => ({ prices: c.diameter === "d32" ? { HTG: htg(2400) } : c.diameter === "d40" ? { HTG: htg(3200) } : undefined, onHand: c.diameter === "d25" ? 140 : c.diameter === "d32" ? 90 : 6 })),
     inventory: { tracked: true, onHand: 0, lowStockThreshold: 10, manualAvailability: "in_stock" }, isNew: true,
   }),
   base("p-002", "fer-a-beton", "FER-BET", L("Fer à béton 12 m", "Fè beton 12 m"), L("Barre de fer à béton, longueur 12 m. Description d'exemple.", "Ba fè beton, longè 12 m. Deskripsyon egzanp."), "metal", {
-    pricing: { retail: htg(950), wholesale: wh([{ minQty: 20, unitPrice: 880 }, { minQty: 100, unitPrice: 820 }]), minOrderQty: 5 }, featuredRank: 8, relatedIds: ["p-001", "p-003"],
+    prices: [{ retail: htg(950), wholesale: wh([{ minQty: 20, unitPrice: 880 }, { minQty: 100, unitPrice: 820 }]), minOrderQty: 5 }], featuredRank: 8, relatedIds: ["p-001", "p-003"],
     attributes: { material: "iron", length: "12" }, options: [rebar],
-    variants: variantsOf("FER-BET", [rebar], (c) => ({ price: c.diameter === "d10" ? htg(1400) : c.diameter === "d12" ? htg(1900) : undefined, onHand: c.diameter === "d8" ? 300 : c.diameter === "d10" ? 220 : 40 })),
+    variants: variantsOf("FER-BET", [rebar], (c) => ({ prices: c.diameter === "d10" ? { HTG: htg(1400) } : c.diameter === "d12" ? { HTG: htg(1900) } : undefined, onHand: c.diameter === "d8" ? 300 : c.diameter === "d10" ? 220 : 40 })),
     inventory: { tracked: true, onHand: 0, lowStockThreshold: 50, manualAvailability: "in_stock" },
   }),
   base("p-003", "corniere-acier", "COR-ACI", L("Cornière en acier 40×40", "Kònyè asye 40×40"), L("Cornière en acier, 6 m. Produit sans variante, sans prix de gros.", "Kònyè asye, 6 m. Pwodwi san varyant, san pri an gwo."), "metal", {
-    pricing: { retail: htg(2600), wholesale: off }, featuredRank: 11, attributes: { material: "galv", length: "6", thickness: "3" }, inventory: { tracked: true, onHand: 12, lowStockThreshold: 5, manualAvailability: "in_stock" },
+    prices: [{ retail: htg(2600), wholesale: off }], featuredRank: 11, attributes: { material: "galv", length: "6", thickness: "3" }, inventory: { tracked: true, onHand: 12, lowStockThreshold: 5, manualAvailability: "in_stock" },
   }),
   base("p-004", "baskets-sport", "BSK-SPT", L("Baskets de sport", "Soulye espò"), L("Baskets légères pour le sport et la marche. Une pointure et une couleur à choisir.", "Soulye lejè pou espò ak mache. Chwazi yon pwenti ak yon koulè."), "shoes", {
-    unit: "pair", pricing: { currency: "USD", retail: usd(28), wholesale: wh([{ minQty: 6, unitPrice: 25 }, { minQty: 12, unitPrice: 23 }]) }, featuredRank: 1, images: img("baskets-sport", ["-blanc"]), relatedIds: ["p-005"],
+    unit: "pair", prices: [{ currency: "USD", retail: usd(28), wholesale: wh([{ minQty: 6, unitPrice: 25 }, { minQty: 12, unitPrice: 23 }]) }], featuredRank: 1, images: img("baskets-sport", ["-blanc"]), relatedIds: ["p-005"],
     attributes: { model: "Sport 1", material: "synthetic", audience: "men" }, options: [shoeSize, shoeColor],
     variants: variantsOf("BSK-SPT", [shoeSize, shoeColor], (c, i) => ({ onHand: 12 - (i % 5) * 2, imageIndex: c.color === "white" ? 3 : 0 })),
     inventory: { tracked: true, onHand: 0, lowStockThreshold: 3, manualAvailability: "in_stock" }, isNew: true,
   }),
   base("p-005", "sandales-cuir", "SND-CUI", L("Sandales en cuir", "Sandal an po"), L("Sandales en cuir véritable, plusieurs pointures.", "Sandal an vrè po, plizyè pwenti."), "shoes", {
-    unit: "pair", pricing: { currency: "USD", retail: usd(15), wholesale: off }, featuredRank: 6, attributes: { model: "Été", material: "leather", audience: "women" }, options: [sandSize],
+    unit: "pair", prices: [{ currency: "USD", retail: usd(15), wholesale: off }], featuredRank: 6, attributes: { model: "Été", material: "leather", audience: "women" }, options: [sandSize],
     variants: variantsOf("SND-CUI", [sandSize], (c) => ({ onHand: c.size === "s40" ? 0 : 9 })), inventory: { tracked: true, onHand: 0, lowStockThreshold: 2, manualAvailability: "in_stock" },
   }),
   base("p-006", "matelas-mousse", "MAT-MOU", L("Matelas en mousse", "Matla an mous"), L("Matelas en mousse haute densité. Le prix dépend des dimensions.", "Matla an mous ki di. Pri a depann de dimansyon yo."), "bedding", {
-    pricing: { retail: htg(4500), wholesale: wh([{ minQty: 5, unitPrice: 4000 }, { minQty: 10, unitPrice: 3700 }]) }, featuredRank: 3, relatedIds: ["p-007"],
+    prices: [
+      { retail: htg(4500), wholesale: wh([{ minQty: 5, unitPrice: 4000 }, { minQty: 10, unitPrice: 3700 }]) },
+      // Same mattress, same stock: an independent USD price set (its own retail and wholesale tiers).
+      { currency: "USD", retail: usd(60), wholesale: wh([{ minQty: 5, unitPrice: 54 }, { minQty: 10, unitPrice: 50 }]) },
+    ], featuredRank: 3, relatedIds: ["p-007"],
     attributes: { material: "foam", thickness: "16", type: "foam" }, options: [matSize],
-    variants: variantsOf("MAT-MOU", [matSize], (c) => ({ price: c.size === "double" ? htg(6800) : c.size === "large" ? htg(8200) : undefined, onHand: c.size === "single" ? 24 : c.size === "double" ? 9 : 3 })),
+    variants: variantsOf("MAT-MOU", [matSize], (c) => ({ prices: c.size === "double" ? { HTG: htg(6800), USD: usd(90) } : c.size === "large" ? { HTG: htg(8200), USD: usd(110) } : undefined, onHand: c.size === "single" ? 24 : c.size === "double" ? 9 : 3 })),
     inventory: { tracked: true, onHand: 0, lowStockThreshold: 4, manualAvailability: "in_stock" },
   }),
   base("p-007", "drap-coton-set", "DRP-COT", L("Parure de draps en coton", "Seri dra an koton"), L("Drap-housse, drap plat et deux taies d'oreiller.", "Dra ki mete sou matla a, dra plat ak de tèt zòrye."), "bedding", {
-    unit: "set", unitNote: L("1 drap-housse + 1 drap plat + 2 taies", "1 dra matla + 1 dra plat + 2 tèt zòrye"), pricing: { currency: "USD", retail: usd(19), wholesale: wh([{ minQty: 6, unitPrice: 17 }]) }, featuredRank: 9, relatedIds: ["p-006"],
-    attributes: { material: "cotton" }, options: [sheetSize], variants: variantsOf("DRP-COT", [sheetSize], (c) => ({ price: c.size === "double" ? usd(26) : undefined, onHand: c.size === "single" ? 35 : 22 })), inventory: { tracked: true, onHand: 0, manualAvailability: "in_stock" },
+    unit: "set", unitNote: L("1 drap-housse + 1 drap plat + 2 taies", "1 dra matla + 1 dra plat + 2 tèt zòrye"), prices: [{ currency: "USD", retail: usd(19), wholesale: wh([{ minQty: 6, unitPrice: 17 }]) }], featuredRank: 9, relatedIds: ["p-006"],
+    attributes: { material: "cotton" }, options: [sheetSize], variants: variantsOf("DRP-COT", [sheetSize], (c) => ({ prices: c.size === "double" ? { USD: usd(26) } : undefined, onHand: c.size === "single" ? 35 : 22 })), inventory: { tracked: true, onHand: 0, manualAvailability: "in_stock" },
   }),
   base("p-008", "table-a-manger", "TAB-MNG", L("Table à manger", "Tab pou manje"), L("Table à manger en bois, deux tailles.", "Tab pou manje an bwa, de gwosè."), "furniture", {
-    pricing: { retail: htg(9500), wholesale: off }, featuredRank: 5, relatedIds: ["p-009", "p-010"], attributes: { material: "wood", color: "brown", shape: "rect" }, options: [tableSize],
-    variants: variantsOf("TAB-MNG", [tableSize], (c) => ({ price: c.size === "p6" ? htg(13500) : undefined, onHand: c.size === "p4" ? 5 : 2 })), inventory: { tracked: true, onHand: 0, lowStockThreshold: 2, manualAvailability: "in_stock" },
+    prices: [{ retail: htg(9500), wholesale: off }], featuredRank: 5, relatedIds: ["p-009", "p-010"], attributes: { material: "wood", color: "brown", shape: "rect" }, options: [tableSize],
+    variants: variantsOf("TAB-MNG", [tableSize], (c) => ({ prices: c.size === "p6" ? { HTG: htg(13500) } : undefined, onHand: c.size === "p4" ? 5 : 2 })), inventory: { tracked: true, onHand: 0, lowStockThreshold: 2, manualAvailability: "in_stock" },
   }),
   base("p-009", "chaise-empilable", "CHS-EMP", L("Chaise empilable", "Chèz ki ka anpile"), L("Chaise empilable, idéale pour les groupes.", "Chèz ki ka anpile, bon pou gwo gwoup."), "furniture", {
-    pricing: { retail: htg(1100), wholesale: wh([{ minQty: 10, unitPrice: 950 }, { minQty: 30, unitPrice: 850 }]) }, featuredRank: 10, relatedIds: ["p-008"],
+    prices: [{ retail: htg(1100), wholesale: wh([{ minQty: 10, unitPrice: 950 }, { minQty: 30, unitPrice: 850 }]) }], featuredRank: 10, relatedIds: ["p-008"],
     attributes: { material: "metal", color: "green", dimensions: "45 × 50 × 80 cm" }, inventory: { tracked: true, onHand: 80, lowStockThreshold: 10, manualAvailability: "in_stock" },
   }),
   base("p-010", "table-basse", "TAB-BAS", L("Table basse sur commande", "Ti tab sou kòmand"), L("Fabriquée sur commande : le stock n'est pas suivi.", "Fabrike sou kòmand: pa gen swivi stòk."), "furniture", {
-    pricing: { retail: htg(3800), wholesale: off }, featuredRank: 14, attributes: { material: "wood", color: "brown", shape: "rect" },
+    prices: [{ retail: htg(3800), wholesale: off }], featuredRank: 14, attributes: { material: "wood", color: "brown", shape: "rect" },
     inventory: { tracked: false, onHand: 0, manualAvailability: "preorder" },
   }),
   base("p-011", "seau-pack", "SEA-P6", L("Seau plastique 20 L (pack de 6)", "Bokit plastik 20 L (pake 6)"), L("Pack de six seaux de 20 litres.", "Pake sis bokit 20 lit."), "household", {
-    unit: "pack", unitNote: L("6 seaux par pack", "6 bokit nan yon pake"), pricing: { retail: htg(1500), wholesale: wh([{ minQty: 5, unitPrice: 1350 }]) }, featuredRank: 7,
+    unit: "pack", unitNote: L("6 seaux par pack", "6 bokit nan yon pake"), prices: [{ retail: htg(1500), wholesale: wh([{ minQty: 5, unitPrice: 1350 }]) }], featuredRank: 7,
     attributes: { material: "plastic", capacity: "20 L" }, inventory: { tracked: true, onHand: 0, lowStockThreshold: 3, manualAvailability: "in_stock" },
   }),
   base("p-012", "corde-nylon", "COR-NYL", L("Corde en nylon 8 mm", "Kòd nylon 8 mm"), L("Corde en nylon vendue au mètre (minimum 5 m).", "Kòd nylon yo vann pa mèt (minimòm 5 m)."), "general", {
-    unit: "meter", pricing: { retail: htg(35), wholesale: wh([{ minQty: 50, unitPrice: 30 }, { minQty: 200, unitPrice: 26 }]), minOrderQty: 5 }, featuredRank: 12,
+    unit: "meter", prices: [{ retail: htg(35), wholesale: wh([{ minQty: 50, unitPrice: 30 }, { minQty: 200, unitPrice: 26 }]), minOrderQty: 5 }], featuredRank: 12,
     inventory: { tracked: true, onHand: 420, lowStockThreshold: 50, manualAvailability: "in_stock" },
   }),
   base("p-013", "boite-vis", "VIS-200", L("Boîte de vis à bois (200 pièces)", "Bwat vis pou bwa (200 moso)"), L("Boîte de 200 vis à bois.", "Bwat 200 vis pou bwa."), "general", {
-    unit: "box", unitNote: L("200 pièces par boîte", "200 moso nan yon bwat"), pricing: { retail: htg(650), wholesale: wh([{ minQty: 10, unitPrice: 575 }]) }, featuredRank: 13, inventory: { tracked: true, onHand: 60, lowStockThreshold: 10, manualAvailability: "in_stock" },
+    unit: "box", unitNote: L("200 pièces par boîte", "200 moso nan yon bwat"), prices: [{ retail: htg(650), wholesale: wh([{ minQty: 10, unitPrice: 575 }]) }], featuredRank: 13, inventory: { tracked: true, onHand: 60, lowStockThreshold: 10, manualAvailability: "in_stock" },
   }),
   base("p-014", "casserole-set", "CAS-SET", L("Set de casseroles en inox", "Seri chodyè an inoks"), L("Set de casseroles avec couvercles, en promotion.", "Seri chodyè ak kouvèti, an pwomosyon."), "household", {
-    unit: "set", pricing: { retail: htg(3200), sale: htg(2800), wholesale: off }, featuredRank: 4, attributes: { material: "steel", capacity: "3 casseroles" }, inventory: { tracked: true, onHand: 18, lowStockThreshold: 4, manualAvailability: "in_stock" },
+    unit: "set", prices: [{ retail: htg(3200), sale: htg(2800), wholesale: off }], featuredRank: 4, attributes: { material: "steel", capacity: "3 casseroles" }, inventory: { tracked: true, onHand: 18, lowStockThreshold: 4, manualAvailability: "in_stock" },
   }),
   // A draft the seller has not finished (no price yet) and an inactive product.
-  base("p-015", "etagere-bois", "", L("Étagère en bois", "Etajè an bwa"), L("", ""), "furniture", { status: "draft", pricing: { retail: 0, wholesale: off }, images: [], featuredRank: 90, inventory: { tracked: true, onHand: 0, manualAvailability: "in_stock" } }),
-  base("p-016", "tabouret-bois", "TAB-TBR", L("Tabouret en bois", "Tabouret an bwa"), L("Tabouret retiré de la vente.", "Tabouret yo retire nan vant."), "furniture", { status: "inactive", pricing: { retail: htg(700), wholesale: off }, featuredRank: 91, attributes: { material: "wood", color: "brown" }, inventory: { tracked: true, onHand: 7, manualAvailability: "in_stock" } }),
+  base("p-015", "etagere-bois", "", L("Étagère en bois", "Etajè an bwa"), L("", ""), "furniture", { status: "draft", prices: [], images: [], featuredRank: 90, inventory: { tracked: true, onHand: 0, manualAvailability: "in_stock" } }),
+  base("p-016", "tabouret-bois", "TAB-TBR", L("Tabouret en bois", "Tabouret an bwa"), L("Tabouret retiré de la vente.", "Tabouret yo retire nan vant."), "furniture", { status: "inactive", prices: [{ retail: htg(700), wholesale: off }], featuredRank: 91, attributes: { material: "wood", color: "brown" }, inventory: { tracked: true, onHand: 7, manualAvailability: "in_stock" } }),
 ];
 
 /** Opening balances plus a few later movements so the history screens have something real-looking to show. */

@@ -13,6 +13,7 @@ import { formatMoney } from "@/lib/money";
 import { useLocale, useT } from "@/i18n/provider";
 import { buildCartLine } from "@/lib/cart";
 import { snapshotFor, unitPriceFor } from "@/lib/catalog/pricing";
+import { inCurrency } from "@/lib/catalog/offers";
 import type { Product } from "@/lib/catalog-types";
 import { availabilityTone, findVariant, hasVariants } from "@/lib/product";
 import { useCart } from "@/lib/stores/cart-store";
@@ -29,13 +30,16 @@ function initialSelection(product: Product): Record<string, string> {
  * Gallery + purchase panel. The unit price follows the chosen quantity (retail → wholesale tiers) and the total
  * updates live. Static sections (description, specs, pickup) arrive as `children`.
  */
-export function ProductExperience({ product, children }: { product: Product; children: ReactNode }) {
+export function ProductExperience({ product: allOffers, children }: { product: Product; children: ReactNode }) {
   const t = useT();
   const unitLabel = useUnitLabel();
   const router = useLocaleRouter();
   const locale = useLocale();
   const cart = useCart();
   const toast = useToast();
+  // One product, possibly several currencies: the customer picks the currency to reserve in (never inferred from location).
+  const [chosenCurrency, setChosenCurrency] = useState(allOffers.offers[0]?.currency ?? allOffers.price.currency);
+  const product = useMemo(() => inCurrency(allOffers, chosenCurrency) ?? allOffers, [allOffers, chosenCurrency]);
   const [selection, setSelection] = useState(() => initialSelection(product));
   const [quantityRaw, setQuantity] = useState(product.minOrderQty);
   const [imageIndex, setImageIndex] = useState(() => findVariant(product, initialSelection(product))?.imageIndex ?? 0);
@@ -95,6 +99,21 @@ export function ProductExperience({ product, children }: { product: Product; chi
           {product.unitNote && <p className="text-caption mt-0.5 text-ink-soft">{product.unitNote}</p>}
           {up.kind === "wholesale" && <Badge tone="accent" className="mt-2">{t("pricing.wholesaleApplied")}</Badge>}
         </div>
+
+        {allOffers.offers.length > 1 && (
+          <div role="group" aria-labelledby="currency-choice" className="mt-4">
+            <p id="currency-choice" className="text-label font-semibold">{t("product.currencyChoice")}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {allOffers.offers.map((o) => (
+                <button key={o.currency} type="button" aria-pressed={o.currency === chosenCurrency} onClick={() => { setChosenCurrency(o.currency); setQuantity(o.minOrderQty); }}
+                  className={`text-label min-h-11 rounded-control border px-4 font-semibold ${o.currency === chosenCurrency ? "border-brand-700 bg-brand-50 text-brand-800" : "border-line-strong bg-surface text-ink-soft hover:bg-sand-50"}`}>
+                  {formatMoney(o.price, locale)}
+                </button>
+              ))}
+            </div>
+            <p className="text-caption mt-1.5 text-ink-muted">{t("product.currencyHint")}</p>
+          </div>
+        )}
 
         {hasVariants(product) && <div className="mt-6"><OptionPicker product={product} selection={selection} onSelect={select} /></div>}
 

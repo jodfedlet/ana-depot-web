@@ -15,7 +15,8 @@ import type { Actor, Reservation, ReservationCustomer, ReservationLine } from ".
 import { type Action, type ActionError, applyAction, computeTotals } from "../reservations/workflow";
 import { seedCatalog, catalogStore } from "../stores/catalog-store";
 import { stockOf } from "../catalog/stock";
-import { hasVariantsRecord } from "../catalog/model";
+import { hasVariantsRecord, pricingIn } from "../catalog/model";
+import type { CurrencyCode } from "../money";
 import { sampleReservations } from "../mock/reservations";
 import { samplePickupHistory, samplePickupSettings } from "../mock/pickup";
 import { pickupStore } from "../stores/pickup-store";
@@ -63,13 +64,17 @@ export async function submitReservation(input: SubmitReservationInput): Promise<
   // Stock rules (frontend demonstration of what the API must enforce): only active products, minimum order, and no overselling.
   const reservations = reservationStore.getSnapshot();
   const catalog = catalogStore.getSnapshot();
+  // Stock is ONE position per product/variant shared by every currency: demand is summed across lines (HTG + USD lines of the same item add up).
+  const demand = new Map<string, number>();
+  for (const l of input.lines) demand.set(`${l.productId}:${l.variantId ?? ""}`, (demand.get(`${l.productId}:${l.variantId ?? ""}`) ?? 0) + l.quantity);
   for (const l of input.lines) {
     const rec = catalog.products.find((p) => p.id === l.productId);
     if (!rec || rec.status !== "active") return { ok: false, error: "product_unavailable", detail: l.name };
-    // A line must be priced in its product's currency: amounts are never converted between currencies.
-    if (l.unitPrice.currency !== rec.pricing.currency) return { ok: false, error: "currency_mismatch", detail: l.name };
-    if (l.quantity < Math.max(1, rec.pricing.minOrderQty ?? 1)) return { ok: false, error: "below_minimum", detail: l.name };
-    if (rec.inventory.tracked && l.quantity > stockOf(rec, reservations, hasVariantsRecord(rec) ? l.variantId : undefined).available) return { ok: false, error: "insufficient_stock", detail: l.name };
+    // The line must be priced in a currency the product is sold in, with THAT currency's minimum order. Never converted.
+    const pricing = pricingIn(rec, l.unitPrice.currency as CurrencyCode);
+    if (!pricing) return { ok: false, error: "currency_mismatch", detail: l.name };
+    if (l.quantity < Math.max(1, pricing.minOrderQty ?? 1)) return { ok: false, error: "below_minimum", detail: l.name };
+    if (rec.inventory.tracked && (demand.get(`${l.productId}:${l.variantId ?? ""}`) ?? l.quantity) > stockOf(rec, reservations, hasVariantsRecord(rec) ? l.variantId : undefined).available) return { ok: false, error: "insufficient_stock", detail: l.name };
     if (!rec.inventory.tracked && rec.inventory.manualAvailability === "out_of_stock") return { ok: false, error: "product_unavailable", detail: l.name };
   }
   const c = input.customer;

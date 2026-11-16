@@ -195,6 +195,7 @@ export const store: typeof frStore = {
     per: "/ {unit}",
   },
   pricing: {
+    alsoIn: "Disponib tou a",
     tiersTitle: "Pri selon kantite a",
     quantityCol: "Kantite",
     priceCol: "Pri pou chak inite",
@@ -224,6 +225,8 @@ export const store: typeof frStore = {
     addedQty: "{qty} {unit} × {name} mete nan panye a",
     sku: "Referans: {sku}",
     skuLabel: "Referans",
+    currencyChoice: "Monnen rezèvasyon an",
+    currencyHint: "Chwazi monnen w vle rezève pwodwi sa a ladan l. Chak monnen gen pwòp pri li; pa gen okenn to chanj ki aplike.",
     unitLabel: "Vann pa",
     viewCart: "Gade panye a",
     reserveNow: "Rezève kounye a",

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildCartLine, cartReducer, cartSubtotals, lineTotal } from "./cart";
-import { type ProductDraft, draftToRecord, emptyDraft, recordToDraft, validateDraft } from "./catalog/draft";
+import { type DraftPrice, type ProductDraft, draftToRecord, emptyDraft, emptyDraftPrice, recordToDraft, validateDraft } from "./catalog/draft";
+import { inCurrency } from "./catalog/offers";
 import { toProduct } from "./catalog/localize";
 import { snapshotFor, unitPriceFor, validatePricing } from "./catalog/pricing";
 import { seedCategories, seedProducts } from "./mock/catalog-seed";
@@ -12,21 +13,30 @@ import { resetDemoData, runReservationAction, submitReservation } from "./api/re
 import { saveProduct } from "./api/catalog-admin";
 import { sampleReservations } from "./mock/reservations";
 import { sumByCurrency } from "./money";
+import { queryCatalog } from "./catalog-query";
+import { stockOf } from "./catalog/stock";
 
 const rec = (slug: string) => seedProducts.find((p) => p.slug === slug)!;
 const category = (slug: string) => seedCategories.find((c) => c.slug === slug)!;
 const display = (slug: string) => toProduct(rec(slug), category(rec(slug).categorySlug), "fr", []);
 const staff = { kind: "staff", name: "Test" } as const;
 
-describe("every product has an explicit currency", () => {
-  it("seed products are HTG or USD, and the sample catalog covers both", () => {
-    const currencies = new Set(seedProducts.map((p) => p.pricing.currency));
-    expect(currencies).toEqual(new Set(["HTG", "USD"]));
-    for (const p of seedProducts) expect(["HTG", "USD"]).toContain(p.pricing.currency);
+describe("every product has explicit per-currency prices (one product, independent price sets)", () => {
+  it("seed prices are HTG and/or USD; the sample catalog covers HTG-only, USD-only and both", () => {
+    const sets = seedProducts.map((p) => p.prices.map((x) => x.currency).join("+"));
+    expect(sets).toContain("HTG");
+    expect(sets).toContain("USD");
+    expect(sets).toContain("HTG+USD");
+    for (const p of seedProducts) {
+      const codes = p.prices.map((x) => x.currency);
+      expect(new Set(codes).size, p.slug).toBe(codes.length); // never two price sets for one currency
+      for (const c of codes) expect(["HTG", "USD"]).toContain(c);
+    }
   });
-  it("the customer-facing product carries the currency on price, compare-at price and variant prices", () => {
-    const shoes = display("baskets-sport"); // USD
+  it("the customer-facing product carries the currency on price, compare-at price, offers and variant prices", () => {
+    const shoes = display("baskets-sport"); // USD only
     expect(shoes.price.currency).toBe("USD");
+    expect(shoes.offers.map((o) => o.currency)).toEqual(["USD"]);
     const sheets = display("drap-coton-set"); // USD with a variant priced on its own
     expect(sheets.variants.find((v) => v.price)?.price?.currency).toBe("USD");
     const pot = display("casserole-set"); // HTG with a sale price
@@ -34,49 +44,97 @@ describe("every product has an explicit currency", () => {
     expect(pot.compareAtPrice?.currency).toBe("HTG");
     expect(pot.price.amount).toBeLessThan(pot.compareAtPrice!.amount);
   });
+  it("ONE mattress, two independent price sets and ONE stock", () => {
+    const record = rec("matelas-mousse");
+    expect(seedProducts.filter((p) => p.slug === "matelas-mousse")).toHaveLength(1);
+    expect(record.prices.map((x) => x.currency)).toEqual(["HTG", "USD"]);
+    const [htg, usd] = record.prices;
+    expect(htg.retail).toBe(450000);
+    expect(usd.retail).toBe(6000);
+    expect(htg.wholesale.tiers.map((t) => t.minQty)).toEqual([5, 10]);
+    expect(usd.wholesale.tiers.map((t) => [t.minQty, t.unitPrice])).toEqual([[5, 5400], [10, 5000]]);
+    const view = display("matelas-mousse");
+    expect(view.offers.map((o) => [o.currency, o.price.amount])).toEqual([["HTG", 450000], ["USD", 6000]]);
+    // each currency view prices the same variant with ITS OWN override and tiers
+    const hv = inCurrency(view, "HTG")!, uv = inCurrency(view, "USD")!;
+    const double = (v: typeof view) => v.variants.find((x) => x.price)!;
+    expect(double(hv).price).toEqual({ amount: 680000, currency: "HTG" });
+    expect(double(uv).price).toEqual({ amount: 9000, currency: "USD" });
+    expect(inCurrency(view, "EUR")).toBeNull(); // a missing currency is never invented
+    // stock is a single position: it does not depend on the currency view
+    expect(hv.availableQty).toBe(uv.availableQty);
+    expect(record.inventory).toBeDefined();
+  });
+  it("a product not sold in a currency is not offered in it (no conversion)", () => {
+    expect(inCurrency(display("casserole-set"), "USD")).toBeNull();
+    expect(inCurrency(display("baskets-sport"), "HTG")).toBeNull();
+  });
 });
 
-describe("creating and editing products in either currency", () => {
-  const base = (currency: "HTG" | "USD", over: Partial<ProductDraft> = {}): ProductDraft => ({
-    ...emptyDraft("general"), nameFr: "Article", sku: `T-${currency}`, currency, retail: "25.50", sale: "20", minOrderQty: "2",
-    wholesaleEnabled: true, tiers: [{ minQty: "10", unitPrice: "18.75" }, { minQty: "50", unitPrice: "15" }], ...over,
+describe("creating and editing products in either or both currencies", () => {
+  const priced = (over: Partial<DraftPrice> = {}): DraftPrice => ({ ...emptyDraftPrice(true), retail: "25.50", sale: "20", minOrderQty: "2", wholesaleEnabled: true, tiers: [{ minQty: "10", unitPrice: "18.75" }, { minQty: "50", unitPrice: "15" }], ...over });
+  const base = (currencies: ("HTG" | "USD")[], over: Partial<ProductDraft> = {}): ProductDraft => ({
+    ...emptyDraft("general"), nameFr: "Article", sku: `T-${currencies.join("")}`,
+    prices: { HTG: currencies.includes("HTG") ? priced() : emptyDraftPrice(), USD: currencies.includes("USD") ? priced() : emptyDraftPrice() }, ...over,
   });
   const general = category("general");
 
   for (const currency of ["HTG", "USD"] as const) {
-    it(`${currency}: validates, saves and round-trips retail, sale and wholesale tiers in ${currency}`, () => {
-      const d = base(currency);
+    it(`${currency} only: validates, saves and round-trips retail, sale and wholesale tiers in ${currency}`, () => {
+      const d = base([currency]);
       expect(validateDraft(d, general, [], "publish")).toEqual({});
       const r = draftToRecord(d, { id: "x", slug: "x", now: "2026-11-15T10:00:00Z" });
-      expect(r.pricing).toMatchObject({ currency, retail: 2550, sale: 2000, minOrderQty: 2, wholesale: { enabled: true, tiers: [{ minQty: 10, unitPrice: 1875 }, { minQty: 50, unitPrice: 1500 }] } });
+      expect(r.prices).toHaveLength(1);
+      expect(r.prices[0]).toMatchObject({ currency, retail: 2550, sale: 2000, minOrderQty: 2, wholesale: { enabled: true, tiers: [{ minQty: 10, unitPrice: 1875 }, { minQty: 50, unitPrice: 1500 }] } });
       const again = recordToDraft(r);
-      expect(again).toMatchObject({ currency, retail: "25.5", sale: "20" });
-      expect(again.tiers.map((t) => t.unitPrice)).toEqual(["18.75", "15"]);
-      // editing a price keeps the currency
-      const edited = draftToRecord({ ...again, retail: "30" }, { id: "x", slug: "x", now: "2026-11-16T10:00:00Z" });
-      expect(edited.pricing.currency).toBe(currency);
-      expect(edited.pricing.retail).toBe(3000);
+      expect(again.prices[currency]).toMatchObject({ enabled: true, retail: "25.5", sale: "20" });
+      expect(again.prices[currency].tiers.map((t) => t.unitPrice)).toEqual(["18.75", "15"]);
+      const other = currency === "HTG" ? "USD" : "HTG";
+      expect(again.prices[other].enabled).toBe(false); // the other currency is NOT generated
+      const edited = draftToRecord({ ...again, prices: { ...again.prices, [currency]: { ...again.prices[currency], retail: "30" } } }, { id: "x", slug: "x", now: "2026-11-16T10:00:00Z" });
+      expect(edited.prices[0].currency).toBe(currency);
+      expect(edited.prices[0].retail).toBe(3000);
     });
   }
 
-  it("rejects an unsupported currency and keeps sale/tier rules independent of the currency", () => {
-    expect(validateDraft({ ...base("USD"), currency: "EUR" as never }, general, [], "publish").currency).toBe("currencyInvalid");
-    expect(validateDraft(base("USD", { sale: "30" }), general, [], "publish").sale).toBe("saleInvalid");
-    expect(validateDraft(base("HTG", { tiers: [{ minQty: "10", unitPrice: "30" }] }), general, [], "publish")["tier.0.tierAboveBase"]).toBe("tierAboveBase");
+  it("HTG and USD on ONE product: independent retail, sale and tiers; editing one never touches the other", () => {
+    const d = base(["HTG", "USD"], { prices: { HTG: priced({ retail: "2500", sale: "", minOrderQty: "", tiers: [{ minQty: "5", unitPrice: "2300" }] }), USD: priced({ retail: "18", sale: "", minOrderQty: "3", tiers: [{ minQty: "5", unitPrice: "16.5" }] }) } });
+    expect(validateDraft(d, general, [], "publish")).toEqual({});
+    const r = draftToRecord(d, { id: "x", slug: "x", now: "2026-11-15T10:00:00Z" });
+    expect(r.prices.map((x) => [x.currency, x.retail, x.minOrderQty])).toEqual([["HTG", 250000, undefined], ["USD", 1800, 3]]);
+    expect(r.prices[0].wholesale.tiers).toEqual([{ minQty: 5, unitPrice: 230000 }]);
+    expect(r.prices[1].wholesale.tiers).toEqual([{ minQty: 5, unitPrice: 1650 }]);
+    const edited = draftToRecord({ ...recordToDraft(r), prices: { ...recordToDraft(r).prices, USD: { ...recordToDraft(r).prices.USD, retail: "19" } } }, { id: "x", slug: "x", now: "later" });
+    expect(edited.prices[0]).toEqual(r.prices[0]);
+    expect(edited.prices[1].retail).toBe(1900);
   });
 
-  it("variant prices are entered in the product currency and tiers scale proportionally for each currency", () => {
-    for (const [slug, currency] of [["tube-rond-galva", "HTG"], ["drap-coton-set", "USD"]] as const) {
+  it("validates each currency on its own, and publishing needs at least one currency", () => {
+    expect(validateDraft(base([]), general, [], "publish").prices).toBe("priceRequired");
+    expect(validateDraft(base(["USD"], { prices: { HTG: emptyDraftPrice(), USD: priced({ sale: "30" }) } }), general, [], "publish")["price.USD.sale"]).toBe("saleInvalid");
+    const mixed = validateDraft(base(["HTG", "USD"], { prices: { HTG: priced(), USD: priced({ tiers: [{ minQty: "10", unitPrice: "30" }] }) } }), general, [], "publish");
+    expect(mixed["price.USD.tier.0.tierAboveBase"]).toBe("tierAboveBase");
+    expect(Object.keys(mixed).some((k) => k.startsWith("price.HTG"))).toBe(false); // the HTG set is valid and unaffected
+    // a drafted currency with nothing typed is not an error until publishing
+    expect(validateDraft(base(["USD"], { prices: { HTG: emptyDraftPrice(), USD: emptyDraftPrice(true) } }), general, [], "draft")).toEqual({});
+  });
+
+  it("variant prices are per currency, only for currencies the product sells in, and tiers scale proportionally in each", () => {
+    for (const [slug, currency] of [["tube-rond-galva", "HTG"], ["drap-coton-set", "USD"], ["matelas-mousse", "USD"]] as const) {
       const r = rec(slug);
-      const priced = r.variants.find((v) => v.price !== undefined)!;
-      const snap = snapshotFor(r.pricing, priced.price);
+      const pr = r.prices.find((x) => x.currency === currency)!;
+      const withOwn = r.variants.find((v) => v.prices?.[currency] !== undefined)!;
+      const snap = snapshotFor(pr, withOwn.prices![currency]);
       expect(snap.currency).toBe(currency);
-      const tier = r.pricing.wholesale.tiers[0];
-      expect(snap.tiers[0].unitPrice).toBe(Math.round(tier.unitPrice * (priced.price! / r.pricing.retail)));
-      // round-trip through the editor keeps the variant price and the product currency
-      expect(recordToDraft(r).variants.find((v) => v.id === priced.id)?.price).toBe(String(priced.price! / 100));
-      expect(draftToRecord(recordToDraft(r), { id: r.id, slug: r.slug, now: "x" }).pricing.currency).toBe(currency);
+      expect(snap.tiers[0].unitPrice).toBe(Math.round(pr.wholesale.tiers[0].unitPrice * (withOwn.prices![currency]! / pr.retail)));
+      const draft = recordToDraft(r);
+      expect(draft.variants.find((v) => v.id === withOwn.id)?.prices[currency]).toBe(String(withOwn.prices![currency]! / 100));
+      expect(draftToRecord(draft, { id: r.id, slug: r.slug, now: "x" }).variants.find((v) => v.id === withOwn.id)?.prices?.[currency]).toBe(withOwn.prices![currency]);
     }
+    // a variant price typed for a currency that is switched off is dropped, never kept or converted
+    const d = recordToDraft(rec("matelas-mousse"));
+    const off = { ...d, prices: { ...d.prices, USD: { ...d.prices.USD, enabled: false } } };
+    expect(draftToRecord(off, { id: "m", slug: "m", now: "x" }).variants.every((v) => v.prices?.USD === undefined)).toBe(true);
   });
 
   it("wholesale tiers work in USD exactly as in HTG", () => {
@@ -89,14 +147,19 @@ describe("creating and editing products in either currency", () => {
     expect(s.currency).toBe("USD");
   });
 
-  it("saves a USD product through the admin API and it appears to customers in USD", async () => {
+  it("saves a USD-only and a two-currency product through the admin API and customers see the right offers", async () => {
     resetDemoData();
-    const saved = await saveProduct(base("USD", { sku: "USD-1", tiers: [{ minQty: "10", unitPrice: "18" }] }), "active", "Test");
-    expect(saved.ok).toBe(true);
-    if (!saved.ok) return;
-    const stored = catalogStore.getSnapshot().products.find((p) => p.id === saved.data.id)!;
-    expect(stored.pricing.currency).toBe("USD");
+    const usdOnly = await saveProduct(base(["USD"], { sku: "USD-1", prices: { HTG: emptyDraftPrice(), USD: priced({ tiers: [{ minQty: "10", unitPrice: "18" }] }) } }), "active", "Test");
+    expect(usdOnly.ok).toBe(true);
+    if (!usdOnly.ok) return;
+    const stored = catalogStore.getSnapshot().products.find((p) => p.id === usdOnly.data.id)!;
+    expect(stored.prices.map((x) => x.currency)).toEqual(["USD"]);
     expect(toProduct(stored, general, "ht", []).price).toEqual({ amount: 2000, currency: "USD" });
+    const both = await saveProduct(base(["HTG", "USD"], { sku: "BOTH-1" }), "active", "Test");
+    expect(both.ok).toBe(true);
+    if (!both.ok) return;
+    const view = toProduct(catalogStore.getSnapshot().products.find((p) => p.id === both.data.id)!, general, "fr", []);
+    expect(view.offers.map((o) => o.currency)).toEqual(["HTG", "USD"]);
   });
 });
 
@@ -152,7 +215,7 @@ describe("reservations snapshot price, unit, tier and currency", () => {
     expect(before.lines[0]).toMatchObject({ priceKind: "wholesale", tierMinQty: 12, unitPrice: { amount: 2300, currency: "USD" }, quantity: 12 });
     expect(before.totals).toEqual([{ amount: 27600, currency: "USD" }]);
     // the seller changes the product's price and currency afterwards
-    catalogStore.set((s) => ({ ...s, products: s.products.map((p) => (p.slug === "baskets-sport" ? { ...p, pricing: { ...p.pricing, currency: "HTG" as const, retail: 999900 } } : p)) }));
+    catalogStore.set((s) => ({ ...s, products: s.products.map((p) => (p.slug === "baskets-sport" ? { ...p, prices: [{ ...p.prices[0], currency: "HTG" as const, retail: 999900 }] } : p)) }));
     const after = reservationStore.getSnapshot().find((x) => x.reference === res.data.reference)!;
     expect(after.lines).toEqual(before.lines);
     expect(after.totals).toEqual(before.totals);
@@ -231,5 +294,60 @@ describe("sample reservations demonstrate mixed currencies consistently", () => 
     expect(sampleReservations.some((r) => r.totals.length > 1)).toBe(true);
     const collected = sampleReservations.find((r) => r.reference === "ANA-COLL01")!;
     expect(collected.payment.records.map((p) => p.currency).sort()).toEqual(["HTG", "USD"]);
+  });
+});
+
+describe("ONE stock position shared by HTG and USD (mattress, large size: 3 units)", () => {
+  beforeEach(() => resetDemoData());
+  const view = display("matelas-mousse");
+  const large = view.variants.find((v) => v.availableQty === 3)!;
+  const inCur = (c: string) => inCurrency(view, c)!;
+  const lineIn = (c: string, qty: number) => {
+    const l = buildCartLine(inCur(c), inCur(c).variants.find((v) => v.id === large.id), qty);
+    return { productId: l.productId, variantId: l.variantId, slug: l.slug, name: l.name, variantLabel: l.variantLabel, quantity: qty, unitPrice: l.unitPrice, unit: l.unit, priceKind: l.priceKind, image: l.image };
+  };
+
+  it("the same item in HTG and in USD is two cart lines (two prices) whose quantities together cannot exceed the stock", () => {
+    let lines = cartReducer([], { type: "add", line: buildCartLine(inCur("HTG"), inCur("HTG").variants.find((v) => v.id === large.id), 2) });
+    lines = cartReducer(lines, { type: "add", line: buildCartLine(inCur("USD"), inCur("USD").variants.find((v) => v.id === large.id), 2) });
+    expect(lines).toHaveLength(2);
+    expect(new Set(lines.map((l) => l.key)).size).toBe(2);
+    expect(lines.map((l) => l.unitPrice)).toEqual([{ amount: 820000, currency: "HTG" }, { amount: 11000, currency: "USD" }]);
+    expect(lines.map((l) => l.quantity)).toEqual([2, 1]); // only 1 of the 3 units was left for USD
+    const up = cartReducer(lines, { type: "setQuantity", key: lines[1].key, quantity: 3 });
+    expect(up[1].quantity).toBe(1);
+    expect(cartSubtotals(up).map((t) => t.currency)).toEqual(["HTG", "USD"]);
+  });
+
+  it("a reservation counts stock across currencies: 2 HTG + 2 USD of 3 is refused, 2 HTG + 1 USD is accepted", async () => {
+    expect(await submitReservation({ lines: [lineIn("HTG", 2), lineIn("USD", 2)], customer, locale: "fr", acknowledgedTerms: true })).toMatchObject({ ok: false, error: "insufficient_stock" });
+    const ok = await submitReservation({ lines: [lineIn("HTG", 2), lineIn("USD", 1)], customer, locale: "fr", acknowledgedTerms: true });
+    expect(ok.ok).toBe(true);
+    if (!ok.ok) return;
+    const r = reservationStore.getSnapshot().find((x) => x.reference === ok.data.reference)!;
+    expect(r.totals).toEqual([{ amount: 1640000, currency: "HTG" }, { amount: 11000, currency: "USD" }]);
+    // the stock is now fully reserved whichever currency the next customer picks
+    const rec2 = catalogStore.getSnapshot().products.find((p) => p.slug === "matelas-mousse")!;
+    expect(stockOf(rec2, reservationStore.getSnapshot(), large.id).available).toBe(0);
+    expect(await submitReservation({ lines: [lineIn("USD", 1)], customer, locale: "fr", acknowledgedTerms: true })).toMatchObject({ ok: false, error: "insufficient_stock" });
+  });
+
+  it("a line in a currency the product is not sold in is refused (casserole is HTG-only)", async () => {
+    const l = line("casserole-set", 1);
+    expect(await submit([{ ...l, unitPrice: { amount: 1000, currency: "USD" } }])).toMatchObject({ ok: false, error: "currency_mismatch" });
+  });
+});
+
+describe("catalog filter by currency with a two-currency product", () => {
+  const all = seedProducts.filter((p) => p.status === "active").map((p) => toProduct(p, category(p.categorySlug), "fr", []));
+  it("the mattress appears under both currencies with each price; HTG-only and USD-only products only under theirs", () => {
+    const names = (c: string) => queryCatalog(all, { currency: c, pageSize: 50 }).products.map((p) => [p.slug, p.price.currency]);
+    expect(names("HTG")).toContainEqual(["matelas-mousse", "HTG"]);
+    expect(names("USD")).toContainEqual(["matelas-mousse", "USD"]);
+    expect(names("HTG").map((x) => x[0])).not.toContain("baskets-sport");
+    expect(names("USD").map((x) => x[0])).not.toContain("casserole-set");
+    const counts = queryCatalog(all, { pageSize: 50 }).currencies;
+    expect(counts.map((c) => c.code)).toEqual(["HTG", "USD"]);
+    expect(counts[0].count + counts[1].count).toBeGreaterThan(all.length); // the mattress counts in both
   });
 });

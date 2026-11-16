@@ -1,15 +1,27 @@
 import { market } from "@/config/market";
 import { type LText, L, pick } from "../localized";
-import { type CurrencyCode, isSupportedCurrency, majorToMinor, minorToMajor } from "../money";
+import { type CurrencyCode, SUPPORTED_CURRENCIES, majorToMinor, minorToMajor } from "../money";
 import { validatePricing } from "./pricing";
 import {
-  type AttributeDef, type CategoryRecord, type ManualAvailability, type ProductRecord, type ProductStatus, type UnitId, type VariantOption, type VariantRecord,
+  type AttributeDef, type CategoryRecord, type Pricing, pricingIn, type ManualAvailability, type ProductRecord, type ProductStatus, type UnitId, type VariantOption, type VariantRecord,
 } from "./model";
 
 /** String-based form state for the product editor (inputs are strings; conversion happens on save). */
 export interface DraftOptionValue { id: string; fr: string; ht: string; swatch?: string }
 export interface DraftOption { key: string; fr: string; ht: string; values: DraftOptionValue[] }
-export interface DraftVariant { id: string; sku: string; optionValues: Record<string, string>; price: string; onHand: string; active: boolean; imageIndex?: number }
+/**
+ * The price editor state for ONE currency. A product has an independent one per supported currency; only `enabled` ones
+ * are sold. Variants may override the retail price per currency (`DraftVariant.prices`). Stock is not here: it is shared.
+ */
+export interface DraftPrice {
+  enabled: boolean;
+  retail: string; sale: string; minOrderQty: string;
+  wholesaleEnabled: boolean;
+  tiers: { minQty: string; unitPrice: string }[];
+}
+export const emptyDraftPrice = (enabled = false): DraftPrice => ({ enabled, retail: "", sale: "", minOrderQty: "", wholesaleEnabled: false, tiers: [] });
+export const emptyDraftPrices = (): Record<CurrencyCode, DraftPrice> => ({ HTG: emptyDraftPrice(), USD: emptyDraftPrice() });
+export interface DraftVariant { id: string; sku: string; optionValues: Record<string, string>; prices: Record<CurrencyCode, string>; onHand: string; active: boolean; imageIndex?: number }
 export interface DraftImage { id: string; src: string }
 
 export interface ProductDraft {
@@ -26,11 +38,9 @@ export interface ProductDraft {
   options: DraftOption[];
   variants: DraftVariant[];
   unit: UnitId;
-  currency: CurrencyCode;
   unitNoteFr: string; unitNoteHt: string;
-  retail: string; sale: string; minOrderQty: string;
-  wholesaleEnabled: boolean;
-  tiers: { minQty: string; unitPrice: string }[];
+  /** One price set per supported currency — ONE product, independent prices, shared stock. */
+  prices: Record<CurrencyCode, DraftPrice>;
   tracked: boolean;
   onHand: string;
   lowStock: string;
@@ -39,8 +49,8 @@ export interface ProductDraft {
 
 export const emptyDraft = (categorySlug = ""): ProductDraft => ({
   status: "draft", categorySlug, nameFr: "", nameHt: "", descFr: "", descHt: "", sku: "", brand: "", images: [], attributes: {},
-  hasVariants: false, options: [], variants: [], unit: "unit", currency: market.defaultProductCurrency, unitNoteFr: "", unitNoteHt: "", retail: "", sale: "", minOrderQty: "",
-  wholesaleEnabled: false, tiers: [], tracked: true, onHand: "0", lowStock: "", manualAvailability: "in_stock",
+  hasVariants: false, options: [], variants: [], unit: "unit", unitNoteFr: "", unitNoteHt: "", prices: { ...emptyDraftPrices(), [market.defaultProductCurrency]: emptyDraftPrice(true) },
+  tracked: true, onHand: "0", lowStock: "", manualAvailability: "in_stock",
 });
 
 const major = (minor: number | undefined, currency: CurrencyCode) => (minor === undefined ? "" : String(minorToMajor(minor, currency)));
@@ -51,10 +61,12 @@ export function recordToDraft(r: ProductRecord): ProductDraft {
     sku: r.sku, brand: r.brand ?? "", images: r.images.map((i, n) => ({ id: `img-${n}-${i.src.length}`, src: i.src })), attributes: { ...r.attributes },
     hasVariants: r.options.length > 0 && r.variants.length > 0,
     options: r.options.map((o) => ({ key: o.key, fr: o.label.fr, ht: o.label.ht, values: o.values.map((v) => ({ id: v.id, fr: v.label.fr, ht: v.label.ht, swatch: v.swatch })) })),
-    variants: r.variants.map((v) => ({ id: v.id, sku: v.sku, optionValues: { ...v.optionValues }, price: major(v.price, r.pricing.currency), onHand: String(v.onHand), active: v.active, imageIndex: v.imageIndex })),
-    unit: r.unit, currency: r.pricing.currency, unitNoteFr: r.unitNote.fr, unitNoteHt: r.unitNote.ht,
-    retail: major(r.pricing.retail, r.pricing.currency), sale: major(r.pricing.sale, r.pricing.currency), minOrderQty: r.pricing.minOrderQty ? String(r.pricing.minOrderQty) : "",
-    wholesaleEnabled: r.pricing.wholesale.enabled, tiers: r.pricing.wholesale.tiers.map((t) => ({ minQty: String(t.minQty), unitPrice: major(t.unitPrice, r.pricing.currency) })),
+    variants: r.variants.map((v) => ({ id: v.id, sku: v.sku, optionValues: { ...v.optionValues }, prices: Object.fromEntries(SUPPORTED_CURRENCIES.map((c) => [c, major(v.prices?.[c], c)])) as Record<CurrencyCode, string>, onHand: String(v.onHand), active: v.active, imageIndex: v.imageIndex })),
+    unit: r.unit, unitNoteFr: r.unitNote.fr, unitNoteHt: r.unitNote.ht,
+    prices: Object.fromEntries(SUPPORTED_CURRENCIES.map((c) => {
+      const pr = pricingIn(r, c);
+      return [c, pr ? { enabled: true, retail: major(pr.retail, c), sale: major(pr.sale, c), minOrderQty: pr.minOrderQty ? String(pr.minOrderQty) : "", wholesaleEnabled: pr.wholesale.enabled, tiers: pr.wholesale.tiers.map((t) => ({ minQty: String(t.minQty), unitPrice: major(t.unitPrice, c) })) } : emptyDraftPrice()];
+    })) as Record<CurrencyCode, DraftPrice>,
     tracked: r.inventory.tracked, onHand: String(r.inventory.onHand), lowStock: r.inventory.lowStockThreshold === undefined ? "" : String(r.inventory.lowStockThreshold),
     manualAvailability: r.inventory.manualAvailability,
   };
@@ -99,19 +111,19 @@ export function validateDraft(d: ProductDraft, category: CategoryRecord | undefi
   if (publish && !d.sku.trim()) e.sku = "skuRequired";
   if (d.sku.trim() && otherSkus.includes(d.sku.trim())) e.sku = "skuDuplicate";
   if (publish && !d.categorySlug) e.category = "categoryRequired";
-  const cur = d.currency;
-  if (!isSupportedCurrency(cur)) e.currency = "currencyInvalid";
-  const retail = parseMoney(d.retail, cur);
-  const sale = parseMoney(d.sale, cur);
-  const minQty = parseInteger(d.minOrderQty);
-  const tiers = d.tiers.map((t) => ({ minQty: parseInteger(t.minQty), unitPrice: parseMoney(t.unitPrice, cur) }));
-  if (publish || d.retail.trim()) {
-    for (const issue of validatePricing({ retail, sale, minOrderQty: minQty, wholesaleEnabled: d.wholesaleEnabled, tiers })) {
-      if (issue.index !== undefined) e[`tier.${issue.index}.${issue.code}`] = issue.code;
-      else if (issue.code === "retailInvalid") e.retail = issue.code;
-      else if (issue.code === "saleInvalid") e.sale = issue.code;
-      else if (issue.code === "minOrderInvalid") e.minOrderQty = issue.code;
-      else e.tiers = issue.code;
+  const enabled = SUPPORTED_CURRENCIES.filter((c) => d.prices[c]?.enabled);
+  if (publish && enabled.length === 0) e.prices = "priceRequired";
+  for (const cur of enabled) {
+    const dp = d.prices[cur];
+    // Every currency is validated on its own; amounts are parsed in THAT currency and never compared with another one.
+    if (!(publish || dp.retail.trim())) continue;
+    const tiers = dp.tiers.map((t) => ({ minQty: parseInteger(t.minQty), unitPrice: parseMoney(t.unitPrice, cur) }));
+    for (const issue of validatePricing({ retail: parseMoney(dp.retail, cur), sale: parseMoney(dp.sale, cur), minOrderQty: parseInteger(dp.minOrderQty), wholesaleEnabled: dp.wholesaleEnabled, tiers })) {
+      if (issue.index !== undefined) e[`price.${cur}.tier.${issue.index}.${issue.code}`] = issue.code;
+      else if (issue.code === "retailInvalid") e[`price.${cur}.retail`] = issue.code;
+      else if (issue.code === "saleInvalid") e[`price.${cur}.sale`] = issue.code;
+      else if (issue.code === "minOrderInvalid") e[`price.${cur}.minOrderQty`] = issue.code;
+      else e[`price.${cur}.tiers`] = issue.code;
     }
   }
   if (publish && category) {
@@ -127,8 +139,11 @@ export function validateDraft(d: ProductDraft, category: CategoryRecord | undefi
     d.variants.forEach((v, i) => {
       if (publish && !v.sku.trim()) e[`variant.${i}.sku`] = "skuRequired";
       else if (v.sku.trim() && (otherSkus.includes(v.sku.trim()) || skus.filter((s) => s === v.sku.trim()).length > 1)) e[`variant.${i}.sku`] = "skuDuplicate";
-      const p = parseMoney(v.price, cur);
-      if (v.price.trim() && !(p !== undefined && p > 0)) e[`variant.${i}.price`] = "variantPrice";
+      for (const cur of enabled) {
+        const typed = v.prices[cur] ?? "";
+        const p = parseMoney(typed, cur);
+        if (typed.trim() && !(p !== undefined && p > 0)) e[`variant.${i}.price.${cur}`] = "variantPrice";
+      }
       if (d.tracked) { const n = parseInteger(v.onHand); if (!(n !== undefined && Number.isInteger(n) && n >= 0)) e[`variant.${i}.onHand`] = "stockInvalid"; }
     });
   } else if (d.tracked) {
@@ -139,19 +154,29 @@ export function validateDraft(d: ProductDraft, category: CategoryRecord | undefi
   return e;
 }
 
+/** Variant overrides for the currencies the product is actually sold in (a disabled currency's typed values are dropped). */
+function variantPrices(v: DraftVariant, enabled: CurrencyCode[]): Partial<Record<CurrencyCode, number>> | undefined {
+  const entries = enabled.map((c) => [c, parseMoney(v.prices[c] ?? "", c) || undefined] as const).filter((x): x is readonly [CurrencyCode, number] => x[1] !== undefined);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
+function toPricing(dp: DraftPrice, cur: CurrencyCode): Pricing {
+  const tiers = dp.wholesaleEnabled ? dp.tiers.map((t) => ({ minQty: parseInteger(t.minQty) || 0, unitPrice: parseMoney(t.unitPrice, cur) || 0 })).sort((a, b) => a.minQty - b.minQty) : [];
+  return { currency: cur, retail: parseMoney(dp.retail, cur) || 0, sale: parseMoney(dp.sale, cur) || undefined, wholesale: { enabled: dp.wholesaleEnabled, tiers }, minOrderQty: parseInteger(dp.minOrderQty) || undefined };
+}
+
 export function draftToRecord(d: ProductDraft, ctx: { id: string; slug: string; now: string; createdAt?: string; featuredRank?: number; isNew?: boolean; relatedIds?: string[]; isSample?: boolean }): ProductRecord {
-  const cur = d.currency;
+  const enabled = SUPPORTED_CURRENCIES.filter((c) => d.prices[c]?.enabled);
   const hasV = d.hasVariants && d.options.length > 0;
   const options: VariantOption[] = hasV ? d.options.map((o) => ({ key: o.key, label: L(o.fr, o.ht), values: o.values.map((v) => ({ id: v.id, label: L(v.fr, v.ht), swatch: v.swatch })) })) : [];
-  const variants: VariantRecord[] = hasV ? d.variants.map((v) => ({ id: v.id, sku: v.sku.trim(), optionValues: v.optionValues, price: parseMoney(v.price, cur) || undefined, onHand: d.tracked ? Math.max(0, parseInteger(v.onHand) || 0) : 0, imageIndex: v.imageIndex, active: v.active })) : [];
-  const tiers = d.wholesaleEnabled ? d.tiers.map((t) => ({ minQty: parseInteger(t.minQty) || 0, unitPrice: parseMoney(t.unitPrice, cur) || 0 })).sort((a, b) => a.minQty - b.minQty) : [];
+  const variants: VariantRecord[] = hasV ? d.variants.map((v) => ({ id: v.id, sku: v.sku.trim(), optionValues: v.optionValues, prices: variantPrices(v, enabled), onHand: d.tracked ? Math.max(0, parseInteger(v.onHand) || 0) : 0, imageIndex: v.imageIndex, active: v.active })) : [];
   const attrs: Record<string, string> = {};
   for (const [k, v] of Object.entries(d.attributes)) if (v.trim()) attrs[k] = v.trim();
   return {
     id: ctx.id, slug: ctx.slug, sku: d.sku.trim(), name: L(d.nameFr.trim(), d.nameHt.trim()), description: L(d.descFr.trim(), d.descHt.trim()),
     categorySlug: d.categorySlug, brand: d.brand.trim() || undefined, images: d.images.map((i) => ({ src: i.src })), status: d.status, unit: d.unit,
     unitNote: L(d.unitNoteFr.trim(), d.unitNoteHt.trim()), attributes: attrs, options, variants,
-    pricing: { currency: cur, retail: parseMoney(d.retail, cur) || 0, sale: parseMoney(d.sale, cur) || undefined, wholesale: { enabled: d.wholesaleEnabled, tiers }, minOrderQty: parseInteger(d.minOrderQty) || undefined },
+    prices: enabled.map((cur) => toPricing(d.prices[cur], cur)),
     inventory: { tracked: d.tracked, onHand: d.tracked && !hasV ? Math.max(0, parseInteger(d.onHand) || 0) : 0, lowStockThreshold: parseInteger(d.lowStock), manualAvailability: d.manualAvailability },
     isNew: ctx.isNew, createdAt: ctx.createdAt ?? ctx.now, updatedAt: ctx.now, featuredRank: ctx.featuredRank ?? 999, relatedIds: ctx.relatedIds, isSample: ctx.isSample,
   };
@@ -168,7 +193,7 @@ export function generateVariants(options: DraftOption[], existing: DraftVariant[
     const found = existing.find((v) => sameCombo(v.optionValues, c));
     if (found) return { ...found, optionValues: c };
     const suffix = usable.map((o) => o.values.find((v) => v.id === c[o.key])?.id ?? "").join("-").toUpperCase();
-    return { id: `v-${Date.now().toString(36)}-${i}`, sku: skuBase ? `${skuBase}-${suffix}` : "", optionValues: c, price: "", onHand: "0", active: true };
+    return { id: `v-${Date.now().toString(36)}-${i}`, sku: skuBase ? `${skuBase}-${suffix}` : "", optionValues: c, prices: { HTG: "", USD: "" }, onHand: "0", active: true };
   });
 }
 
