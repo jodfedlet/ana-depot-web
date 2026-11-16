@@ -23,8 +23,8 @@ const displayName = (email: string) => {
  */
 export async function AdminGate({ locale, children }: { locale: Locale; children: ReactNode }) {
   const access = await getAdminAccess();
-  if (access.state === "unauthenticated") redirect(`/${locale}/admin/sign-in`);
-  if (access.state === "session_invalid") redirect(`/${locale}/admin/sign-in?status=expired`);
+  if (access.state === "unauthenticated") redirect(`/${locale}/auth/login?next=${encodeURIComponent("/admin")}`);
+  if (access.state === "session_invalid") redirect(`/${locale}/auth/login?status=expired&next=${encodeURIComponent("/admin")}`);
   if (access.state === "allowed") {
     return (
       <AdminIdentityProvider identity={{ email: access.me.email, name: displayName(access.me.email) }}>
@@ -39,7 +39,7 @@ export async function AdminGate({ locale, children }: { locale: Locale; children
       ? { icon: <ShieldAlert aria-hidden />, title: t("admin.guard.forbiddenTitle"), text: t("admin.guard.forbiddenText", { email: access.email }), action: <AdminSignOutButton label={t("admin.guard.forbiddenAction")} /> }
       : access.state === "backend_unreachable"
         ? { icon: <ServerCrash aria-hidden />, title: t("admin.guard.unreachableTitle"), text: t("admin.guard.unreachableText"), action: <ButtonLink href="/admin">{t("admin.guard.retry")}</ButtonLink> }
-        : { icon: <Settings2 aria-hidden />, title: t("admin.guard.notConfiguredTitle"), text: t("admin.guard.notConfiguredText"), action: <ButtonLink href="/admin/sign-in" variant="outline"><LogIn aria-hidden className="size-4" />{t("admin.signIn.submit")}</ButtonLink> };
+        : { icon: <Settings2 aria-hidden />, title: t("admin.guard.notConfiguredTitle"), text: t("admin.guard.notConfiguredText"), action: <ButtonLink href="/auth/login" variant="outline"><LogIn aria-hidden className="size-4" />{t("admin.signIn.submit")}</ButtonLink> };
   return (
     <div className="grid min-h-dvh place-items-center bg-sand-50 p-4">
       <main id="main" className="w-full max-w-lg rounded-card border border-line bg-surface p-4">

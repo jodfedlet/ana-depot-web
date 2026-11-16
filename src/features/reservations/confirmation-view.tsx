@@ -101,7 +101,7 @@ export function ConfirmationView({ reference }: { reference: string }) {
       <div className="flex flex-wrap gap-3">
         <ButtonLink href={`/reservations/${view.reference}`} size="lg">{t("reserve.confirmation.track")}</ButtonLink>
         <ButtonLink href="/products" size="lg" variant="outline">{t("reserve.confirmation.continue")}</ButtonLink>
-        {!session && <ButtonLink href="/register" size="lg" variant="ghost">{t("reserve.confirmation.createAccount")}</ButtonLink>}
+        {!session && <ButtonLink href="/auth/sign-up" size="lg" variant="ghost">{t("reserve.confirmation.createAccount")}</ButtonLink>}
       </div>
     </div>
   );

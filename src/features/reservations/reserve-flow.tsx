@@ -130,7 +130,7 @@ export function ReserveFlow() {
               <h2 ref={headingRef} tabIndex={-1} className={heading}>{t("reserve.contact.title")}</h2>
               <p className="text-label font-normal text-ink-soft">
                 {t("reserve.contact.intro")}{" "}
-                {!session && <>{t("reserve.contact.haveAccount")} <Link href="/sign-in" className="font-semibold text-brand-700 underline underline-offset-2">{t("reserve.contact.signIn")}</Link></>}
+                {!session && <>{t("reserve.contact.haveAccount")} <Link href="/auth/login" className="font-semibold text-brand-700 underline underline-offset-2">{t("reserve.contact.signIn")}</Link></>}
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <TextField label={t("reserve.contact.firstName")} name="given-name" autoComplete="given-name" value={contact.firstName} onChange={(e) => edit("firstName", e.target.value)} error={errors.firstName} />

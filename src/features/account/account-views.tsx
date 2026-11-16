@@ -2,6 +2,7 @@
 
 import { ChevronRight, LogIn, PackageOpen } from "lucide-react";
 import { useState } from "react";
+import { LogoutButton } from "@/components/auth-block/logout-button";
 import { DemoNotice } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { SelectField, TextField } from "@/components/ui/field";
@@ -12,7 +13,7 @@ import { PaymentStatusBadge, ReservationStatusBadge } from "@/features/reservati
 import { dialCodes } from "@/config/market";
 import { useFormat } from "@/i18n/format";
 import { Link } from "@/i18n/link";
-import { useLocalePathname, useLocaleRouter } from "@/i18n/navigation";
+import { useLocalePathname } from "@/i18n/navigation";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/cn";
 import { type Reservation, reservationItemCount } from "@/lib/reservations/types";
@@ -32,8 +33,8 @@ export function RequireSession({ children }: { children: React.ReactNode }) {
   if (status === "signed_out") {
     return (
       <EmptyState icon={<LogIn aria-hidden />} title={t("account.gate.title")} description={t("account.gate.text")}>
-        <ButtonLink href="/sign-in">{t("nav.signIn")}</ButtonLink>
-        <ButtonLink href="/register" variant="outline">{t("footer.createAccount")}</ButtonLink>
+        <ButtonLink href="/auth/login">{t("nav.signIn")}</ButtonLink>
+        <ButtonLink href="/auth/sign-up" variant="outline">{t("footer.createAccount")}</ButtonLink>
       </EmptyState>
     );
   }
@@ -43,8 +44,7 @@ export function RequireSession({ children }: { children: React.ReactNode }) {
 export function AccountNav() {
   const t = useT();
   const pathname = useLocalePathname();
-  const router = useLocaleRouter();
-  const { session, signOut } = useSession();
+  const { session } = useSession();
   const items = [
     { href: "/account", label: t("account.nav.overview"), exact: true },
     { href: "/account/reservations", label: t("account.nav.reservations") },
@@ -63,7 +63,7 @@ export function AccountNav() {
         })}
         {session && (
           <li className="shrink-0 lg:mt-3 lg:border-t lg:border-line lg:pt-3">
-            <button type="button" onClick={async () => { if (await signOut()) { router.push("/sign-in?status=signed_out"); router.refresh(); } }} className="text-label flex min-h-11 w-full items-center rounded-control px-3.5 font-normal text-ink-soft hover:bg-sand-100">{t("account.nav.signOut")}</button>
+            <LogoutButton variant="ghost" className="text-label !justify-start w-full font-normal text-ink-soft">{t("account.nav.signOut")}</LogoutButton>
           </li>
         )}
       </ul>

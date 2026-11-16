@@ -37,8 +37,8 @@ export function Footer() {
           <ul className="space-y-2.5">
             <li><Link className={linkCls} href="/reservations">{t("nav.trackReservation")}</Link></li>
             <li><Link className={linkCls} href="/cart">{t("footer.cart")}</Link></li>
-            <li><Link className={linkCls} href="/sign-in">{t("nav.signIn")}</Link></li>
-            <li><Link className={linkCls} href="/register">{t("footer.createAccount")}</Link></li>
+            <li><Link className={linkCls} href="/auth/login">{t("nav.signIn")}</Link></li>
+            <li><Link className={linkCls} href="/auth/sign-up">{t("footer.createAccount")}</Link></li>
           </ul>
           <h2 className={`${heading} mt-6`}>{t("footer.help")}</h2>
           <ul className="space-y-2.5">

@@ -146,7 +146,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   // If the Supabase session ends while the page is open (expiry, revocation, sign-out in another tab), leave the admin.
   const authStatus = auth.status;
   useEffect(() => {
-    if (authStatus === "signed_out") router.replace("/admin/sign-in?status=expired");
+    if (authStatus === "signed_out") router.replace("/auth/login?status=expired&next=%2Fadmin");
   }, [authStatus, router]);
 
   return (

@@ -22,10 +22,10 @@ export function useAdminSession() {
   const locale = useLocale();
   return {
     session: identity,
-    /** Ends the Supabase session, then returns to the staff sign-in. */
+    /** Ends the Supabase session, then returns to the sign-in page. */
     signOut: async () => {
       await authStore.signOut();
-      router.push(`/${locale}/admin/sign-in?status=signed_out`);
+      router.push(`/${locale}/auth/login?status=signed_out`);
       router.refresh();
     },
   };

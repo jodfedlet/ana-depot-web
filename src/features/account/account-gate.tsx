@@ -10,6 +10,6 @@ import { getVerifiedUser } from "@/lib/auth/supabase-server";
  */
 export async function AccountGate({ locale, children }: { locale: Locale; children: ReactNode }) {
   const user = await getVerifiedUser();
-  if (!user) redirect(`/${locale}/sign-in?next=${encodeURIComponent("/account")}`);
+  if (!user) redirect(`/${locale}/auth/login?next=${encodeURIComponent("/account")}`);
   return <>{children}</>;
 }
