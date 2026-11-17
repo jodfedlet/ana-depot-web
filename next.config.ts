@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 import { validateSupabaseConfig } from "./src/lib/auth/config";
+import { securityHeaders, securityWarnings } from "./src/lib/security/headers";
 
 /**
  * NEXT_PUBLIC_* values are inlined into the browser bundle at BUILD time, so a secret placed there would ship to every visitor even though the
@@ -26,7 +27,12 @@ const legacyAuthPaths: Record<string, string> = {
   "/verify-email": "/auth/login",
 };
 
+securityWarnings().forEach((w) => console.warn(`[security] ${w}`));
+
 const nextConfig: NextConfig = {
+  async headers() {
+    return securityHeaders();
+  },
   async redirects() {
     return Object.entries(legacyAuthPaths).flatMap(([from, to]) => [
       { source: from, destination: to, permanent: false },

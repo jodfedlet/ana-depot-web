@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { authCookieOptions } from "./cookie-options";
 import { getSupabaseConfig } from "./config";
 
 const hasAuthCookie = (request: NextRequest) => request.cookies.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
@@ -14,6 +15,7 @@ export async function refreshAuthSession(request: NextRequest): Promise<NextResp
   const config = getSupabaseConfig();
   if (!config || !hasAuthCookie(request)) return response;
   const supabase = createServerClient(config.url, config.anonKey, {
+    cookieOptions: authCookieOptions(),
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (all) => {

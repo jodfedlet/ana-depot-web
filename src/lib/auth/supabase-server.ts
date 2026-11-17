@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { cache } from "react";
 import { type AdminAccess, resolveAdminAccess } from "./admin-access";
+import { authCookieOptions } from "./cookie-options";
 import { getSupabaseConfig } from "./config";
 import { fetchMe } from "./me";
 
@@ -14,6 +15,7 @@ export async function createServerSupabase() {
   if (!config) return null;
   const store = await cookies();
   return createServerClient(config.url, config.anonKey, {
+    cookieOptions: authCookieOptions(),
     cookies: {
       getAll: () => store.getAll(),
       setAll: (all) => {
