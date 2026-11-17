@@ -122,7 +122,8 @@ export type LineCheck =
 export function checkLine(line: CartLine, product: Product | undefined, demand: number): LineCheck {
   const sellable = product ? inCurrency(product, line.pricing.currency) : null;
   if (!product || !sellable) return { kind: "unavailable" };
-  const variant = line.variantId ? product.variants.find((v) => v.id === line.variantId) : undefined;
+  // the variant of THIS currency's view: its own price in this currency (not the primary currency's) must be the one used
+  const variant = line.variantId ? sellable.variants.find((v) => v.id === line.variantId) : undefined;
   if (line.variantId && !variant) return { kind: "unavailable" };
   if ((variant?.availability ?? product.availability) === "out_of_stock") return { kind: "unavailable" };
   const available = variant?.availableQty ?? product.availableQty;

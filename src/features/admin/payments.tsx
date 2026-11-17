@@ -1,121 +1,73 @@
 "use client";
 
-import { Search, Wallet } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
+import { AdminErrorState } from "@/components/ui/admin-error";
 import { Badge } from "@/components/ui/badge";
-import { MoneyTotals } from "@/components/ui/price";
+import { Button } from "@/components/ui/button";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 import { useFormat } from "@/i18n/format";
 import { Link } from "@/i18n/link";
-import { useLocale, useT } from "@/i18n/provider";
-import { SUPPORTED_CURRENCIES, formatMoney, sumByCurrency } from "@/lib/money";
-import { outstandingRows, paymentsIn } from "@/lib/reports/finance";
-import { customerFullName } from "@/lib/reservations/types";
-import { useIsClient } from "@/lib/stores/create-persisted-store";
-import { useReservations } from "@/lib/stores/reservation-store";
+import { useT } from "@/i18n/provider";
+import { listPayments } from "@/lib/api/admin/endpoints";
+import { useAdminResource } from "@/lib/api/admin/hooks";
+import { SUPPORTED_CURRENCIES } from "@/lib/money";
+import { RefreshButton, useMoneyText, useUrlState } from "./common";
 
 const field = "text-label min-h-11 rounded-control border border-line-strong bg-surface px-3";
 
-/**
- * Recorded payments and balances still to be paid, always per currency. Payments are immutable records: each keeps the
- * amount and currency it was received in. Browser-only demo data until the payments endpoints exist.
- */
+/** Every recorded payment (server-side filters and paging), newest first. Recording, reversing and adjusting happen on the reservation, where the balances are. */
 export function PaymentsView() {
   const t = useT();
   const fmt = useFormat();
-  const locale = useLocale();
-  const ready = useIsClient();
-  const reservations = useReservations();
-  const [currency, setCurrency] = useState<"all" | (typeof SUPPORTED_CURRENCIES)[number]>("all");
-  const [q, setQ] = useState("");
-
-  const byId = useMemo(() => new Map(reservations.map((r) => [r.id, r])), [reservations]);
-  const records = useMemo(() => paymentsIn(reservations).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)), [reservations]);
-  const outstanding = useMemo(() => outstandingRows(reservations), [reservations]);
-  if (!ready) return <Skeleton className="h-72 w-full" />;
-
-  const needle = q.trim().toLowerCase();
-  const shown = records.filter((p) => {
-    if (currency !== "all" && p.currency !== currency) return false;
-    const r = byId.get(p.reservationId);
-    return !needle || `${p.reference} ${r ? customerFullName(r.customer) : ""}`.toLowerCase().includes(needle);
-  });
-  const shownTotals = sumByCurrency(shown.map((p) => ({ amount: p.amount, currency: p.currency })));
-  const dueRows = outstanding.map((x) => ({ ...x, due: currency === "all" ? x.due : x.due.filter((m) => m.currency === currency) })).filter((x) => x.due.length > 0);
-  const dueTotals = sumByCurrency(dueRows.flatMap((x) => x.due));
-
+  const money = useMoneyText();
+  const url = useUrlState("/admin/payments");
+  const currency = url.get("currency"), from = url.get("from"), to = url.get("to"), reversed = url.get("reversed");
+  const page = Math.max(0, Number(url.get("page")) || 0);
+  const res = useAdminResource(`payments:${currency}:${from}:${to}:${reversed}:${page}`, (signal) => listPayments({ currency: currency || undefined, from: from || undefined, to: to || undefined, reversed: reversed || undefined, page, size: 20 }, { signal }));
+  const hasFilters = !!(currency || from || to || reversed);
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <p className="text-caption text-ink-soft">{t("admin.payments.note")}</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label htmlFor="pcur" className="text-caption mb-1 block text-ink-muted">{t("admin.payments.filterCurrency")}</label>
-          <select id="pcur" value={currency} onChange={(e) => setCurrency(e.target.value as typeof currency)} className={field}>
-            <option value="all">{t("admin.payments.allCurrencies")}</option>
-            {SUPPORTED_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div className="relative sm:w-80">
-          <label htmlFor="pq" className="sr-only">{t("admin.payments.search")}</label>
-          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
-          <input id="pq" type="search" placeholder={t("admin.payments.search")} value={q} onChange={(e) => setQ(e.target.value)} className={`${field} w-full pl-9`} />
-        </div>
-      </div>
-
-      <section aria-labelledby="out-title" className="rounded-card border border-line bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
-          <h2 id="out-title" className="text-h3">{t("admin.payments.outstandingTitle")}</h2>
-          <MoneyTotals totals={dueTotals} inline />
-        </div>
-        <p className="text-caption px-5 pt-3 text-ink-soft">{t("admin.payments.outstandingText")}</p>
-        {dueRows.length === 0 ? <p className="text-label px-5 py-4 font-normal text-ink-soft">{t("admin.payments.noOutstanding")}</p> : (
-          <ul className="divide-y divide-line">
-            {dueRows.map(({ reservation: r, due }) => (
-              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-                <div>
-                  <Link href={`/admin/reservations/${r.reference}`} className="text-label font-semibold text-brand-700 hover:underline" aria-label={`${t("admin.payments.open")} ${r.reference}`}><span translate="no">{r.reference}</span></Link>
-                  <p className="text-caption text-ink-soft">{customerFullName(r.customer)}</p>
-                </div>
-                <div className="text-right"><p className="text-caption text-ink-muted">{t("admin.payments.columns.due")}</p><MoneyTotals totals={due} /></div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-labelledby="rec-title" className="rounded-card border border-line bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
-          <h2 id="rec-title" className="text-h3">{t("admin.payments.receivedTitle")} <Badge className="ml-1">{t("admin.payments.count", { count: shown.length })}</Badge></h2>
-          <MoneyTotals totals={shownTotals} inline />
-        </div>
-        {records.length === 0 ? <EmptyState icon={<Wallet aria-hidden />} title={t("admin.payments.emptyTitle")} description={t("admin.payments.emptyText")} />
-          : shown.length === 0 ? <EmptyState icon={<Search aria-hidden />} title={t("admin.payments.noMatchTitle")} description={t("admin.payments.noMatchText")} />
-          : (
-            <div className="overflow-x-auto">
-              <table className="text-label w-full min-w-[40rem] text-left font-normal">
-                <caption className="sr-only">{t("admin.payments.receivedTitle")}</caption>
-                <thead className="text-caption text-ink-muted"><tr>
-                  {(["date", "reservation", "customer", "amount", "method", "recordedBy"] as const).map((c) => <th key={c} scope="col" className={`px-5 py-2 font-medium ${c === "amount" ? "text-right" : ""}`}>{t(`admin.payments.columns.${c}`)}</th>)}
-                </tr></thead>
+      <form onSubmit={(e) => e.preventDefault()} className="grid gap-3 rounded-card border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div><label htmlFor="pcur" className="text-caption mb-1 block text-ink-muted">{t("admin.payments.filterCurrency")}</label><select id="pcur" value={currency} onChange={(e) => url.set({ currency: e.target.value || undefined })} className={`${field} w-full`}><option value="">{t("admin.payments.allCurrencies")}</option>{SUPPORTED_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
+        <div><label htmlFor="pfrom" className="text-caption mb-1 block text-ink-muted">{t("admin.list.from")}</label><input id="pfrom" type="date" value={from} onChange={(e) => url.set({ from: e.target.value || undefined })} className={`${field} w-full`} /></div>
+        <div><label htmlFor="pto" className="text-caption mb-1 block text-ink-muted">{t("admin.list.to")}</label><input id="pto" type="date" value={to} onChange={(e) => url.set({ to: e.target.value || undefined })} className={`${field} w-full`} /></div>
+        <div><label htmlFor="prev" className="text-caption mb-1 block text-ink-muted">{t("adminRes.reversalFilter")}</label><select id="prev" value={reversed} onChange={(e) => url.set({ reversed: e.target.value || undefined })} className={`${field} w-full`}><option value="">{t("admin.list.allStatuses")}</option><option value="false">{t("adminRes.notReversed")}</option><option value="true">{t("adminRes.reversed")}</option></select></div>
+        <div className="flex items-end"><RefreshButton onClick={res.reload} loading={res.loading} /></div>
+      </form>
+      {res.error != null && !res.data ? <AdminErrorState error={res.error} onRetry={res.reload} /> : !res.data ? <div role="status" aria-label={t("adminCommon.loading")}><Skeleton className="h-64 w-full" /></div> : (
+        <>
+          <p role="status" className="text-label font-normal text-ink-soft">{t("admin.payments.count", { count: res.data.totalItems })}{hasFilters && <Button variant="ghost" size="sm" className="ml-2" onClick={url.clear}>{t("adminCommon.clearFilters")}</Button>}</p>
+          {res.data.items.length === 0 ? (
+            <div className="rounded-card border border-line bg-surface"><EmptyState icon={<Search aria-hidden />} title={hasFilters ? t("admin.payments.noMatchTitle") : t("admin.payments.emptyTitle")} description={hasFilters ? t("admin.payments.noMatchText") : t("admin.payments.emptyText")} /></div>
+          ) : (
+            <div className="overflow-x-auto rounded-card border border-line bg-surface" aria-busy={res.loading}>
+              <table className="w-full min-w-[44rem] text-left">
+                <caption className="sr-only">{t("admin.payments.title")}</caption>
+                <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr><th scope="col" className="px-3 py-3 font-medium">{t("admin.payments.columns.date")}</th><th scope="col" className="px-3 py-3 font-medium">{t("admin.payments.columns.reservation")}</th><th scope="col" className="px-3 py-3 text-right font-medium">{t("admin.payments.columns.amount")}</th><th scope="col" className="px-3 py-3 font-medium">{t("admin.payments.columns.reference")}</th><th scope="col" className="px-3 py-3 font-medium">{t("admin.products.status")}</th></tr></thead>
                 <tbody className="divide-y divide-line">
-                  {shown.map((p) => {
-                    const r = byId.get(p.reservationId);
-                    return (
-                      <tr key={p.id}>
-                        <td className="px-5 py-3">{fmt.dateTime(p.receivedAt)}</td>
-                        <td className="px-5 py-3"><Link href={`/admin/reservations/${p.reference}`} className="font-semibold text-brand-700 hover:underline"><span translate="no">{p.reference}</span></Link></td>
-                        <td className="px-5 py-3">{r ? customerFullName(r.customer) : "—"}</td>
-                        <td className="text-price px-5 py-3 text-right font-semibold">{formatMoney({ amount: p.amount, currency: p.currency }, locale)}</td>
-                        <td className="px-5 py-3">{t("paymentMethod.cash_at_pickup")}</td>
-                        <td className="px-5 py-3">{p.staff}</td>
-                      </tr>
-                    );
-                  })}
+                  {res.data.items.map((p) => (
+                    <tr key={p.id} className="text-label align-top font-normal hover:bg-sand-50">
+                      <td className="whitespace-nowrap px-3 py-3 text-ink-soft">{fmt.dateTime(p.receivedAt)}</td>
+                      <th scope="row" className="px-3 py-3 text-left font-semibold" translate="no"><Link href={`/admin/reservations/${p.reservationReference}`} className="hover:underline">{p.reservationReference}</Link></th>
+                      <td className={`px-3 py-3 text-right tabular-nums ${p.reversed ? "text-ink-muted line-through" : "font-semibold"}`}>{money(p.amount, p.currency)}</td>
+                      <td className="px-3 py-3 text-ink-soft">{p.reference ?? "—"}</td>
+                      <td className="px-3 py-3">{p.reversed ? <Badge tone="danger">{t("adminRes.reversed")}</Badge> : <Badge tone="success">{t("adminRes.valid")}</Badge>}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
-      </section>
+          {res.data.totalPages > 1 && (
+            <nav className="flex items-center justify-between gap-3" aria-label={t("admin.list.pagination")}>
+              <Button variant="outline" size="sm" disabled={page <= 0} onClick={() => url.set({ page: String(page - 1) }, true)}>{t("adminCommon.previous")}</Button>
+              <span className="text-label font-normal text-ink-soft">{t("adminCommon.page", { page: page + 1, count: res.data.totalPages })}</span>
+              <Button variant="outline" size="sm" disabled={page + 1 >= res.data.totalPages} onClick={() => url.set({ page: String(page + 1) }, true)}>{t("adminCommon.next")}</Button>
+            </nav>
+          )}
+        </>
+      )}
     </div>
   );
 }

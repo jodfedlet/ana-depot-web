@@ -11,6 +11,21 @@ const lineIn = (p: Product, currency: string, variantId: string | undefined, qty
   return buildCartLine(sellable, variantId ? sellable.variants.find((v) => v.id === variantId) : undefined, qty);
 };
 
+describe("checkLine with a variant that has its OWN price in the second currency (regression)", () => {
+  const withUsdOverride = (): Product => product({ variants: [{ ...mattress.variants[0], retailPrices: [{ currency: "USD", retailPrice: "13.00" }] }, mattress.variants[1]] });
+  it("an unchanged USD line of such a variant is NOT reported as a price change", () => {
+    const p = withUsdOverride();
+    const line = lineIn(p, "USD", "v-s", 2);
+    expect(line.unitPrice).toEqual({ amount: 1300, currency: "USD" });
+    expect(checkLine(line, p, 2)).toMatchObject({ kind: "ok" });
+  });
+  it("a real change of that override IS reported, in USD", () => {
+    const line = lineIn(withUsdOverride(), "USD", "v-s", 2);
+    const result = checkLine(line, product({ variants: [{ ...mattress.variants[0], retailPrices: [{ currency: "USD", retailPrice: "14.00" }] }, mattress.variants[1]] }), 2);
+    expect(result).toMatchObject({ kind: "changed", before: { amount: 1300, currency: "USD" }, after: { amount: 1400, currency: "USD" } });
+  });
+});
+
 describe("checkLine: the cart is revalidated against what the API says NOW (MOCKED data)", () => {
   const p = product();
   const htg = lineIn(p, "HTG", "v-s", 2);

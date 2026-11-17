@@ -6,7 +6,7 @@ import { admin, bodyText, check, env, key, launch, makePng, newPage, overflow, p
 import os from "node:os";
 
 const browser = await launch();
-const run = async (name, fn) => { try { await fn(); } catch (e) { check(`${name}: script`, false, String(e.message).split("\n")[0]); } };
+const run = async (name, fn) => { try { await fn(); } catch (e) { check(`${name}: script`, false, `${String(e.message).split("\n")[0]} @ ${(String(e.stack).match(/run\.mjs:(\d+)/) ?? [])[1] ?? "?"}`); } };
 
 /** Signs in through the real Supabase auth UI (no custom form) and lands on the administration. */
 async function staffSession(opts = {}) {
@@ -425,6 +425,236 @@ await run("inventory", async () => {
   check("recounting both variants to zero makes the product OUT_OF_STOCK on the storefront", pa.availability === "OUT_OF_STOCK" && pa.qty === 0);
   // leave stock for the reservation journey later
   for (const [sku, q] of [[skuS, 6], [skuM, 4]]) { const pos = await positionOf(sku); await admin("POST", `/admin/inventory/${pos.id}/adjustments`, { type: "ADD", quantity: q, reason: "RECEPTION" }, key()); }
+  await ctx.close();
+});
+
+/** A guest reservation through the PUBLIC API (the storefront UI journey is exercised once below and in e2e/storefront). */
+async function apiReserve(lines, phone = uniqPhone()) {
+  const r = await fetch(`${env.API}/api/v1/reservations`, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ lines, contact: { firstName: "Test", lastName: "Admin", dialCode: "+509", phone }, locale: "fr", acknowledgedTerms: true }) });
+  const body = await r.json();
+  if (r.status !== 201) throw new Error(`reserve ${r.status} ${JSON.stringify(body).slice(0, 120)}`);
+  return { ...body, phone };
+}
+const variantId = async (sku) => (await (await fetch(`${env.API}/api/v1/products/${state.slug}`)).json()).variants.find((v) => v.sku === sku).id;
+const resDetail = async (id) => (await admin("GET", `/admin/reservations/${id}`)).body;
+const toReady = async (id) => { await admin("POST", `/admin/reservations/${id}/accept`, undefined, key()); await admin("POST", `/admin/reservations/${id}/ready`, {}, key()); };
+const dialog = (page) => page.getByRole("dialog");
+
+await run("reservations", async () => {
+  section("F. The operational journey: guest reservation -> staff accepts, readies, records payments per currency, collects -> stock and reports");
+  if (!state.prodId) throw new Error("no product");
+  const skuS = `${E2E.sku}-S`, skuM = `${E2E.sku}-M`;
+  const before = { s: await positionOf(skuS), m: await positionOf(skuM) };
+  const ovBefore = (await admin("GET", "/admin/reports/overview")).body;
+
+  // 1. the GUEST reserves through the real storefront UI (HTG on size S, USD on size M)
+  const phone = uniqPhone();
+  const g = await newPage(browser);
+  const gp = g.page;
+  await gp.goto(`${env.WEB}/fr/products/${state.slug}`); await settle(gp, 1200);
+  await gp.getByRole("radio", { name: /Taille E2E S/ }).click();
+  const q = gp.getByRole("group", { name: /Quantité/ }).locator("input").first(); await q.fill("2"); await q.blur();
+  await gp.getByRole("button", { name: "Ajouter au panier" }).first().click(); await sleep(300);
+  await gp.goto(`${env.WEB}/fr/products/${state.slug}`); await settle(gp, 1200);
+  await gp.getByRole("button", { name: /USD/ }).first().click();
+  await gp.getByRole("radio", { name: /Taille E2E M/ }).click();
+  await gp.getByRole("button", { name: "Ajouter au panier" }).first().click(); await sleep(300);
+  await gp.goto(`${env.WEB}/fr/reserve`); await settle(gp, 1000);
+  await gp.getByLabel("Prénom").fill("Gaëlle"); await gp.getByLabel("Nom", { exact: true }).fill("Invitée"); await gp.getByLabel("Téléphone").fill(phone);
+  await gp.getByRole("button", { name: "Continuer vers le retrait" }).click();
+  await gp.getByRole("button", { name: "Continuer vers la vérification" }).click();
+  await gp.getByRole("checkbox", { name: /J'ai lu et je comprends/ }).check();
+  await gp.getByRole("button", { name: "Envoyer la réservation" }).click();
+  await gp.waitForURL(/confirmation\/ANA-/, { timeout: 15000 });
+  await settle(gp, 800);
+  const ref = ((await bodyText(gp)).match(/ANA-[A-Z0-9]{6}/) ?? [])[0];
+  check("a guest reserved HTG and USD lines of the new product through the storefront", !!ref, ref);
+
+  // 2. staff finds it (server-side search by phone), filters, opens it
+  const { page, ctx } = await staffSession();
+  await page.goto(`${env.WEB}/fr/admin/reservations?q=${phone}`);
+  await settle(page, 1000);
+  check("staff finds the reservation by the guest's phone (server-side search)", (await bodyText(page)).includes(ref));
+  await page.goto(`${env.WEB}/fr/admin/reservations?status=PENDING_REVIEW&currency=USD&q=${ref}`);
+  await settle(page, 1000);
+  check("status + currency filters are applied by the API", (await bodyText(page)).includes(ref));
+  await shot(page, "admin-07-reservation-list-1280");
+  await page.getByRole("link", { name: new RegExp(`Ouvrir ${ref}|${ref}`) }).first().click();
+  await page.waitForURL(new RegExp(`reservations/${ref}`));
+  await settle(page, 1200);
+  let id = (await admin("GET", `/admin/reservations?q=${ref}`)).body.items[0].id;
+  let d = await resDetail(id);
+  const t1 = await bodyText(page);
+  check("detail shows the snapshot lines, per-currency totals and the terms version", t1.includes(E2E.prodFr) && d.balances.length === 2 && t1.includes(env.TERMS) && /Prix normal|Prix promotionnel|Prix de gros/.test(t1));
+  check("the price the server applied for the USD variant is shown (variant's own price, not recomputed in the browser)", d.lines.some((l) => l.currency === "USD") && t1.includes(money(Number(d.lines.find((l) => l.currency === "USD").unitPrice), "USD")));
+  await shot(page, "admin-08-reservation-detail-1280");
+
+  // 3. notes: internal vs customer-visible
+  await page.getByRole("button", { name: "Note interne" }).click();
+  await dialog(page).getByLabel("Note interne (jamais visible par le client)").fill("NOTE-INTERNE-SECRETE");
+  await dialog(page).getByRole("button", { name: "Ajouter" }).click(); await sleep(1200);
+  await page.getByRole("button", { name: "Message pour le client" }).click();
+  await dialog(page).getByLabel("Message pour le client (visible)").fill("Passez demain à 10 h");
+  await dialog(page).getByRole("button", { name: "Ajouter" }).click(); await sleep(1200);
+  d = await resDetail(id);
+  check("the two notes are stored with the right visibility", d.notes.some((n) => n.visibility === "INTERNAL" && /SECRETE/.test(n.body)) && d.notes.some((n) => n.visibility === "CUSTOMER_VISIBLE" && /10 h/.test(n.body)));
+  check("the screen separates them (internal marked staff-only)", /Personnel uniquement/.test(await bodyText(page)));
+
+  // 4-5. accept (does not mean paid or ready), ready
+  await page.getByRole("button", { name: "Accepter", exact: true }).click();
+  await dialog(page).getByRole("button", { name: "Accepter la réservation" }).click(); await sleep(1500);
+  d = await resDetail(id);
+  check("accepting sets CONFIRMED only: still UNPAID and not ready", d.status === "CONFIRMED" && d.paymentStatus === "UNPAID" && d.readyAt === null);
+  await page.getByRole("button", { name: "Marquer prête à retirer" }).click();
+  await dialog(page).getByRole("button", { name: "Marquer prête" }).click(); await sleep(1500);
+  d = await resDetail(id);
+  check("mark ready -> READY_FOR_PICKUP, no expiry invented (no hold period configured)", d.status === "READY_FOR_PICKUP" && d.expiresAt === null);
+
+  // the customer sees only the customer-visible note
+  const web = await newPage(browser);
+  await web.page.goto(`${env.WEB}/fr/reservations`); await settle(web.page, 800);
+  await web.page.getByLabel("Référence").fill(ref); await web.page.getByLabel("Téléphone").fill(phone);
+  await web.page.getByRole("button", { name: "Afficher ma réservation" }).click();
+  await web.page.waitForURL(/reservations\/ANA-/); await settle(web.page, 1000);
+  const wt = await bodyText(web.page);
+  check("the customer's tracking page shows the visible note and NOT the internal one", /Passez demain à 10 h/.test(wt) && !/SECRETE/.test(wt) && /Prête à retirer/.test(wt));
+  await web.ctx.close();
+
+  // 6. partial HTG payment
+  const htg = d.balances.find((b) => b.currency === "HTG"), usd = d.balances.find((b) => b.currency === "USD");
+  await page.reload(); await settle(page, 1200);
+  await page.getByRole("button", { name: "Enregistrer le paiement" }).first().click();
+  await dialog(page).getByLabel("Montant reçu (HTG)").fill("1000.00");
+  await dialog(page).getByRole("button", { name: "Enregistrer le paiement" }).click(); await sleep(1500);
+  d = await resDetail(id);
+  check("a partial HTG payment makes the reservation PARTIAL; USD is untouched (a payment settles only its own currency)", d.paymentStatus === "PARTIAL" && d.balances.find((b) => b.currency === "HTG").paid === "1000.00" && d.balances.find((b) => b.currency === "USD").paid === "0.00");
+  check("collection is not offered, and the API refuses it (409 payment_required)", (await page.getByRole("button", { name: "Terminer le retrait" }).count()) === 0 && (await admin("POST", `/admin/reservations/${id}/collect`, undefined, key())).status === 409);
+
+  // 7. lost answer on the remaining HTG payment: retried with the same key, applied once
+  const dueHtg = d.balances.find((b) => b.currency === "HTG").due;
+  let dropped = false; const keys = [];
+  await page.route("**/api/v1/admin/reservations/*/payments", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    keys.push(route.request().headers()["idempotency-key"]);
+    if (!dropped) { dropped = true; await route.fetch(); return route.abort("failed"); }
+    return route.continue();
+  });
+  await page.getByRole("button", { name: "Enregistrer le paiement" }).first().click();
+  await dialog(page).getByLabel("Montant reçu (HTG)").fill(dueHtg);
+  await dialog(page).getByRole("button", { name: "Enregistrer le paiement" }).click(); await sleep(1500);
+  check("a lost answer is shown as an error, not as a recorded payment", /connexion|Connexion/.test(await bodyText(page)));
+  await dialog(page).getByRole("button", { name: "Enregistrer le paiement" }).click(); await sleep(1500);
+  await page.unroute("**/api/v1/admin/reservations/*/payments");
+  d = await resDetail(id);
+  const htgPays = (await admin("GET", `/admin/reservations/${id}/payments`)).body.payments.filter((p) => p.currency === "HTG" && !p.reversed);
+  check("the retry reused the SAME key and the payment exists exactly ONCE", keys.length === 2 && keys[0] === keys[1] && htgPays.length === 2 && d.balances.find((b) => b.currency === "HTG").due === "0.00", `${keys.length} ${htgPays.length}`);
+  check("HTG is settled but the reservation is still PARTIAL (USD due)", d.paymentStatus === "PARTIAL");
+
+  // 8. USD payment -> PAID -> collect
+  await page.reload(); await settle(page, 1200);
+  await page.getByRole("button", { name: "Enregistrer le paiement" }).first().click();
+  await dialog(page).getByLabel("Devise du paiement").selectOption("USD");
+  await dialog(page).getByLabel("Montant reçu (USD)").fill(usd.total);
+  await dialog(page).getByRole("button", { name: "Enregistrer le paiement" }).click(); await sleep(1500);
+  d = await resDetail(id);
+  check("every currency settled -> PAID", d.paymentStatus === "PAID" && d.balances.every((b) => b.due === "0.00"));
+  await page.reload(); await settle(page, 1200);
+  await shot(page, "admin-09-payments-panel-1280");
+  await page.getByRole("button", { name: "Terminer le retrait" }).first().click();
+  check("collect needs an explicit handover confirmation (button disabled until ticked)", await dialog(page).getByRole("button", { name: "Terminer le retrait" }).isDisabled());
+  await dialog(page).getByLabel(/Je confirme que les produits ont été remis/).check();
+  await dialog(page).getByRole("button", { name: "Terminer le retrait" }).click(); await sleep(1800);
+  d = await resDetail(id);
+  check("collected", d.status === "COLLECTED");
+
+  // 9. inventory deducted exactly once
+  const after = { s: await positionOf(skuS), m: await positionOf(skuM) };
+  check("stock deducted exactly once (S −2, M −1) and no longer reserved", after.s.onHand === before.s.onHand - 2 && after.m.onHand === before.m.onHand - 1 && after.s.reserved === before.s.reserved && after.m.reserved === before.m.reserved, JSON.stringify([before.s.onHand, after.s.onHand, before.m.onHand, after.m.onHand]));
+  const mv = (await admin("GET", `/admin/inventory/${after.s.id}/movements?size=5`)).body.items;
+  check("a SALE movement was recorded for the reservation (traceable)", mv.some((m) => m.type === "SALE" && m.reservationId === id && m.delta === -2));
+  check("collecting again is refused and stock is unchanged", (await admin("POST", `/admin/reservations/${id}/collect`, undefined, key())).status === 409 && (await positionOf(skuS)).onHand === after.s.onHand);
+
+  // 10. reports reflect the operation, per currency
+  const ovAfter = (await admin("GET", "/admin/reports/overview")).body;
+  const delta = (cur, a, b) => (Number(b[cur] ?? 0) - Number(a[cur] ?? 0)).toFixed(2);
+  check("reports: collected value rose by exactly this reservation's totals, HTG and USD separately", delta("HTG", ovBefore.collected, ovAfter.collected) === Number(htg.total).toFixed(2) && delta("USD", ovBefore.collected, ovAfter.collected) === Number(usd.total).toFixed(2), JSON.stringify([ovBefore.collected, ovAfter.collected]));
+  check("reports: net payments rose by exactly the money recorded, per currency", delta("HTG", ovBefore.paymentsNet, ovAfter.paymentsNet) === Number(htg.total).toFixed(2) && delta("USD", ovBefore.paymentsNet, ovAfter.paymentsNet) === Number(usd.total).toFixed(2));
+  await page.goto(`${env.WEB}/fr/admin`); await settle(page, 1200);
+  check("the dashboard shows the new figures (no stale cache)", (await bodyText(page)).includes(money(Number(ovAfter.paymentsNet.HTG), "HTG")));
+  await page.goto(`${env.WEB}/fr/admin/payments?currency=USD`); await settle(page, 1000);
+  const pt = await bodyText(page);
+  check("the payments page lists payments with the currency filter applied by the API", pt.includes(ref) && !/ HTG/.test(pt.slice(pt.indexOf("Reçu le"))), "");
+  const rec = (await admin("GET", `/admin/reservations/${id}/reconciliation`)).body;
+  check("the ledger reconciles with the cached paid amounts", rec.consistent === true);
+
+  // 11. over-payment (policy undecided): the server accepts, the UI says so
+  const over = await apiReserve([{ productId: state.prodId, variantId: await variantId(skuS), quantity: 1, currency: "HTG" }]);
+  await toReady(over.id);
+  await page.goto(`${env.WEB}/fr/admin/reservations/${over.reference}`); await settle(page, 1200);
+  const total = (await resDetail(over.id)).balances[0].total;
+  await page.getByRole("button", { name: "Enregistrer le paiement" }).first().click();
+  await dialog(page).getByLabel("Montant reçu (HTG)").fill((Number(total) + 100).toFixed(2));
+  await dialog(page).getByRole("button", { name: "Enregistrer le paiement" }).click(); await sleep(1500);
+  const ot = await bodyText(page);
+  check("an over-payment is accepted by the SERVER and shown as 'Trop-perçu' with the undecided-policy note; due never negative", /Trop-perçu/.test(ot) && /politique de trop-perçu n'est pas encore décidée/.test(ot) && (await resDetail(over.id)).balances[0].due === "0.00");
+  await shot(page, "admin-10-overpayment-1280");
+
+  // 12. reject: OTHER needs an explanation
+  const rej = await apiReserve([{ productId: state.prodId, variantId: await variantId(skuS), quantity: 1, currency: "HTG" }]);
+  const reservedBefore = (await positionOf(skuS)).reserved;
+  await page.goto(`${env.WEB}/fr/admin/reservations/${rej.reference}`); await settle(page, 1200);
+  await page.getByRole("button", { name: "Refuser", exact: true }).click();
+  await dialog(page).getByLabel("Motif du refus").selectOption("OTHER");
+  check("rejecting for 'Autre' is blocked until an explanation is given", await dialog(page).getByRole("button", { name: "Refuser la réservation" }).isDisabled());
+  await dialog(page).getByLabel(/Explication pour le client/).fill("Produit retiré de la vente");
+  await dialog(page).getByRole("button", { name: "Refuser la réservation" }).click(); await sleep(1500);
+  const rd = await resDetail(rej.id);
+  check("rejected with its reason; reserved stock released", rd.status === "REJECTED" && rd.history.at(-1).reasonCode === "OTHER" && (await positionOf(skuS)).reserved === reservedBefore - 1);
+
+  // 13. cancel with a payment: the consequence is stated, payment stays on the ledger
+  const can = await apiReserve([{ productId: state.prodId, variantId: await variantId(skuS), quantity: 1, currency: "HTG" }]);
+  await toReady(can.id);
+  await admin("POST", `/admin/reservations/${can.id}/payments`, { amount: "100.00", currency: "HTG", method: "CASH_AT_PICKUP" }, key());
+  await page.goto(`${env.WEB}/fr/admin/reservations/${can.reference}`); await settle(page, 1200);
+  await page.getByRole("button", { name: "Annuler la réservation" }).first().click();
+  const dt = await bodyText(page);
+  check("cancelling a paid reservation states the financial consequence (no refund, payment stays on the ledger)", /Des paiements sont enregistrés/.test(dt) && /ne rembourse rien/.test(dt) && /ne gère aucun remboursement/.test(dt));
+  await dialog(page).getByLabel("Motif d'annulation").fill("Client injoignable");
+  await dialog(page).getByLabel(/J'ai vérifié les conséquences/).check();
+  await dialog(page).getByRole("button", { name: "Annuler la réservation" }).click(); await sleep(1500);
+  const cd = await resDetail(can.id);
+  const cpay = (await admin("GET", `/admin/reservations/${can.id}/payments`)).body;
+  check("cancelled; the payment remains recorded (no refund created)", cd.status === "CANCELLED" && cpay.payments.length === 1 && !cpay.payments[0].reversed && cpay.balances[0].paid === "100.00");
+
+  // 14. reversal + adjustment on a ready reservation
+  const rev = await apiReserve([{ productId: state.prodId, variantId: await variantId(skuM), quantity: 1, currency: "USD" }]);
+  await toReady(rev.id);
+  await admin("POST", `/admin/reservations/${rev.id}/payments`, { amount: "5.00", currency: "USD", method: "CASH_AT_PICKUP" }, key());
+  await page.goto(`${env.WEB}/fr/admin/reservations/${rev.reference}`); await settle(page, 1200);
+  await page.getByRole("button", { name: "Annuler le paiement" }).first().click();
+  await dialog(page).getByLabel("Motif").fill("Erreur de saisie");
+  await dialog(page).getByRole("button", { name: "Annuler le paiement" }).click(); await sleep(1500);
+  const rp = (await admin("GET", `/admin/reservations/${rev.id}/payments`)).body;
+  check("a payment reversal is a NEW ledger entry; the original stays visible (struck) and the balance is restored", rp.payments[0].reversed === true && rp.balances[0].paid === "0.00" && /Annulé le/.test(await bodyText(page)));
+  await page.getByRole("button", { name: "Ajuster le journal" }).click();
+  await dialog(page).getByLabel(/Montant signé/).fill("1.00");
+  await dialog(page).getByLabel("Motif").fill("Correction");
+  await dialog(page).getByRole("button", { name: "Ajuster le journal" }).click(); await sleep(1500);
+  await page.getByRole("button", { name: "Afficher le journal" }).click(); await sleep(900);
+  const lt = await bodyText(page);
+  check("the ledger lists received, reversal and adjustment entries (append-only)", /Paiement reçu/.test(lt) && /Annulation/.test(lt) && /Ajustement/.test(lt));
+  await shot(page, "admin-11-ledger-1280");
+
+  // 15. two staff members: the second accept is refused and the screen refreshes
+  const race = await apiReserve([{ productId: state.prodId, variantId: await variantId(skuS), quantity: 1, currency: "HTG" }]);
+  await page.goto(`${env.WEB}/fr/admin/reservations/${race.reference}`); await settle(page, 1200);
+  await page.getByRole("button", { name: "Accepter", exact: true }).click();
+  await admin("POST", `/admin/reservations/${race.id}/reject`, { reason: "CANNOT_FULFILL" }, key()); // someone else decided first
+  await dialog(page).getByRole("button", { name: "Accepter la réservation" }).click(); await sleep(1500);
+  check("a concurrent decision is refused (409 invalid_status), nothing is overwritten, the screen shows the real state", (await resDetail(race.id)).status === "REJECTED" && /n'est pas possible dans l'état actuel/.test(await bodyText(page)));
+  await page.getByRole("dialog").getByRole("button", { name: "Annuler" }).click().catch(() => {});
+
+  // cleanup so later sections/runs keep a known stock
   await ctx.close();
 });
 
