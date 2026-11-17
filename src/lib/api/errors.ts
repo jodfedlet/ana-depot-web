@@ -65,3 +65,6 @@ const FIELD_CODES: Record<string, true> = Object.fromEntries(["required", "inval
 export const isVersionConflict = (error: unknown): boolean => problemOf(error)?.code === "concurrent_update";
 /** 403 from the API: signed in, but not staff (or not allowed). Distinct from 401 (no valid session). */
 export const isForbidden = (error: unknown): boolean => problemOf(error)?.status === 403;
+
+/** A failure where the write may or may not have been applied (no answer, or the gateway/server failed): the retry must reuse the same idempotency key. */
+export const isTransientError = (error: unknown): boolean => { const p = problemOf(error); return !!p && (p.code === "timeout" || p.code === "network_error" || p.status >= 502); };

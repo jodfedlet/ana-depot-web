@@ -20,7 +20,7 @@ import { createCategory, getCategory, listAllCategories, listCategoryProducts, m
 import { useAction, useAdminResource } from "@/lib/api/admin/hooks";
 import { announceAdminChange } from "@/lib/api/admin/signals";
 import { attemptKey, endAttempt } from "@/lib/api/idempotency";
-import { fieldProblems, isVersionConflict } from "@/lib/api/errors";
+import { fieldProblems, isTransientError } from "@/lib/api/errors";
 import { cn } from "@/lib/cn";
 import { useUnsavedChanges } from "../admin-shell";
 import { AttributeEditor } from "./attribute-editor";
@@ -119,7 +119,7 @@ function CategoryFormView({ initial, saved, categories, onReload }: { initial: C
     const scope = `category:${f.id ?? "new"}`;
     const key = attemptKey(scope, body);
     const r = await action.run(() => (f.id ? updateCategory(f.id, body, { idempotencyKey: key }) : createCategory(body, { idempotencyKey: key })));
-    if (!r.ok) { if (!isTransient(r.error)) endAttempt(scope); window.setTimeout(() => document.querySelector<HTMLElement>("[aria-invalid='true'], [role='alert']")?.scrollIntoView({ block: "center" })); return; }
+    if (!r.ok) { if (!isTransientError(r.error)) endAttempt(scope); window.setTimeout(() => document.querySelector<HTMLElement>("[aria-invalid='true'], [role='alert']")?.scrollIntoView({ block: "center" })); return; }
     endAttempt(scope);
     setBaseline(JSON.stringify(f));
     toast.show({ tone: "success", message: t(f.id ? "adminCat.saved" : "adminCat.created") });
@@ -174,7 +174,6 @@ function CategoryFormView({ initial, saved, categories, onReload }: { initial: C
 }
 
 const FIELD_MSG: Record<string, true> = { required: true, invalid: true, too_long: true, required_to_publish: true, duplicate_slug: true };
-const isTransient = (e: unknown) => { const c = (e as { problem?: { code?: string; status?: number } }).problem; return !!c && (c.code === "timeout" || c.code === "network_error" || (c.status ?? 0) >= 502); };
 function fieldLabel(t: ReturnType<typeof useT>, field: string): string {
   const attr = /^attributes\[(\d+)\]\.options\[(\d+)\]\.(.+)$/.exec(field);
   if (attr) return t("adminCat.optionPath", { n: Number(attr[1]) + 1, m: Number(attr[2]) + 1, field: attr[3] });

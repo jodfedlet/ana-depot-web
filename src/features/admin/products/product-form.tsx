@@ -18,7 +18,7 @@ import type { AdminCategory, AdminProduct } from "@/lib/api/admin/dto";
 import { createProduct, deleteProduct, getCategory, getProduct, listAllCategories, setProductStatus, updateProduct } from "@/lib/api/admin/endpoints";
 import { useAction, useAdminResource } from "@/lib/api/admin/hooks";
 import { announceAdminChange } from "@/lib/api/admin/signals";
-import { fieldProblems, problemOf } from "@/lib/api/errors";
+import { fieldProblems, isTransientError } from "@/lib/api/errors";
 import { attemptKey, endAttempt } from "@/lib/api/idempotency";
 import { cn } from "@/lib/cn";
 import { useUnsavedChanges } from "../admin-shell";
@@ -33,7 +33,6 @@ export function ProductEditor({ id }: { id?: string }) {
   return <ProductFormView key={`${res.data.id}:${res.data.version}`} product={res.data} initial={productToForm(res.data)} onReload={res.reload} />;
 }
 
-const isTransient = (e: unknown) => { const p = problemOf(e); return !!p && (p.code === "timeout" || p.code === "network_error" || p.status >= 502); };
 
 function ProductFormView({ product, initial, onReload }: { product: AdminProduct | undefined; initial: Form; onReload: () => void }) {
   const t = useT();
@@ -79,7 +78,7 @@ function ProductFormView({ product, initial, onReload }: { product: AdminProduct
     const scope = `product:${form.id ?? "new"}`;
     const key = attemptKey(scope, body);
     const r = await save.run(() => (form.id ? updateProduct(form.id, body, { idempotencyKey: key }) : createProduct(body, { idempotencyKey: key })));
-    if (!r.ok) { if (!isTransient(r.error)) endAttempt(scope); window.setTimeout(() => document.querySelector<HTMLElement>("[aria-invalid='true'], [role='alert']")?.scrollIntoView({ block: "center" })); return; }
+    if (!r.ok) { if (!isTransientError(r.error)) endAttempt(scope); window.setTimeout(() => document.querySelector<HTMLElement>("[aria-invalid='true'], [role='alert']")?.scrollIntoView({ block: "center" })); return; }
     endAttempt(scope);
     setBaseline(JSON.stringify(form));
     announceAdminChange();
@@ -91,7 +90,7 @@ function ProductFormView({ product, initial, onReload }: { product: AdminProduct
     if (!product || !confirm) return;
     const scope = `product-status:${product.id}:${confirm}`;
     const r = await life.run((): Promise<unknown> => confirm === "delete" ? deleteProduct(product.id, { idempotencyKey: attemptKey(scope, {}) }) : setProductStatus(product.id, confirm === "deactivate" ? "INACTIVE" : "ACTIVE", undefined, { idempotencyKey: attemptKey(scope, { v: product.version }) }));
-    if (!r.ok) { if (!isTransient(r.error)) endAttempt(scope); return; }
+    if (!r.ok) { if (!isTransientError(r.error)) endAttempt(scope); return; }
     endAttempt(scope);
     announceAdminChange();
     setConfirm(null);

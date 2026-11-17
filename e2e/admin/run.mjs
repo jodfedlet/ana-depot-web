@@ -319,6 +319,115 @@ await run("products", async () => {
   await ctx.close();
 });
 
+const positionOf = async (variantSku) => (await admin("GET", `/admin/inventory?productId=${state.prodId}&size=50`)).body.items.find((i) => i.variantSku === variantSku);
+const publicAvail = async () => { const r = await (await fetch(`${env.API}/api/v1/products/${state.slug}`)).json(); return { availability: r.availability, qty: r.availableQuantity, json: JSON.stringify(r) }; };
+
+await run("inventory", async () => {
+  section("E. Inventory: register, adjust, refusal, exactly-once retry, threshold, conflict, history");
+  if (!state.prodId) throw new Error("no product from section D");
+  const skuS = `${E2E.sku}-S`, skuM = `${E2E.sku}-M`;
+  const { page, ctx } = await staffSession();
+  await page.goto(`${env.WEB}/fr/admin/inventory?productId=${state.prodId}`);
+  await settle(page, 1000);
+  check("a product without stock is offered for registration", /Produits sans stock enregistré/.test(await bodyText(page)));
+  for (const [sku, qty, thr] of [[skuS, "5", "2"], [skuM, "3", ""]]) {
+    await page.getByRole("button", { name: /Enregistrer le stock du produit choisi/ }).click();
+    await page.getByLabel("Variante").selectOption({ label: sku });
+    await page.getByLabel("Quantité initiale").fill(qty);
+    if (thr) await page.getByLabel("Seuil de stock bas").fill(thr);
+    await page.getByRole("dialog").getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await sleep(1200);
+  }
+  const s0 = await positionOf(skuS), m0 = await positionOf(skuM);
+  check("stock was registered per variant in the backend (one record per variant, shared by HTG/USD)", s0?.onHand === 5 && s0.lowStockThreshold === 2 && m0?.onHand === 3, JSON.stringify([s0?.onHand, m0?.onHand]));
+  let pa = await publicAvail();
+  check("the public API now shows availableQuantity 8 and IN_STOCK, and never onHand/reserved", pa.qty === 8 && pa.availability === "IN_STOCK" && !/onHand|reserved/.test(pa.json), JSON.stringify([pa.qty, pa.availability]));
+  await page.goto(`${env.WEB}/fr/admin/inventory?q=${encodeURIComponent(E2E.sku)}`);
+  await settle(page, 1000);
+  const row = () => page.locator("tr", { hasText: skuS });
+  check("the table shows on hand / reserved / available from the server", /5/.test(await row().innerText()) && /Disponible/.test(await bodyText(page)));
+  await shot(page, "admin-06-inventory-1280");
+
+  // adjust
+  await row().getByRole("button", { name: "Ajuster" }).click();
+  await page.getByLabel("Quantité", { exact: true }).fill("4");
+  check("a preview of the result is shown before saving", /aperçu\) : 9/.test(await bodyText(page)));
+  await page.getByRole("button", { name: "Enregistrer le mouvement" }).click();
+  await sleep(1300);
+  check("an ADD of 4 is applied by the backend (5 → 9) with a recorded movement", (await positionOf(skuS)).onHand === 9);
+  pa = await publicAvail();
+  check("the storefront reflects it immediately (availableQuantity 12)", pa.qty === 12);
+
+  // refusal
+  await row().getByRole("button", { name: "Ajuster" }).click();
+  await page.getByLabel("Type de mouvement").selectOption("REDUCE");
+  await page.getByLabel("Quantité", { exact: true }).fill("100");
+  await page.getByRole("button", { name: "Enregistrer le mouvement" }).click();
+  await sleep(1300);
+  check("removing more than exists is refused by the server with a translated message; stock unchanged", /négatif/.test(await bodyText(page)) && (await positionOf(skuS)).onHand === 9);
+  await page.getByRole("button", { name: "Annuler" }).click();
+
+  // lost answer -> retry applies ONCE
+  let dropped = false; const keys = [];
+  await page.route("**/api/v1/admin/inventory/*/adjustments", async (route) => {
+    keys.push(route.request().headers()["idempotency-key"]);
+    if (!dropped) { dropped = true; await route.fetch(); return route.abort("failed"); }
+    return route.continue();
+  });
+  await row().getByRole("button", { name: "Ajuster" }).click();
+  await page.getByLabel("Quantité", { exact: true }).fill("1");
+  await page.getByRole("button", { name: "Enregistrer le mouvement" }).click();
+  await sleep(1500);
+  check("when the answer is lost the screen shows an error and does NOT claim success", /connexion|Connexion/.test(await bodyText(page)));
+  await page.getByRole("button", { name: "Enregistrer le mouvement" }).click();
+  await sleep(1500);
+  await page.unroute("**/api/v1/admin/inventory/*/adjustments");
+  check("the retry reused the SAME Idempotency-Key", keys.length === 2 && keys[0] === keys[1], keys.join(" / "));
+  check("the adjustment was applied exactly ONCE (9 → 10, not 11)", (await positionOf(skuS)).onHand === 10);
+
+  // history
+  await row().getByRole("button", { name: "Historique" }).click();
+  await sleep(900);
+  const ht = await bodyText(page);
+  check("history lists the movements (initial, add, add) newest first", /Stock initial/.test(ht) && (ht.match(/Ajout/g) ?? []).length >= 2 && /Réception de marchandise/.test(ht));
+  await page.getByRole("dialog").getByRole("button", { name: "Fermer" }).last().click();
+
+  // threshold + conflict
+  await row().getByRole("button", { name: "Seuil", exact: true }).click();
+  await page.getByLabel("Seuil de stock bas").fill("10");
+  await page.getByRole("dialog").getByRole("button", { name: "Enregistrer" }).click();
+  await sleep(1300);
+  const pubVariants = (await (await fetch(`${env.API}/api/v1/products/${state.slug}`)).json()).variants;
+  const sVariant = pubVariants.find((v) => v.sku === skuS);
+  check("a threshold equal to the available stock makes that position LOW, and its public variant LOW_STOCK (the threshold is the seller's; none is invented)", (await positionOf(skuS)).state === "LOW" && sVariant?.availability === "LOW_STOCK", JSON.stringify([(await positionOf(skuS)).state, sVariant?.availability]));
+  const cur = await positionOf(skuS);
+  await row().getByRole("button", { name: "Seuil", exact: true }).click();
+  await admin("PATCH", `/admin/inventory/${cur.id}/threshold`, { version: cur.version, lowStockThreshold: 3 }, key()); // someone else changes it first
+  await page.getByLabel("Seuil de stock bas").fill("7");
+  await page.getByRole("dialog").getByRole("button", { name: "Enregistrer" }).click();
+  await sleep(1300);
+  check("a stale threshold edit is refused with a conflict message; the other value is kept", /modifiées par quelqu'un d'autre/.test(await bodyText(page)) && (await positionOf(skuS)).lowStockThreshold === 3);
+  await page.getByRole("dialog").getByRole("button", { name: "Recharger" }).click();
+  await sleep(1000);
+
+  // recount to zero -> OUT
+  await page.goto(`${env.WEB}/fr/admin/inventory?q=${encodeURIComponent(E2E.sku)}`);
+  await settle(page, 1000);
+  for (const sku of [skuS, skuM]) {
+    await page.locator("tr", { hasText: sku }).getByRole("button", { name: "Ajuster" }).click();
+    await page.getByLabel("Type de mouvement").selectOption("RECOUNT");
+    await page.getByLabel("Nouvelle quantité totale").fill("0");
+    await page.getByLabel("Motif").selectOption("COUNT");
+    await page.getByRole("button", { name: "Enregistrer le mouvement" }).click();
+    await sleep(1200);
+  }
+  pa = await publicAvail();
+  check("recounting both variants to zero makes the product OUT_OF_STOCK on the storefront", pa.availability === "OUT_OF_STOCK" && pa.qty === 0);
+  // leave stock for the reservation journey later
+  for (const [sku, q] of [[skuS, 6], [skuM, 4]]) { const pos = await positionOf(sku); await admin("POST", `/admin/inventory/${pos.id}/adjustments`, { type: "ADD", quantity: q, reason: "RECEPTION" }, key()); }
+  await ctx.close();
+});
+
 console.log(`\n${results.filter((r) => r.ok).length} passed, ${results.filter((r) => !r.ok).length} failed`);
 console.log(pageErrors.length ? `page errors:\n${pageErrors.join("\n")}` : "no unexpected page errors");
 await browser.close();
