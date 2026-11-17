@@ -20,6 +20,24 @@ describe("checkout redirect target (defence in depth before window.location.assi
   });
 });
 
+describe("local-verification switch NEXT_PUBLIC_CHECKOUT_TEST_ORIGIN", () => {
+  const fake = "http://127.0.0.1:9199";
+  it("additionally allows exactly that origin", () => {
+    expect(isSafeCheckoutUrl("http://127.0.0.1:9199/pay/cs_fake_1", fake)).toBe(true);
+    expect(isSafeCheckoutUrl("http://127.0.0.1:9199/pay/cs_fake_1")).toBe(false); // not set: refused
+  });
+  it("keeps refusing every other host, scheme, port and credential even when set", () => {
+    for (const u of ["http://127.0.0.1:9200/pay/x", "http://127.0.0.1/pay/x", "https://127.0.0.1:9199/pay/x", "http://localhost:9199/pay/x", "http://127.0.0.1.evil.com:9199/x", "http://evil.com/?http://127.0.0.1:9199", "http://user:pw@127.0.0.1:9199/x", "https://evil.example/x", "javascript:alert(1)"]) {
+      expect(isSafeCheckoutUrl(u, fake)).toBe(false);
+    }
+  });
+  it("still accepts Stripe's real hosts, and a malformed value allows nothing extra", () => {
+    expect(isSafeCheckoutUrl("https://checkout.stripe.com/c/pay/x", fake)).toBe(true);
+    expect(isSafeCheckoutUrl("http://127.0.0.1:9199/x", "not a url")).toBe(false);
+    expect(isSafeCheckoutUrl("http://127.0.0.1:9199/x", "ftp://127.0.0.1:9199")).toBe(false);
+  });
+});
+
 describe("polling schedule after returning from Stripe", () => {
   it("is gentle (2s, 4s, 8s, then 15s) and bounded to about two minutes", () => {
     expect(POLL_DELAYS_MS.slice(0, 4)).toEqual([2000, 4000, 8000, 15000]);

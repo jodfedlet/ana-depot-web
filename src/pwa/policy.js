@@ -17,7 +17,7 @@
   var DEFAULT_LOCALE = "fr";
 
   /** Path segments (after the locale) that are private or transactional: never cached, never served offline. */
-  var PRIVATE_SEGMENTS = ["admin", "account", "auth", "reserve", "reservations"];
+  var PRIVATE_SEGMENTS = ["admin", "account", "auth", "reserve", "reservations", "payment"];
 
   /** Public pages that may be kept for offline reading (after the locale): home, catalog, product, cart, search, info pages. The bare `/` (the manifest's start_url, redirected to a language by the proxy) is allowed so an installed app can open offline; the redirect itself is never stored, `fallbackKeys` answers from the saved language home. */
   var PUBLIC_PAGE = /^(\/|\/(fr|ht)(\/(products(\/[^/]+)?|cart|search|info\/[^/]+))?\/?)$/;

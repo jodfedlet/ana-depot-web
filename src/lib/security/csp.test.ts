@@ -82,7 +82,7 @@ describe("securityHeaders", () => {
     const rules = securityHeaders({}, false).slice(1);
     expect(rules.map((r) => r.source)).toEqual(PRIVATE_PAGE_SOURCES);
     for (const r of rules) expect(r.headers).toEqual([{ key: "Cache-Control", value: "private, no-store" }]);
-    expect(PRIVATE_PAGE_SOURCES.join(" ")).toMatch(/admin.*account.*auth.*reservations/);
+    expect(PRIVATE_PAGE_SOURCES.join(" ")).toMatch(/admin.*account.*auth.*reservations.*payment/);
   });
   it("warns in production when no asset origin is configured", () => {
     expect(securityWarnings({ NODE_ENV: "production" })).toHaveLength(1);

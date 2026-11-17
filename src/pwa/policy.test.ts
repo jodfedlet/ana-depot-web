@@ -22,7 +22,7 @@ describe("classify: what the worker may touch", () => {
   });
 
   it("treats every private or transactional navigation as live-only (never cached)", () => {
-    for (const p of ["/fr/admin", "/fr/admin/products/1", "/ht/account", "/fr/account/profile", "/fr/auth/login", "/fr/auth/callback", "/fr/reserve", "/fr/reserve/confirmation/ANA-1", "/fr/reservations", "/ht/reservations/ANA-1"]) {
+    for (const p of ["/fr/admin", "/fr/admin/products/1", "/ht/account", "/fr/account/profile", "/fr/auth/login", "/fr/auth/callback", "/fr/reserve", "/fr/reserve/confirmation/ANA-1", "/fr/reservations", "/ht/reservations/ANA-1", "/fr/payment/return", "/ht/payment/cancelled"]) {
       expect(nav(p)).toBe("private-page");
     }
   });

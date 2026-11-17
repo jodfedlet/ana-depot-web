@@ -14,7 +14,7 @@ const STRIPPED_LOCALE = "/:locale(fr|ht)";
  * Pages whose HTML is for ONE person (administration, account, sign-in/recovery flows, reservation tracking): never stored by a shared cache or the service worker.
  * The static shells carry no personal data (it is fetched client-side with the session token), but a CDN or proxy must not keep them either.
  */
-export const PRIVATE_PAGE_SOURCES = [`${STRIPPED_LOCALE}/admin/:path*`, `${STRIPPED_LOCALE}/account/:path*`, `${STRIPPED_LOCALE}/auth/:path*`, `${STRIPPED_LOCALE}/reservations/:path*`];
+export const PRIVATE_PAGE_SOURCES = [`${STRIPPED_LOCALE}/admin/:path*`, `${STRIPPED_LOCALE}/account/:path*`, `${STRIPPED_LOCALE}/auth/:path*`, `${STRIPPED_LOCALE}/reservations/:path*`, `${STRIPPED_LOCALE}/payment/:path*`];
 
 /**
  * Security headers for every response, built from the environment at BUILD time (next.config `headers()` is evaluated at build).
@@ -52,5 +52,6 @@ export function securityHeaders(env: Record<string, string | undefined> = proces
 export function securityWarnings(env: Record<string, string | undefined> = process.env): string[] {
   const out: string[] = [];
   if (assetOriginsOf(env.NEXT_PUBLIC_ASSET_ORIGINS).length === 0 && env.NODE_ENV === "production") out.push("NEXT_PUBLIC_ASSET_ORIGINS is not set: img-src falls back to https:. Set it to the public image domain (R2/CDN).");
+  if (env.NEXT_PUBLIC_CHECKOUT_TEST_ORIGIN?.trim() && env.NODE_ENV === "production") out.push("NEXT_PUBLIC_CHECKOUT_TEST_ORIGIN is set: the checkout redirect check also allows that origin. Local verification only; never set it in a deployed build.");
   return out;
 }

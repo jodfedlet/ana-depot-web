@@ -112,3 +112,7 @@ Behaviour:
 * Static copy that used to say "no online payment" now says "you are not asked to pay now / pay at pickup", which stays true with Stripe on.
 
 Verification: `npm run e2e:stripe` (e2e/storefront/stripe.mjs) is **MOCKED** (Playwright route handlers replace the API and the Stripe page): it proves what the web side shows and requests, not the backend nor Stripe.
+
+**Local verification switch (never in production).** `NEXT_PUBLIC_CHECKOUT_TEST_ORIGIN` (build time, e.g. `http://127.0.0.1:9199` for the API repo's fake Stripe) makes the redirect check also accept
+EXACTLY that origin. Every other host, scheme, port and any credentials stay refused (unit-tested). A production build with it set prints a build warning. `/payment/*` pages are private: `Cache-Control: private, no-store`,
+never cached by the service worker, `noindex`.

@@ -17,14 +17,29 @@ export const announcesOnlinePayment = (status: ReservationStatus): boolean => st
 /**
  * Defence in depth before `window.location.assign`: the URL must come from the backend AND still look like Stripe's hosted page — https, no credentials,
  * default port, host `stripe.com` or a subdomain of it (for example `checkout.stripe.com`). Anything else is refused and nothing is opened.
+ *
+ * LOCAL VERIFICATION ONLY: `NEXT_PUBLIC_CHECKOUT_TEST_ORIGIN` (build time, for example `http://127.0.0.1:9199`, a fake Stripe) additionally allows EXACTLY that one
+ * origin (scheme + host + port) and nothing else. It must never be set in a production build (`checkoutTestOriginWarning` reports it).
  */
-export function isSafeCheckoutUrl(value: unknown): value is string {
+export function isSafeCheckoutUrl(value: unknown, testOrigin: string | undefined = process.env.NEXT_PUBLIC_CHECKOUT_TEST_ORIGIN): value is string {
   if (typeof value !== "string" || value.length > 2048) return false;
   try {
     const u = new URL(value);
-    return u.protocol === "https:" && u.username === "" && u.password === "" && u.port === "" && (u.hostname === "stripe.com" || u.hostname.endsWith(".stripe.com"));
+    if (u.username !== "" || u.password !== "") return false;
+    if (testOrigin && u.origin === exactOrigin(testOrigin)) return true;
+    return u.protocol === "https:" && u.port === "" && (u.hostname === "stripe.com" || u.hostname.endsWith(".stripe.com"));
   } catch {
     return false;
+  }
+}
+
+/** The origin of a configured test URL, or null when it is not a plain http(s) origin (a malformed value allows nothing). */
+function exactOrigin(configured: string): string | null {
+  try {
+    const u = new URL(configured.trim());
+    return u.protocol === "http:" || u.protocol === "https:" ? u.origin : null;
+  } catch {
+    return null;
   }
 }
 
