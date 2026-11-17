@@ -1,9 +1,9 @@
-import { getBrowserClient } from "@/lib/auth/supabase-browser";
 import { type CatalogQuery, type SortKey } from "../catalog-types";
 import { currencyDigits } from "../money";
-import { anonymousApiClient, browserApiClient } from "./client";
+import { anonymousApiClient } from "./client";
 import type { CategoryDto, MeDto, PageDto, PickupDto, ProductDto, ProfileDto, ReservationViewDto } from "./dto";
 import { ApiError, newIdempotencyKey } from "./http";
+import { signedInClient } from "./session-client";
 
 /**
  * Every storefront call to the Spring Boot API, one function per endpoint of `ana-depot-api/docs/api.md`. Nothing here invents an endpoint,
@@ -25,14 +25,8 @@ function publicClient() {
 /** Runs a call on the public client; a missing configuration is a REJECTED promise (never a synchronous throw), so hooks show an error state. */
 const publicCall = async <T>(run: (client: NonNullable<ReturnType<typeof anonymousApiClient>>) => Promise<T>): Promise<T> => run(publicClient());
 
-/** A client that carries the signed-in customer's token; throws `session_expired` if the session cannot supply one. */
-async function customerClient() {
-  const c = browserApiClient();
-  if (!c) throw notConfigured();
-  const { data } = (await getBrowserClient()?.auth.getSession()) ?? { data: { session: null } };
-  if (!data.session?.access_token) throw new ApiError({ status: 401, code: "session_expired" });
-  return c;
-}
+/** Calls made as the signed-in customer (see session-client.ts). */
+const customerClient = signedInClient;
 
 // ---- catalog ----------------------------------------------------------------------------------------------------------------------------------
 

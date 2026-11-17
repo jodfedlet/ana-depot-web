@@ -10,6 +10,8 @@ const KNOWN = [
   "rate_limited", "insufficient_stock", "product_unavailable", "price_not_available", "variant_required", "variant_unavailable", "below_minimum_order", "unsupported_currency",
   "currency_required", "pickup_disabled", "pickup_not_configured", "idempotency_key_reuse", "validation_failed", "terms_not_acknowledged", "search_query_too_long", "invalid_page",
   "page_out_of_range", "filter_invalid", "concurrent_update", "internal_error",
+  // staff (administration) codes
+  "duplicate_sku", "duplicate_slug", "invalid_status", "payment_required", "already_paid", "already_reversed", "inventory_exists", "stock_negative", "stock_invalid", "inventory_not_tracked", "variant_in_use", "product_in_use", "category_has_active_products", "attribute_in_use", "option_in_use", "attribute_type_locked", "variant_axis_in_use", "attribute_required_violation", "category_inactive", "product_not_in_category", "order_incomplete", "upload_type_not_allowed", "upload_too_large", "upload_missing", "upload_type_mismatch", "upload_signature_mismatch", "upload_not_pending", "upload_expired", "images_order_invalid", "storage_unavailable", "storage_not_configured", "customer_managed_by_owner", "period_too_long", "date_range_invalid", "reason_required", "currency_invalid", "paid_negative", "ledger_amount_zero", "idempotency_key_required", "price_required", "retail_price_invalid", "sale_price_invalid", "wholesale_disabled_with_tiers", "required_to_publish",
 ] as const satisfies readonly ApiErrorCode[];
 const known = new Set<string>(KNOWN);
 
@@ -52,3 +54,14 @@ export function fieldProblems(error: unknown): Record<string, string> {
   const p = problemOf(error);
   return Object.fromEntries((p?.errors ?? []).map((e) => [e.field, e.code]));
 }
+
+/** The message for ONE field problem of a 400/422 (`errors[{field, code}]`); unknown codes read as "invalid value". */
+export function fieldErrorKey(code: string): `fieldErrors.${keyof Messages["fieldErrors"]}` {
+  return (code in FIELD_CODES ? `fieldErrors.${code}` : "fieldErrors.invalid") as `fieldErrors.${keyof Messages["fieldErrors"]}`;
+}
+const FIELD_CODES: Record<string, true> = Object.fromEntries(["required", "invalid", "too_long", "too_many_decimals", "must_be_positive", "phone_invalid", "email_invalid", "country_invalid", "schedule_one_day", "time_invalid", "schedule_hours", "day_invalid", "hold_period_invalid", "required_to_publish", "retail_price_invalid", "sale_price_invalid", "price_required", "duplicate_sku", "duplicate_slug"].map((c) => [c, true]));
+
+/** True for a version conflict: someone else changed the record first; the screen must reload it and tell the staff member. */
+export const isVersionConflict = (error: unknown): boolean => problemOf(error)?.code === "concurrent_update";
+/** 403 from the API: signed in, but not staff (or not allowed). Distinct from 401 (no valid session). */
+export const isForbidden = (error: unknown): boolean => problemOf(error)?.status === 403;

@@ -5,22 +5,16 @@ import { Suspense, createContext, useCallback, useContext, useEffect, useRef, us
 import { Wordmark } from "@/components/layout/wordmark";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
-import { DemoNotice } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/states";
-import { useToast } from "@/components/ui/toast";
 import { LanguageSelector } from "@/i18n/language-selector";
 import { Link } from "@/i18n/link";
 import { useLocalePathname, useLocaleRouter } from "@/i18n/navigation";
 import { useT } from "@/i18n/provider";
 import type { MessageKey } from "@/i18n/types";
-import { stockOf, stockState } from "@/lib/catalog/stock";
-import { useCatalogState } from "@/lib/stores/catalog-store";
-import { resetDemoData } from "@/lib/api/reservations";
+import { type AdminSignals, useAdminSignals } from "@/lib/api/admin/signals";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/auth/use-session";
 import { useAdminSession } from "./admin-identity";
-import { useReservations } from "@/lib/stores/reservation-store";
-import { countByStatus } from "@/lib/reservations/query";
 
 // ---------- unsaved changes guard ----------
 interface GuardValue { setDirty: (dirty: boolean) => void; go: (href: string) => void }
@@ -43,16 +37,6 @@ export function useUnsavedChanges(dirty: boolean) {
 export function AdminLoading() {
   const t = useT();
   return <div className="p-8" role="status" aria-label={t("admin.guard.loading")}><Skeleton className="h-8 w-56" /><Skeleton className="mt-4 h-40 w-full" /></div>;
-}
-
-// ---------- honesty marker: data is not (yet) server-backed ----------
-/**
- * Every admin module reads and writes browser-local demo data until its backend endpoints exist. This notice stays on
- * every page so nobody mistakes a localStorage change for a saved, shared store operation.
- */
-function ServerConnectionNotice() {
-  const t = useT();
-  return <DemoNotice className="mb-6" title={t("admin.connection.title")}>{t("admin.connection.text")}</DemoNotice>;
 }
 
 // ---------- popover ----------
@@ -89,16 +73,11 @@ const navItems: NavItem[] = [
   { href: "/admin/settings", key: "admin.nav.storeSettings", icon: Settings, alsoActive: ["/admin/pickup-settings"] },
 ];
 
-function NavList({ onNavigate }: { onNavigate?: () => void }) {
+function NavList({ onNavigate, signals }: { onNavigate?: () => void; signals: AdminSignals }) {
   const t = useT();
   const pathname = useLocalePathname();
   const { go } = useContext(GuardContext);
-  const reservations = useReservations();
-  const { products } = useCatalogState();
-  const pending = countByStatus(reservations).pending_review;
-  // Tracked products that need attention (low or out of stock) — real counts from the stock records.
-  const stock = products.filter((p) => p.status === "active" && p.inventory.tracked).filter((p) => { const s = stockState(p, stockOf(p, reservations)); return s === "low" || s === "out"; }).length;
-  const badges = { pending, stock };
+  const badges = { pending: signals.pending ?? 0, stock: signals.stockAttention ?? 0 }; // unknown (loading/failed) shows no badge, never an invented number
   return (
     <nav aria-label={t("admin.nav.label")}>
       <ul className="space-y-1">
@@ -127,11 +106,11 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 export function AdminShell({ children }: { children: ReactNode }) {
   const t = useT();
   const router = useLocaleRouter();
-  const toast = useToast();
   const { session, signOut } = useAdminSession();
   const auth = useSession();
-  const reservations = useReservations();
-  const pending = reservations.filter((r) => r.status === "pending_review");
+  const signals = useAdminSignals();
+  const pending = signals.recent;
+  const pendingCount = signals.pending ?? 0;
   const [menuOpen, setMenuOpen] = useState(false);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const dirtyRef = useRef(false);
@@ -154,7 +133,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <div className="min-h-dvh bg-sand-50 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside className="sticky top-0 hidden h-dvh flex-col gap-6 overflow-y-auto border-r border-line bg-surface p-4 lg:flex">
           <div className="px-1 pt-1"><Wordmark href="/admin" /><p className="text-eyebrow mt-2 pl-[2.625rem] text-ink-muted">{t("admin.brand")}</p></div>
-          <Suspense fallback={<Skeleton className="h-40 w-full" />}><NavList /></Suspense>
+          <Suspense fallback={<Skeleton className="h-40 w-full" />}><NavList signals={signals} /></Suspense>
           <div className="mt-auto"><Link href="/" className="text-label inline-flex min-h-11 items-center px-3 font-semibold text-brand-700 hover:underline">{t("admin.nav.viewStore")} →</Link></div>
         </aside>
 
@@ -164,13 +143,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <span className="text-label font-semibold lg:hidden">{t("admin.brand")}</span>
             <div className="ml-auto flex items-center gap-1 sm:gap-2">
               <LanguageSelector />
-              <Popover label={t("admin.topbar.notifications")} trigger={<><Bell aria-hidden className="size-5" />{pending.length > 0 && <span aria-hidden className="grid min-w-5 place-items-center rounded-full bg-accent-600 px-1.5 text-xs font-bold text-white">{pending.length}</span>}</>}>
+              <Popover label={t("admin.topbar.notifications")} trigger={<><Bell aria-hidden className="size-5" />{pendingCount > 0 && <span aria-hidden className="grid min-w-5 place-items-center rounded-full bg-accent-600 px-1.5 text-xs font-bold text-white">{pendingCount}</span>}</>}>
                 <p className="text-label px-2 py-1.5 font-semibold">{t("admin.topbar.notifications")}</p>
-                {pending.length === 0 ? <p className="text-label px-2 py-2 font-normal text-ink-soft">{t("admin.topbar.none")}</p> : (
+                {pendingCount === 0 ? <p className="text-label px-2 py-2 font-normal text-ink-soft">{t("admin.topbar.none")}</p> : (
                   <ul>
-                    <li className="text-label px-2 py-1 font-normal text-ink-soft" role="status">{t("admin.topbar.pending", { count: pending.length })}</li>
+                    <li className="text-label px-2 py-1 font-normal text-ink-soft" role="status">{t("admin.topbar.pending", { count: pendingCount })}</li>
                     {pending.slice(0, 4).map((r) => (
-                      <li key={r.id}><Link href={`/admin/reservations/${r.reference}`} className="text-label flex min-h-11 items-center justify-between rounded-control px-2 hover:bg-sand-50"><span translate="no" className="font-semibold">{r.reference}</span><span className="text-ink-soft">{r.customer.firstName}</span></Link></li>
+                      <li key={r.id}><Link href={`/admin/reservations/${r.reference}`} className="text-label flex min-h-11 items-center justify-between rounded-control px-2 hover:bg-sand-50"><span translate="no" className="font-semibold">{r.reference}</span><span className="text-ink-soft">{r.contact.firstName}</span></Link></li>
                     ))}
                     <li><Link href="/admin/reservations?status=pending_review" className="text-label flex min-h-11 items-center rounded-control px-2 font-semibold text-brand-700 hover:bg-sand-50">{t("admin.dashboard.viewAll")}</Link></li>
                   </ul>
@@ -179,15 +158,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <Popover label={t("admin.topbar.account")} trigger={<><span className="grid size-8 place-items-center rounded-full bg-brand-700 text-sm font-semibold text-white">{session?.name.charAt(0)}</span><ChevronDown aria-hidden className="size-4" /></>}>
                 <p className="text-label px-2 py-1.5 font-normal text-ink-soft">{t("admin.topbar.signedInAs", { name: session?.name ?? "" })}</p>
                 <button type="button" className="text-label flex min-h-11 w-full items-center rounded-control px-2 text-left hover:bg-sand-50" onClick={() => { void signOut(); }}>{t("admin.topbar.signOut")}</button>
-                <button type="button" className="text-label flex min-h-11 w-full items-center rounded-control px-2 text-left hover:bg-sand-50" onClick={() => { resetDemoData(); toast.show({ tone: "info", message: t("admin.topbar.resetDone") }); }}>{t("admin.topbar.resetDemo")}</button>
               </Popover>
             </div>
           </header>
-          <main id="main" className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8"><ServerConnectionNotice />{children}</main>
+          <main id="main" className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
         </div>
       </div>
 
-      <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title={t("admin.nav.menu")} side="left"><Suspense fallback={<Skeleton className="h-40 w-full" />}><NavList onNavigate={() => setMenuOpen(false)} /></Suspense></Drawer>
+      <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title={t("admin.nav.menu")} side="left"><Suspense fallback={<Skeleton className="h-40 w-full" />}><NavList onNavigate={() => setMenuOpen(false)} signals={signals} /></Suspense></Drawer>
 
       <Drawer
         open={leaveTo !== null}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Dashboard } from "@/features/admin/dashboard";
 import { isLocale } from "@/i18n/config";
@@ -18,9 +19,8 @@ export default async function AdminDashboardPage({ params }: PageProps<"/[locale
       <header className="mb-6">
         <h1 className="text-h1">{t("admin.dashboard.title")}</h1>
         <p className="text-body mt-1 text-ink-soft">{t("admin.dashboard.subtitle")}</p>
-        <p className="text-caption mt-2 rounded-control border border-dashed border-line-strong bg-surface px-3 py-2 text-ink-soft">{t("admin.demo.banner")}</p>
       </header>
-      <Dashboard />
+      <Suspense><Dashboard /></Suspense>
     </>
   );
 }

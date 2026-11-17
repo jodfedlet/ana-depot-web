@@ -1,3 +1,4 @@
+import { adminLive } from "./fr/admin-live";
 import { api } from "./fr/api";
 import { admin } from "./fr/admin";
 import { adminCatalog } from "./fr/admin-catalog";
@@ -6,4 +7,4 @@ import { customer } from "./fr/customer";
 import { store } from "./fr/store";
 
 /** French (default language). This object DEFINES the message shape; `ht` must match it. */
-export const fr = { ...store, ...customer, ...api, admin: { ...admin, ...adminCatalog, ...adminOps } };
+export const fr = { ...store, ...customer, ...api, ...adminLive, admin: { ...admin, ...adminCatalog, ...adminOps } };
