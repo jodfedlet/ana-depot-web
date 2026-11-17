@@ -1,7 +1,9 @@
+import { seo } from "./seo";
 import type { store as frStore } from "../fr/store";
 
 /** Must satisfy the French shape: a missing or extra key is a compile error. */
 export const store: typeof frStore = {
+  ...seo,
   common: {
     language: "Lang",
     skipToContent: "Ale nan kontni an",

@@ -1,4 +1,7 @@
+import { seo } from "./seo";
+
 export const store = {
+  ...seo,
   common: {
     language: "Langue",
     skipToContent: "Aller au contenu",
