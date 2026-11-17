@@ -40,9 +40,9 @@ function chromiumPath() {
 export const launch = () => chromium.launch({ executablePath: chromiumPath(), args: ["--no-sandbox"] });
 
 export const pageErrors = [];
-export async function newPage(browser, { width = 1280, height = 900 } = {}) {
-  // the app's service worker (PWA) would answer API calls itself, which `page.route` cannot see: the suite fakes network failures, so it runs without one
-  const ctx = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
+export async function newPage(browser, { width = 1280, height = 900, serviceWorkers = "allow" } = {}) {
+  // `serviceWorkers: "block"` for tests that FAKE network answers with `page.route`: the app's service worker (PWA) would otherwise fetch from the API itself, out of the route's sight
+  const ctx = await browser.newContext({ viewport: { width, height }, serviceWorkers });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => pageErrors.push(`pageerror ${page.url()}: ${e.message}`));
   page.on("console", (m) => {

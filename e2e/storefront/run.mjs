@@ -484,7 +484,7 @@ await run("pickup-disabled", async () => {
 // ================= 13. error handling =================
 await run("errors", async () => {
   section("13. Error handling: network, 429, 5xx, timeout (requests faked in the browser; the app's reaction is what is tested)");
-  const { page } = await newPage(browser);
+  const { page } = await newPage(browser, { serviceWorkers: "block" });
   // The plain listing is rendered on the SERVER (its first answer is in the HTML), so a browser-side failure must not blank it...
   await page.route("**/api/v1/products**", (r) => r.abort("failed"));
   await page.goto(`${env.WEB}/fr/products`);
