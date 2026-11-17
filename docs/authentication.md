@@ -9,7 +9,7 @@ session, `admin@…` meant "staff", `wrong-password` showed an error) has been *
 | Protected customer account pages (`/account/**`) | **Real** (server-side session check) |
 | Staff sign-in and admin protection (`/admin/**`) | **Real** (Supabase session **and** backend `staff: true`, checked on the server) |
 | Backend JWT validation, `GET /api/v1/me`, staff provisioning | Implemented in `../ana-depot-api` — see `../ana-depot-api/docs/auth.md` |
-| Admin **data** (products, stock, reservations, payments, pickup settings) | **Demo**: browser `localStorage`, labelled "not connected to the server" |
+| Admin **data** (products, stock, reservations, payments, customers, reports, pickup settings) | **Real**: `/api/v1/admin/**` (see `admin-integration.md`) |
 | Linking account ↔ reservations | **Real**: reservations made while signed in are linked by the API to the account; `/account` reads `/me/profile` and `/me/reservations` (see `storefront-integration.md`) |
 
 ## The auth UI: Supabase UI "password-based-auth-nextjs" block
@@ -106,7 +106,7 @@ A ready local stack (real GoTrue, ES256 signing keys, Mailpit, templates above) 
 | Backend unreachable / malformed answer | "Cannot verify your permissions": **denied** |
 | Signed in, `staff: true` | admin shell renders |
 
-Caveat: layouts do not re-run on client-side navigations, and admin pages currently read local demo data. The real protection for data is the backend, which
+Caveat: layouts do not re-run on client-side navigations. The real protection for data is the backend, which
 authorizes every `/api/v1/admin/**` request from the bearer token; the gate decides what the first render shows. Hiding links is never the mechanism.
 
 ## Provisioning the first administrator

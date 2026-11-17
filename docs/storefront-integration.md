@@ -1,8 +1,7 @@
 # Storefront ↔ backend integration
 
 The **customer storefront** (browse, search, product pages, cart, guest reservation, tracking, customer account) talks to the real Spring Boot API
-(`../ana-depot-api`, contract: `../ana-depot-api/docs/api.md`). The **administration** screens are **not** connected yet and still use browser-local demo data
-(they say so on screen); they are out of scope of this phase.
+(`../ana-depot-api`, contract: `../ana-depot-api/docs/api.md`). The **administration** is connected separately (see `admin-integration.md`).
 
 ```
 Browser (Next.js storefront) ──HTTPS+CORS──▶ Spring Boot API ──▶ Supabase PostgreSQL

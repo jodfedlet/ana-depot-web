@@ -6,7 +6,7 @@ Next.js 16 App Router, React 19, TypeScript strict, Tailwind v4. Single seller, 
 as a furniture/hardware/household specialist — the hero and home must stay category-neutral). Currencies: **HTG and USD** (decided).
 **Retail + wholesale** (per-product quantity price tiers, never wholesale-only). **Commerce model: reservation-first.** Customer reserves online → store reviews → customer visits → pays cash in
 person → collects. There is NO online payment and NO delivery yet. Launch market Haiti; languages `fr` and `ht`.
-The **customer storefront is connected to the real backend** (`../ana-depot-api`, Spring Boot): catalog, search, pickup, cart checks, guest reservations, tracking, customer account (`docs/storefront-integration.md`). The **administration screens are still demo** (browser-local data, labelled) until their own phase.
+The **customer storefront is connected to the real backend** (`../ana-depot-api`, Spring Boot): catalog, search, pickup, cart checks, guest reservations, tracking, customer account (`docs/storefront-integration.md`). The **administration is connected to the real admin APIs** too (`/api/v1/admin/**`, Phase 4; `docs/admin-integration.md`). No demo business data is left.
 Design: `docs/design-system.md` (read before changing UI). Business decisions still open: README.
 
 ## Commands
@@ -17,7 +17,7 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
   `(store)/` = customer site; `admin/` = administration (`admin/(app)/` behind the server-side staff gate; unauthenticated visitors go to `/auth/login?next=/admin`).
 - `src/features/<area>` — screens: `home catalog product cart search reservations account auth info admin` (`admin/products`, `admin/categories` for catalog management).
   `src/components/ui|layout` — shared primitives. `src/lib` — pure logic/types. `src/i18n` — translations & helpers.
-- **API boundary `src/lib/api/*`** (async, typed) is the only thing UI calls. Storefront: `public.ts` (one function per endpoint of `../ana-depot-api/docs/api.md`), `dto.ts`, `map-*.ts`, `*-hooks.ts`, `errors.ts`. **Never add a field, endpoint or status the API contract does not have; never send a price; never search/filter a downloaded catalog; never show success before the server confirmed.** Public reads use the anonymous client (no token). `src/lib/mock/*`, `lib/api/reservations.ts`, `lib/api/catalog-admin.ts` and `lib/stores/{catalog,reservation,pickup}-store.ts` are the **ADMIN-only demo** (localStorage); the storefront must not import them. The only storefront browser state is the cart (`ana.cart.v4`) and tab-scoped sessionStorage (`lib/reservations/access-store.ts`, `pending-submit.ts`).
+- **API boundary `src/lib/api/*`** (async, typed) is the only thing UI calls. Storefront: `public.ts` (one function per endpoint of `../ana-depot-api/docs/api.md`), `dto.ts`, `map-*.ts`, `*-hooks.ts`, `errors.ts`. **Never add a field, endpoint or status the API contract does not have; never send a price; never search/filter a downloaded catalog; never show success before the server confirmed.** Public reads use the anonymous client (no token). Staff calls live in `lib/api/admin/*` (`signedInClient`, typed DTOs, one function per staff endpoint, `useAdminResource`/`useAction`, idempotency keys via `lib/api/idempotency.ts`); the storefront must not import them. The only storefront browser state is the cart (`ana.cart.v4`) and tab-scoped sessionStorage (`lib/reservations/access-store.ts`, `pending-submit.ts`).
 - **Authentication is real Supabase Auth** (`@supabase/ssr` cookies; `src/lib/auth/*`, `src/lib/api/auth.ts`). There are NO demo sessions any more —
   never reintroduce a fake sign-in, a "local session", or a success that Supabase did not confirm. Full guide: `docs/authentication.md`.
   - Identity ≠ authorization. Supabase says WHO; the backend (`GET /api/v1/me` → `staff`) says what they may do. Admin access = verified session + `staff === true`,
@@ -31,26 +31,24 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
     optional server-only `API_BASE_URL`. The service-role key is never used by this app.
   - Privacy: never show whether an address has an account (sign-up/sign-in/recovery/resend are uniform; `user_already_exists` counts as success). Callback redirects are RELATIVE.
   - Checks: `npm test` (mocked/unit), `npm run e2e:stub` (fake Supabase), `npm run e2e:unavailable` (config missing), `npm run e2e:real` (local Supabase + real API; see `docs/authentication.md` and `../ana-depot-api/docs/local-supabase.md`).
-  - Admin modules use browser-local demo data and show a visible "not connected to the server" notice. `src/lib/api/http.ts` is the typed client for the real API.
+  - `src/lib/api/http.ts` is the typed client for the real API. Admin pages never keep business data in the browser (no demo store, no localStorage records).
 
-## Reservation domain (the part that must stay correct)
-- `lib/reservations/workflow.ts` is the single rule engine (pure, tested): pending_review → confirmed → ready_for_pickup → collected;
-  reject/cancel need reasons; payment only when ready; collect needs payment = paid + confirmed handover; cancelling a promised
-  reservation needs an operational check; expiry only by configured policy (`holdPeriodDays`, null = none; never hardcode one).
-- **Pickup snapshots:** each reservation stores its own `PickupSnapshot` (location + instructions). Changing global settings
-  (`lib/api/reservations.savePickupSettings`) only affects NEW reservations. Per-reservation change = `changePickup` action + event + history.
-- **Customer vs staff data:** `lib/reservations/customer-view.ts` is the customer view model (built from the API's `CustomerReservationView` by `lib/api/map-reservation.ts`); it cannot express internal notes/staff names. Customer screens use only it. Guests need reference **and** phone (checked by the SERVER; `reservations/access-store.ts` keeps them for the tab only); never expose by reference alone.
-- Pickup disabled/not configured ⇒ the SERVER refuses (422) and the form is blocked too (don't rely on the form). MonCash/NatCash are "Bientôt disponible",
-  disabled, and never stored on a reservation.
+## Reservation and admin domain (the part that must stay correct)
+- The BACKEND is the rule engine: statuses, `allowedActions`, prices, stock, balances. The UI never recomputes a business rule, never shows success before the server confirmed, and never invents a role,
+  refund, cancellation policy, expiry or FX conversion. Flow: pending → accepted → ready for pickup → collected; reject/cancel need reasons; payments only while READY_FOR_PICKUP; collect needs PAID and deducts stock once; cancelling keeps payments on the ledger (no refund flow).
+- Staff calls: `lib/api/admin/*` (see above). Writes use `useAction` (one in-flight write) and optimistic concurrency by `version` (409 `concurrent_update` ⇒ reload the record, say nothing was overwritten);
+  an uncertain retry (timeout/network/≥502) of the SAME payload reuses its `Idempotency-Key` (payments, stock adjustments), a changed payload gets a new one.
+- Errors: 401 ⇒ sign in again; 403 ⇒ fail closed (no data); 404/409/422 (`fieldProblems` marks inputs)/429/5xx all have fr+ht messages (`apiErrors.*`, `fieldErrors.*`): add both languages with every new code.
+- Pure, tested form logic: `lib/admin/{category-form,product-form,pickup-form,money,slug}.ts`. Customers: guests are corrected in place and never merged; registered customers are read-only (`customer_managed_by_owner`).
+- **Pickup snapshots:** each reservation stores its own pickup snapshot; changing pickup settings only affects NEW reservations.
+- **Customer vs staff data:** `lib/reservations/customer-view.ts` is the customer view model (from the API's `CustomerReservationView` via `lib/api/map-reservation.ts`); it cannot express internal notes/staff names. Guests need reference **and** phone (checked by the SERVER; `reservations/access-store.ts` keeps them for the tab only).
+- Pickup disabled/not configured ⇒ the SERVER refuses (422) and the form is blocked too. MonCash/NatCash are "Bientôt disponible", disabled, never stored on a reservation.
+- Images: ticket -> direct PUT to the presigned URL (R2 in production, MinIO locally) -> complete.
+- Browser suite: `npm run e2e:admin` (`e2e/admin/README.md`).
 
-## Catalog domain (`src/lib/catalog`, pure + tested)
-- `CategoryRecord.attributes` (`AttributeDef`) drive the product form, PDP specs and filters — never hardcode fields per category. Ids/keys are stable; labels are `LText`.
-- `ProductRecord`: `pricing` (retail, sale?, `minOrderQty`, wholesale tiers), optional `options`+`variants`, `inventory` (tracked + `onHand`, or manual availability), `status` draft/active/inactive.
-- Price for a quantity = `pricing.ts` (`snapshotFor` → `unitPriceFor`). Variants with their own price scale tiers proportionally. UI never recomputes prices itself.
-- Stock = `stock.ts`: `available = onHand − reserved` (reserved from open reservations). `submitReservation` re-checks status, minimum order and stock;
-  `runReservationAction(collect)` deducts stock + writes a `sale` movement. Adjustments: `api/catalog-admin.adjustStock`.
-- Validation (`draft.ts`, `category.ts`, `pricing.ts`) returns CODES; the UI renders `admin.products.errors.<code>` / `admin.categories.errors.<code>` — add a message in fr+ht when adding a code.
-- STOREFRONT catalog data comes from the API (`lib/api/catalog-hooks.ts` → `map-catalog.ts`). The demo catalog store (`stores/catalog-store.ts`) now serves only the admin screens, so admin edits do NOT appear on the storefront until admin is connected.
+## Catalog domain
+- Catalog data (storefront and admin) comes from the API; `lib/catalog/model.ts` keeps only `unitIds`/`PriceTier`/`Pricing`. Category `attributes` drive the product form, PDP specs and filters — never hardcode fields per category.
+- Variants = combinations of the category's `variantAxis` CHOICE attributes; a variant's own price ignores the product sale price. Stock is registered per product/variant, separate from the product.
 - Catalog lists paginate (12/page): tests must search (`?q=`) rather than assume a product is on page 1.
 
 ## Currency rules (HTG + USD, decided — do not re-ask)
@@ -63,14 +61,11 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
   The only currency literals live in `SUPPORTED_CURRENCIES` (`lib/money.ts`) and `market.defaultProductCurrency` (form pre-selection).
 - Catalog: `currency` filter; price min/max only with a selected (or the only) currency; price sort groups by currency. Admin reservation list has no amount sort.
 - Money parsing uses decimal-exponent shifting (`majorToMinor`), not `x * 100`.
-- Demo store keys are versioned (`ana.demo.*.vN`): bump when a persisted shape changes.
 
 ## Per-currency pricing (one product, many currencies)
-- `ProductRecord.prices: Pricing[]` — at most one per currency (HTG, USD or both), each with its own retail, sale, minimum order and wholesale tiers;
-  `VariantRecord.prices` overrides retail per currency. Stock (`inventory`) is ONE position shared by every currency. A missing currency is never generated.
-- Customer view: `Product.offers` (one per currency; `price/pricing/...` are the primary-currency view) and `lib/catalog/offers.ts#inCurrency` for a single-currency view.
-  The cart keys lines per currency (`lineKey(product, variant, currency)`) and caps the SUM of HTG+USD lines at the stock; `submitReservation` sums demand across currencies.
-- Admin form: one price set per currency (`ProductDraft.prices[currency]`), validation keys `price.<CUR>.*`, `variant.<i>.price.<CUR>`.
+- A product has at most one price set per currency (HTG, USD or both), each with its own retail, sale, minimum order and wholesale tiers; a variant may override retail per currency. Stock is ONE position shared by every currency. A missing currency is never generated.
+- Customer view: `Product.offers` (one per currency; `price/pricing/...` are the primary-currency view) and `lib/catalog/offers.ts#inCurrency`. The cart keys lines per currency (`lineKey`) and caps the SUM of HTG+USD lines at the stock.
+- Admin form: one price set per currency (`lib/admin/product-form.ts`), field errors keyed `prices.<CUR>.*`.
 
 ## i18n rules
 - No user-facing literals in components: use `useT()` (client) / `getT(locale)` (server). `fr.ts` defines the shape; `ht.ts` is typed
@@ -82,7 +77,7 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
 - Haitian Creole strings need native review before launch.
 
 ## Other rules
-Never present mock behaviour as real (DemoNotice/explicit wording). Don't invent addresses, hours, phones, policies, prices, reviews.
+Never present mock behaviour as real. Don't invent addresses, hours, phones, policies, prices, reviews.
 Tokens only (`globals.css`); no raw hex. Accessibility: labelled controls, 44px targets, focus visible, errors via `aria-describedby`.
 
 ## Next.js 16 gotchas (`cacheComponents: true`)

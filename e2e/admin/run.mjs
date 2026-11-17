@@ -101,7 +101,7 @@ await run("categories", async () => {
   await settle(page, 900);
   const before = (await adminCats()).map((c) => c.slug);
   const t0 = await bodyText(page);
-  check("list shows the server's categories with their counts", before.every((slug) => true) && /Maison/.test(t0) && /produits/.test(t0));
+  check("list shows the server's categories with their counts", before.length > 0 && /Maison/.test(t0) && /produits/.test(t0));
   await page.getByRole("link", { name: /Nouvelle catégorie/ }).first().click();
   await page.waitForURL(/categories\/new/);
   await settle(page);
@@ -768,7 +768,6 @@ await run("responsive-i18n", async () => {
   section("I. Mobile 390px, Haitian Creole, and no demo wording anywhere in the administration");
   const m = await staffSession({ width: 390, height: 844 });
   const mp = m.page;
-  const res = (await admin("GET", `/admin/reservations?q=${state.mainRef}`)).body.items[0];
   const cust = (await admin("GET", `/admin/customers?q=${state.mainPhone}&kind=GUEST`)).body.items[0];
   const pages = [["dashboard", "/fr/admin"], ["reservations", "/fr/admin/reservations"], ["reservation-detail", `/fr/admin/reservations/${state.mainRef}`], ["payments", "/fr/admin/payments"], ["products", "/fr/admin/products"], ["product-edit", `/fr/admin/products/${state.prodId}`], ["categories", "/fr/admin/categories"], ["category-edit", `/fr/admin/categories/${state.catId}`], ["inventory", "/fr/admin/inventory"], ["customers", "/fr/admin/customers"], ["customer-detail", `/fr/admin/customers/${cust?.id}`], ["reports", "/fr/admin/reports?tab=sales"], ["settings", "/fr/admin/settings"], ["pickup-settings", "/fr/admin/pickup-settings"]];
   let n = 40;
