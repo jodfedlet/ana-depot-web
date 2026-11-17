@@ -37,9 +37,20 @@ export interface ApiClientOptions {
   baseUrl: string;
   getAccessToken?: () => Promise<string | null>;
   fetchImpl?: typeof fetch;
+  /** Per-attempt timeout; applies even when the caller passes its own abort signal. */
   timeoutMs?: number;
   newId?: () => string;
+  /** Extra attempts for an idempotent GET after a transport failure or 502/503/504 (default 2). Writes are NEVER retried here. */
+  retries?: number;
+  /** Test seams for the backoff. */
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
 }
+
+/** Backoff for retry number `attempt` (1-based): exponential from 300 ms, capped at 3 s, with FULL jitter (uniform in [0, cap]) so clients that failed together do not retry together. */
+export const backoffDelayMs = (attempt: number, random: () => number = Math.random): number => Math.round(random() * Math.min(3000, 300 * 2 ** (attempt - 1)));
+/** What a GET may be retried after: nothing reached the app (network/timeout) or a gateway/availability error. 429 is NOT retried (it would only feed the limiter); 4xx are permanent. */
+const retryableForGet = (p: ApiProblem) => p.code === "network_error" || p.code === "timeout" || p.status === 502 || p.status === 503 || p.status === 504;
 
 export const newIdempotencyKey = (): string => crypto.randomUUID();
 
@@ -47,11 +58,26 @@ export const newIdempotencyKey = (): string => crypto.randomUUID();
 type Query = Record<string, string | number | boolean | string[] | undefined>;
 interface WriteOptions { idempotencyKey?: string; signal?: AbortSignal }
 
-export function createApiClient({ baseUrl, getAccessToken, fetchImpl = fetch, timeoutMs = 10_000, newId = () => crypto.randomUUID() }: ApiClientOptions) {
+export function createApiClient({ baseUrl, getAccessToken, fetchImpl = fetch, timeoutMs = 10_000, newId = () => crypto.randomUUID(), retries = 2, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), random = Math.random }: ApiClientOptions) {
   const root = baseUrl.replace(/\/+$/, "");
 
+  /** One logical call. Only GET is retried (bounded, with jittered backoff); the same correlation id is kept across attempts so the logs show one story. */
   async function request<T>(method: string, path: string, body?: unknown, opts: WriteOptions & { query?: Query } = {}): Promise<T> {
+    const maxAttempts = method === "GET" ? 1 + Math.max(0, retries) : 1;
     const correlationId = newId();
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await attemptOnce<T>(method, path, body, opts, correlationId);
+      } catch (e) {
+        const p = e instanceof ApiError ? e.problem : null;
+        if (attempt >= maxAttempts || !p || !retryableForGet(p) || opts.signal?.aborted) throw e;
+        await sleep(backoffDelayMs(attempt, random));
+        if (opts.signal?.aborted) throw e;
+      }
+    }
+  }
+
+  async function attemptOnce<T>(method: string, path: string, body: unknown, opts: WriteOptions & { query?: Query }, correlationId: string): Promise<T> {
     const url = new URL(`${root}${path}`);
     for (const [k, v] of Object.entries(opts.query ?? {})) {
       if (Array.isArray(v)) v.forEach((x) => url.searchParams.append(k, x));
@@ -65,7 +91,7 @@ export function createApiClient({ baseUrl, getAccessToken, fetchImpl = fetch, ti
 
     let response: Response;
     try {
-      response = await fetchImpl(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: opts.signal ?? AbortSignal.timeout(timeoutMs), cache: "no-store" });
+      response = await fetchImpl(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs), cache: "no-store" });
     } catch (e) {
       const timedOut = e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError");
       throw new ApiError({ status: 0, code: timedOut ? "timeout" : "network_error", correlationId });

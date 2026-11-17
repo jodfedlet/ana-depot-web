@@ -4,11 +4,12 @@ import { useEffect } from "react";
 import { ButtonLink } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/states";
 import { useT } from "@/i18n/provider";
+import { reportClientError } from "@/lib/observability/report";
 
 export default function GlobalError({ error, retry }: { error: unknown; retry: () => void }) {
   const t = useT();
   useEffect(() => {
-    console.error(error); // replace with error reporting once an observability tool is chosen
+    reportClientError(error); // privacy-safe; goes to a monitoring sink only once one is registered (docs/operations.md)
   }, [error]);
   return (
     <div className="container-page py-16">
