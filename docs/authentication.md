@@ -148,3 +148,7 @@ Guests are never asked to register: browsing, cart, guest reservation and tracki
 - Unit tests use a **mocked** Supabase client and mocked `fetch` (`src/lib/auth/auth.test.ts`, `src/lib/api/http.test.ts`): they prove our logic (error mapping, access
   decisions, request shapes, store transitions). They **do not** prove a real Supabase project accepts the calls.
 - The stub (`e2e/stub-supabase/stub.mjs`) is test-only code and never part of the app. **It is a mock**; the real-stack suite above is what proves behavior against real GoTrue.
+
+## Security headers, CSP, cookies
+The web app sends a Content-Security-Policy and the other security headers on every response (`src/lib/security`), marks the auth cookies `Secure` over HTTPS (`src/lib/auth/cookie-options.ts`, `SECURITY_HTTPS_ONLY`) and ships `scripts/scan-bundle-secrets.mjs` (run it after `npm run build`).
+Controls, the local verification evidence, what was NOT verified (hosted Supabase, real R2, TLS) and the hosted hardening checklist are in `../ana-depot-api/docs/security.md`.
