@@ -6,7 +6,7 @@ import { getT } from "@/i18n/server";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/reserve">): Promise<Metadata> {
   const { locale } = await params;
-  return isLocale(locale) ? { title: getT(locale)("reserve.title") } : {};
+  return isLocale(locale) ? { title: getT(locale)("reserve.title"), robots: { index: false, follow: false } } : {};
 }
 
 export default async function ReservePage({ params }: PageProps<"/[locale]/reserve">) {

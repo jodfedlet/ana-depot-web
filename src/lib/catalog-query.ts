@@ -10,6 +10,9 @@ import { market } from "@/config/market";
 
 export const DEFAULT_PAGE_SIZE = 12;
 
+/** The one product query the home page shows: the latest published products (the server renders the same one, see app/[locale]/(store)/page.tsx). */
+export const HOME_QUERY: CatalogQuery = { sort: "newest", pageSize: 8 };
+
 type RawParams = Record<string, string | string[] | undefined>;
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -48,6 +51,10 @@ export function parseCatalogQuery(params: RawParams): CatalogQuery {
     page: Number.isInteger(page) && page > 0 ? page : 1,
   };
 }
+
+/** True when the query carries no search text and no filter (only category, sort and page): the only shape the server renders and caches. */
+export const isPlainListing = (q: CatalogQuery): boolean =>
+  !q.q && !q.currency && q.minPrice === undefined && q.maxPrice === undefined && !q.inStockOnly && !q.wholesaleOnly && !q.brands?.length && Object.keys(q.attributes ?? {}).length === 0;
 
 /** Serialise a query back to URL params (omits defaults) for links and filter updates. */
 export function toSearchParams(query: CatalogQuery, currencyDigits = 2): URLSearchParams {

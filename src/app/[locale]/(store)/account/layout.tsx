@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AccountGate } from "@/features/account/account-gate";
 import { AccountNav } from "@/features/account/account-views";
 import { Skeleton } from "@/components/ui/states";
 import { isLocale } from "@/i18n/config";
+
+/** The account area belongs to one signed-in person: never indexed. */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 async function Gate({ params, children }: { params: LayoutProps<"/[locale]/account">["params"]; children: React.ReactNode }) {
   const { locale } = await params;

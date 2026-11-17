@@ -7,7 +7,8 @@ import { ApiErrorState } from "@/components/ui/api-error";
 import { ProductGrid } from "@/features/catalog/product-card";
 import { Link } from "@/i18n/link";
 import { useT } from "@/i18n/provider";
-import { useCatalogPage, useCategories } from "@/lib/api/catalog-hooks";
+import { type CatalogInitial, useCatalogPage, useCategories } from "@/lib/api/catalog-hooks";
+import { HOME_QUERY } from "@/lib/catalog-query";
 import type { Category } from "@/lib/catalog-types";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 
@@ -117,10 +118,10 @@ export function PromoBand() {
 }
 
 /** Home merchandising from the API: the active categories and the latest published products (the API's `newest` order; no "featured" flag exists). */
-export function HomeCatalogSections() {
+export function HomeCatalogSections({ initial }: { initial?: CatalogInitial }) {
   const t = useT();
-  const cats = useCategories();
-  const latest = useCatalogPage({ sort: "newest", pageSize: 8 });
+  const cats = useCategories(initial?.categories);
+  const latest = useCatalogPage(HOME_QUERY, initial);
   const loading = (cats.loading && !cats.categories.length) || (latest.loading && !latest.result);
   if (loading) return <div className="container-page mt-14" role="status" aria-label={t("common.loading")}><Skeleton className="h-8 w-56" /><div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="aspect-[4/3]" />)}</div></div>;
   if (cats.error != null && !cats.categories.length) return <div className="container-page mt-14"><ApiErrorState error={cats.error} onRetry={cats.reload} /></div>;

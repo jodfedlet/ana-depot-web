@@ -25,9 +25,13 @@ function cachedCategories(): Promise<CategoryDto[]> {
 /** Test hook: forget the shared category answer. */
 export const resetCategoryCache = () => { categoryCache = null; };
 
-export function useCategories(): { categories: Category[]; dtos: CategoryDto[]; loading: boolean; error: unknown; reload: () => void } {
+/** Answers a server-rendered page already fetched (see `lib/api/server-catalog.ts`): the hooks start from them instead of loading again. */
+export interface CatalogInitial { categories?: CategoryDto[]; page?: PageDto<ProductDto>; category?: CategoryDto }
+export interface ProductInitial { product: ProductDto; category?: CategoryDto; related?: PageDto<ProductDto> }
+
+export function useCategories(initial?: CategoryDto[]): { categories: Category[]; dtos: CategoryDto[]; loading: boolean; error: unknown; reload: () => void } {
   const locale = useLocale();
-  const { data, loading, error, reload } = useApiResource("categories", () => cachedCategories());
+  const { data, loading, error, reload } = useApiResource("categories", () => cachedCategories(), initial);
   const dtos = useMemo(() => [...(data ?? [])].sort((a, b) => a.displayOrder - b.displayOrder), [data]);
   const categories = useMemo(() => dtos.map((d) => toCategory(d, locale)), [dtos, locale]);
   return { categories, dtos, loading, error, reload };
@@ -52,13 +56,13 @@ function facetsOf(category: CategoryDto | undefined, locale: "fr" | "ht"): Facet
     .map((a) => ({ key: a.key, name: pickText(a.label, locale), values: [...a.options].sort((x, y) => x.displayOrder - y.displayOrder).map((o) => ({ id: o.code, label: pickText(o.label, locale) || o.code })) }));
 }
 
-export function useCatalogPage(query: CatalogQuery): CatalogPageState {
+export function useCatalogPage(query: CatalogQuery, initial?: CatalogInitial): CatalogPageState {
   const locale = useLocale();
-  const { dtos } = useCategories();
+  const { dtos } = useCategories(initial?.categories);
   const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
   const key = JSON.stringify(toApiQuery(query, pageSize));
-  const page = useApiResource<PageDto<ProductDto>>(key, (signal) => searchProducts(query, pageSize, { signal }));
-  const category = useApiResource<CategoryDto>(query.category ? `category:${query.category}` : null, (signal) => getCategory(query.category as string, { signal }));
+  const page = useApiResource<PageDto<ProductDto>>(key, (signal) => searchProducts(query, pageSize, { signal }), initial?.page);
+  const category = useApiResource<CategoryDto>(query.category ? `category:${query.category}` : null, (signal) => getCategory(query.category as string, { signal }), initial?.category);
 
   const names = useMemo(() => new Map(dtos.map((c) => [c.slug, pickText(c.name, locale)])), [dtos, locale]);
   const result = useMemo<CatalogResult | undefined>(() => {
@@ -95,12 +99,12 @@ export interface ProductPageState {
 }
 
 /** One published product by slug (or id) with its category (for variant and specification names) and a few neighbours. */
-export function useProductPage(slug: string): ProductPageState {
+export function useProductPage(slug: string, initial?: ProductInitial): ProductPageState {
   const locale = useLocale();
-  const productRes: Resource<ProductDto> = useApiResource(`product:${slug}`, (signal) => getProduct(slug, { signal }));
+  const productRes: Resource<ProductDto> = useApiResource(`product:${slug}`, (signal) => getProduct(slug, { signal }), initial?.product);
   const categorySlug = productRes.data?.categorySlug;
-  const categoryRes = useApiResource<CategoryDto>(categorySlug ? `category:${categorySlug}` : null, (signal) => getCategory(categorySlug as string, { signal }));
-  const relatedRes = useApiResource<PageDto<ProductDto>>(categorySlug ? `related:${categorySlug}` : null, (signal) => searchProducts({ category: categorySlug }, 5, { signal }));
+  const categoryRes = useApiResource<CategoryDto>(categorySlug ? `category:${categorySlug}` : null, (signal) => getCategory(categorySlug as string, { signal }), initial?.category);
+  const relatedRes = useApiResource<PageDto<ProductDto>>(categorySlug ? `related:${categorySlug}` : null, (signal) => searchProducts({ category: categorySlug }, 5, { signal }), initial?.related);
 
   const notFound = productRes.error instanceof ApiError && productRes.error.problem.status === 404;
   const dto = productRes.data;

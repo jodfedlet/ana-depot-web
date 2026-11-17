@@ -7,7 +7,7 @@ import { getT } from "@/i18n/server";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/auth/sign-up-success">): Promise<Metadata> {
   const { locale } = await params;
-  return isLocale(locale) ? { title: getT(locale)("auth.signUpSuccess.title") } : {};
+  return isLocale(locale) ? { title: getT(locale)("auth.signUpSuccess.title"), robots: { index: false, follow: false } } : {};
 }
 
 export default async function Page({ params }: PageProps<"/[locale]/auth/sign-up-success">) {

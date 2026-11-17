@@ -6,7 +6,7 @@ import { getT } from "@/i18n/server";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/search">): Promise<Metadata> {
   const { locale } = await params;
-  return isLocale(locale) ? { title: getT(locale)("catalog.search") } : {};
+  return isLocale(locale) ? { title: getT(locale)("catalog.search"), robots: { index: false, follow: false } } : {};
 }
 
 export default async function SearchPage(props: PageProps<"/[locale]/search">) {

@@ -6,7 +6,7 @@ import { getT } from "@/i18n/server";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/cart">): Promise<Metadata> {
   const { locale } = await params;
-  return isLocale(locale) ? { title: getT(locale)("cart.title") } : {};
+  return isLocale(locale) ? { title: getT(locale)("cart.title"), robots: { index: false, follow: false } } : {};
 }
 
 export default async function CartPage({ params }: PageProps<"/[locale]/cart">) {

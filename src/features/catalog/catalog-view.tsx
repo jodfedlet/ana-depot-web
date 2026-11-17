@@ -6,7 +6,7 @@ import { ApiErrorState } from "@/components/ui/api-error";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/states";
 import { useT } from "@/i18n/provider";
-import { useCatalogPage, useCategories } from "@/lib/api/catalog-hooks";
+import { type CatalogInitial, useCatalogPage, useCategories } from "@/lib/api/catalog-hooks";
 import { activeFilterCount, catalogHref } from "@/lib/catalog-query";
 import type { CatalogQuery } from "@/lib/catalog-types";
 import { market } from "@/config/market";
@@ -20,10 +20,10 @@ import { ProductGrid } from "./product-card";
  * The product list. Everything shown comes from the API: the list and its order (including full-text relevance), the totals, the prices and the
  * availability. The browser sends the URL's filters and renders the page it gets back; it never filters, ranks or searches a downloaded catalog.
  */
-export function CatalogView({ query, mode, basePath }: { query: CatalogQuery; mode: "browse" | "search"; basePath: string }) {
+export function CatalogView({ query, mode, basePath, initial }: { query: CatalogQuery; mode: "browse" | "search"; basePath: string; initial?: CatalogInitial }) {
   const t = useT();
-  const cats = useCategories();
-  const page = useCatalogPage(query);
+  const cats = useCategories(initial?.categories);
+  const page = useCatalogPage(query, initial);
   const { categories } = cats;
   const category = query.category ? categories.find((c) => c.slug === query.category) : undefined;
 

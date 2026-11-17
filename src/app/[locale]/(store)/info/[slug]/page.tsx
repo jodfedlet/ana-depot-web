@@ -5,6 +5,7 @@ import { InfoBody } from "@/features/info/info-body";
 import { type InfoPageSlug, infoPages } from "@/config/site";
 import { isLocale, locales } from "@/i18n/config";
 import { getT } from "@/i18n/server";
+import { pageMetadata } from "@/lib/seo/metadata";
 
 export function generateStaticParams() {
   return locales.flatMap((locale) => Object.keys(infoPages).map((slug) => ({ locale, slug })));
@@ -13,7 +14,11 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/[locale]/info/[slug]">): Promise<Metadata> {
   const { locale, slug } = await params;
   const page = infoPages[slug as InfoPageSlug];
-  return isLocale(locale) && page ? { title: getT(locale)(page.key) } : {};
+  if (!isLocale(locale) || !page) return {};
+  const t = getT(locale);
+  const description = slug === "how-it-works" ? t("seo.infoHowDescription") : slug === "pickup" ? t("seo.infoPickupDescription") : slug === "contact" ? t("seo.infoContactDescription") : undefined;
+  // The pages still waiting for business text (returns, privacy, terms) carry no content worth indexing: they stay reachable but out of search results.
+  return pageMetadata({ locale, path: `/info/${slug}`, title: t(page.key), description, noindex: page.kind === "placeholder" });
 }
 
 export default async function InfoPage({ params }: PageProps<"/[locale]/info/[slug]">) {

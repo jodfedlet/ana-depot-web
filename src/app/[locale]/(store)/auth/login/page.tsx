@@ -9,7 +9,7 @@ import { getT } from "@/i18n/server";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/auth/login">): Promise<Metadata> {
   const { locale } = await params;
-  return isLocale(locale) ? { title: getT(locale)("auth.login.title") } : {};
+  return isLocale(locale) ? { title: getT(locale)("auth.login.title"), robots: { index: false, follow: false } } : {};
 }
 
 async function Content({ locale, searchParams }: { locale: "fr" | "ht"; searchParams: PageProps<"/[locale]/auth/login">["searchParams"] }) {
