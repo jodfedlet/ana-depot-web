@@ -28,6 +28,16 @@ export const reorderCategories = (categoryIds: string[], o?: W) => api.put<{ ite
 export const listCategoryProducts = (id: string, q: Q, o?: Opts) => api.get<PageDto<CategoryProductLine>>(`/categories/${id}/products`, q, o);
 export const moveCategoryProducts = (id: string, toCategoryId: string, productIds: string[], o?: W) => api.post<{ moved: number }>(`/categories/${id}/products/move`, { toCategoryId, productIds }, o);
 
+/** Every category (few of them): pages are followed until the server says there are no more. */
+export async function listAllCategories(signal?: AbortSignal): Promise<AdminCategorySummary[]> {
+  const all: AdminCategorySummary[] = [];
+  for (let page = 0; ; page++) {
+    const res = await listCategories({ page, size: 100 }, { signal });
+    all.push(...res.items);
+    if (page + 1 >= res.totalPages) return all;
+  }
+}
+
 // ---- products ----
 export const listProducts = (q: Q, o?: Opts) => api.get<PageDto<AdminProductSummary>>("/products", q, o);
 export const getProduct = (id: string, o?: Opts) => api.get<AdminProduct>(`/products/${id}`, undefined, o);
