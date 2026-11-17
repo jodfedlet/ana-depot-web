@@ -1,4 +1,4 @@
-import { type Locale, defaultLocale, locales } from "@/i18n/config";
+import { type Locale, defaultLocale, locales } from "../../i18n/config";
 
 /**
  * The public origin of the storefront (`NEXT_PUBLIC_SITE_URL`, e.g. https://www.example.com): canonical URLs, hreflang alternates, Open Graph URLs, the sitemap and
