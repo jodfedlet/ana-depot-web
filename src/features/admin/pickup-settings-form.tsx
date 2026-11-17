@@ -1,8 +1,9 @@
 "use client";
 
-import { History, Save, Undo2 } from "lucide-react";
+import { Save, Undo2 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
-import { Alert, DemoNotice } from "@/components/ui/alert";
+import { Alert } from "@/components/ui/alert";
+import { ActionError, AdminErrorState } from "@/components/ui/admin-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
@@ -11,18 +12,19 @@ import { Skeleton } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { PickupInfo } from "@/features/reservations/shared";
 import { countryOptions } from "@/config/market";
-import { useFormat } from "@/i18n/format";
 import { type Locale, locales } from "@/i18n/config";
 import { useT } from "@/i18n/provider";
 import type { MessageKey } from "@/i18n/types";
-import { savePickupSettings } from "@/lib/api/reservations";
+import { getPickupSettings, savePickupSettings } from "@/lib/api/admin/endpoints";
+import { useAction, useAdminResource } from "@/lib/api/admin/hooks";
+import { announceAdminChange } from "@/lib/api/admin/signals";
+import { isTransientError } from "@/lib/api/errors";
+import { attemptKey, endAttempt } from "@/lib/api/idempotency";
+import { toRequest, toSettings } from "@/lib/admin/pickup-form";
 import { cn } from "@/lib/cn";
 import type { LText } from "@/lib/localized";
 import { type DaySchedule, type PickupInstructions, type PickupLocation, type PickupSettings, pickupAvailability } from "@/lib/pickup/types";
 import { type PickupErrors, changedGroups, validatePickupSettings } from "@/lib/pickup/validate";
-import { useAdminSession } from "@/features/admin/admin-identity";
-import { useIsClient } from "@/lib/stores/create-persisted-store";
-import { usePickup } from "@/lib/stores/pickup-store";
 import { focusFirstInvalid } from "@/lib/validation";
 import { useUnsavedChanges } from "./admin-shell";
 
@@ -51,27 +53,23 @@ function BilingualField({ label, value, onChange, optional, hint }: { label: str
   );
 }
 
-/** Wrapper: remounts the form with fresh state whenever saved settings change. */
+/** Loads the CURRENT configuration from the API; the form is rebuilt whenever its version changes (after a save or a conflict reload). */
 export function PickupSettingsPage() {
   const t = useT();
-  const ready = useIsClient();
-  const { settings } = usePickup();
-  if (!ready) return <div role="status" aria-label={t("common.loading")}><Skeleton className="h-8 w-64" /><Skeleton className="mt-6 h-96 w-full" /></div>;
-  return <PickupSettingsForm key={settings.updatedAt} settings={settings} />;
+  const res = useAdminResource("pickup-settings", (signal) => getPickupSettings({ signal }));
+  if (res.error != null && !res.data) return <AdminErrorState error={res.error} onRetry={res.reload} />;
+  if (!res.data) return <div role="status" aria-label={t("adminCommon.loading")}><Skeleton className="h-8 w-64" /><Skeleton className="mt-6 h-96 w-full" /></div>;
+  return <PickupSettingsForm key={String(res.data.version)} settings={toSettings(res.data)} version={res.data.version} onReload={res.reload} />;
 }
 
-function PickupSettingsForm({ settings }: { settings: PickupSettings }) {
+function PickupSettingsForm({ settings, version, onReload }: { settings: PickupSettings; version: number | null; onReload: () => void }) {
   const t = useT();
-  const fmt = useFormat();
   const toast = useToast();
-  const { session } = useAdminSession();
-  const { history } = usePickup();
+  const save = useAction();
   const formRef = useRef<HTMLFormElement>(null);
   const [draft, setDraft] = useState<PickupSettings>(settings);
   const [errors, setErrors] = useState<PickupErrors>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string>();
   const [previewLocale, setPreviewLocale] = useState<Locale>("fr");
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
@@ -91,17 +89,20 @@ function PickupSettingsForm({ settings }: { settings: PickupSettings }) {
     const found = validatePickupSettings(draft);
     setErrors(found);
     if (Object.keys(found).length) { window.setTimeout(() => focusFirstInvalid(formRef.current)); return; }
-    setSaveError(undefined);
+    save.clear();
     setConfirmOpen(true);
   };
 
   const confirmSave = async () => {
-    setSaving(true);
-    const result = await savePickupSettings(draft, session?.name ?? "Staff");
-    setSaving(false);
-    if (!result.ok) { setSaveError(t(`serviceErrors.${result.error}`)); return; }
+    const body = toRequest(draft, version);
+    const scope = "pickup-settings";
+    const r = await save.run(() => savePickupSettings(body, { idempotencyKey: attemptKey(scope, body) }));
+    if (!r.ok) { if (!isTransientError(r.error)) endAttempt(scope); return; }
+    endAttempt(scope);
     setConfirmOpen(false);
     toast.show({ tone: "success", message: t("admin.pickupSettings.saved") });
+    announceAdminChange();
+    onReload();
   };
 
   const groupLabel = (g: string) => t(`admin.pickupSettings.history.groups.${g as "address"}`);
@@ -180,26 +181,6 @@ function PickupSettingsForm({ settings }: { settings: PickupSettings }) {
             <PickupInfo location={draft.location} instructions={draft.instructions} status="ready_for_pickup" localeOverride={previewLocale} />
           </section>
 
-          <section aria-labelledby="hs" className="rounded-card border border-line bg-surface p-5">
-            <h2 id="hs" className="text-h3 mb-4 flex items-center gap-2"><History aria-hidden className="size-4" />{t("admin.pickupSettings.history.title")}</h2>
-            {history.length === 0 ? <p className="text-label font-normal text-ink-soft">{t("admin.pickupSettings.history.empty")}</p> : (
-              <ol className="space-y-4">
-                {history.map((h) => (
-                  <li key={h.id} className="border-l-2 border-line pl-3">
-                    <p className="text-label font-semibold">{t("admin.pickupSettings.history.entry", { name: h.by, date: fmt.dateTime(h.at) })}</p>
-                    <p className="mt-1 flex flex-wrap gap-1.5">{h.changed.map((g) => <Badge key={g}>{groupLabel(g)}</Badge>)}</p>
-                    {h.changed.includes("address") && (
-                      <dl className="text-caption mt-2 space-y-1 text-ink-soft">
-                        <div><dt className="inline font-semibold">{t("admin.pickupSettings.history.before")}: </dt><dd className="inline">{h.before.location.addressLine}, {h.before.location.city}</dd></div>
-                        <div><dt className="inline font-semibold">{t("admin.pickupSettings.history.after")}: </dt><dd className="inline">{h.after.location.addressLine}, {h.after.location.city}</dd></div>
-                      </dl>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
-          <DemoNotice>{t("admin.demo.saved")}</DemoNotice>
         </div>
       </div>
 
@@ -216,13 +197,13 @@ function PickupSettingsForm({ settings }: { settings: PickupSettings }) {
         </div>
       )}
 
-      <Drawer open={confirmOpen} onClose={() => !saving && setConfirmOpen(false)} title={t("admin.pickupSettings.confirm.title")} side="center"
-        footer={<div className="flex flex-wrap justify-end gap-3"><Button type="button" variant="ghost" onClick={() => setConfirmOpen(false)} disabled={saving}>{t("common.cancel")}</Button><Button type="button" loading={saving} onClick={confirmSave}>{t("admin.pickupSettings.confirm.confirm")}</Button></div>}>
+      <Drawer open={confirmOpen} onClose={() => !save.pending && setConfirmOpen(false)} title={t("admin.pickupSettings.confirm.title")} side="center"
+        footer={<div className="flex flex-wrap justify-end gap-3"><Button type="button" variant="ghost" onClick={() => setConfirmOpen(false)} disabled={save.pending}>{t("common.cancel")}</Button><Button type="button" loading={save.pending} onClick={confirmSave}>{t("admin.pickupSettings.confirm.confirm")}</Button></div>}>
         <p className="text-label font-normal text-ink-soft">{t("admin.pickupSettings.confirm.text")}</p>
         <h3 className="text-label mt-4 font-semibold">{t("admin.pickupSettings.confirm.changes")}</h3>
         <ul className="text-label mt-1 list-disc space-y-1 pl-5 font-normal">{changes.map((g) => <li key={g}>{groupLabel(g)}</li>)}</ul>
         {settings.enabled && !draft.enabled && <Alert tone="danger" className="mt-4" live="polite">{t("admin.pickupSettings.confirm.disabling")}</Alert>}
-        {saveError && <Alert tone="danger" live="assertive" className="mt-4">{saveError}</Alert>}
+        {save.error != null && <div className="mt-4"><ActionError error={save.error} onReload={() => { setConfirmOpen(false); onReload(); }} /></div>}
       </Drawer>
     </form>
   );

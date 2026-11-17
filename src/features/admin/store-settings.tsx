@@ -7,9 +7,10 @@ import { ButtonLink } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/states";
 import { useT } from "@/i18n/provider";
 import { siteConfig } from "@/config/site";
-import { pickupAvailability } from "@/lib/pickup/types";
-import { useIsClient } from "@/lib/stores/create-persisted-store";
-import { usePickup } from "@/lib/stores/pickup-store";
+import { AdminErrorState } from "@/components/ui/admin-error";
+import { getPickupSettings } from "@/lib/api/admin/endpoints";
+import { useAdminResource } from "@/lib/api/admin/hooks";
+import { isConfigured } from "@/lib/admin/pickup-form";
 
 type State = "configured" | "notConfigured" | "decisionPending" | "fixed";
 
@@ -35,11 +36,11 @@ function Card({ title, state, children, action }: { title: string; state: State;
  */
 export function StoreSettings() {
   const t = useT();
-  const ready = useIsClient();
-  const { settings } = usePickup();
-  if (!ready) return <Skeleton className="h-72 w-full" />;
-  const pickupOk = pickupAvailability(settings) !== "not_configured";
-  const hold = settings.holdPeriodDays;
+  const res = useAdminResource("pickup-settings", (signal) => getPickupSettings({ signal }));
+  if (res.error != null && !res.data) return <AdminErrorState error={res.error} onRetry={res.reload} />;
+  if (!res.data) return <Skeleton className="h-72 w-full" />;
+  const pickupOk = isConfigured(res.data);
+  const hold = res.data.holdPeriodDays;
   return (
     <ul className="grid gap-4 lg:grid-cols-2">
       <Card title={t("admin.settings.identityTitle")} state="fixed">{t("admin.settings.identityText", { name: siteConfig.name })}</Card>

@@ -449,6 +449,7 @@ await run("reservations", async () => {
 
   // 1. the GUEST reserves through the real storefront UI (HTG on size S, USD on size M)
   const phone = uniqPhone();
+  state.mainPhone = phone;
   const g = await newPage(browser);
   const gp = g.page;
   await gp.goto(`${env.WEB}/fr/products/${state.slug}`); await settle(gp, 1200);
@@ -468,6 +469,7 @@ await run("reservations", async () => {
   await gp.waitForURL(/confirmation\/ANA-/, { timeout: 15000 });
   await settle(gp, 800);
   const ref = ((await bodyText(gp)).match(/ANA-[A-Z0-9]{6}/) ?? [])[0];
+  state.mainRef = ref;
   check("a guest reserved HTG and USD lines of the new product through the storefront", !!ref, ref);
 
   // 2. staff finds it (server-side search by phone), filters, opens it
@@ -655,6 +657,110 @@ await run("reservations", async () => {
   await page.getByRole("dialog").getByRole("button", { name: "Annuler" }).click().catch(() => {});
 
   // cleanup so later sections/runs keep a known stock
+  await ctx.close();
+});
+
+await run("customers", async () => {
+  section("G. Customers: list, detail, per-currency summary, guest correction, registered read-only, never merged");
+  if (!state.mainPhone) throw new Error("no guest from section F");
+  const { page, ctx } = await staffSession();
+  await page.goto(`${env.WEB}/fr/admin/customers?q=${state.mainPhone}`);
+  await settle(page, 1000);
+  const lt = await bodyText(page);
+  check("the guest from the journey is found by phone (server-side search) and marked as a guest", /Invité/.test(lt) && /Gaëlle/.test(lt));
+  await page.getByRole("link", { name: /Gaëlle Invitée/ }).first().click();
+  await page.waitForURL(/customers\/[0-9a-f-]{36}/);
+  await settle(page, 1200);
+  const cid = page.url().match(/customers\/([0-9a-f-]{36})/)[1];
+  const c = (await admin("GET", `/admin/customers/${cid}`)).body;
+  const dt = await bodyText(page);
+  check("the per-currency summary shows collected HTG and USD separately (never one total)", /Valeur des réservations retirées/.test(dt) && dt.includes(money(Number(c.summary.collectedByCurrency.HTG), "HTG")) && dt.includes(money(Number(c.summary.collectedByCurrency.USD), "USD")), JSON.stringify(c.summary.collectedByCurrency));
+  check("the reservation history lists the reservation with its status", dt.includes(state.mainRef) && /Retirée/.test(dt));
+  await shot(page, "admin-12-customer-1280");
+
+  // staff correction of a GUEST
+  await page.getByLabel("Prénom").fill("Gaëlle-Marie");
+  await page.locator("input[type=email]").fill("gaelle.corrigee@example.test");
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await sleep(1500);
+  const c2 = (await admin("GET", `/admin/customers/${cid}`)).body;
+  check("a guest's name and e-mail were corrected in the backend; the phone (identity) is unchanged", c2.firstName === "Gaëlle-Marie" && c2.email === "gaelle.corrigee@example.test" && c2.phone === c.phone && c2.version === c.version + 1);
+  const rd = (await admin("GET", `/admin/reservations?q=${state.mainRef}`)).body.items[0];
+  check("existing reservations keep the contact they were made with", rd.contact.firstName === "Gaëlle");
+
+  // conflict
+  await admin("PUT", `/admin/customers/${cid}`, { version: c2.version, firstName: "Autre", lastName: c2.lastName, email: c2.email }, key());
+  await page.getByLabel("Prénom").fill("Moi");
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await page.getByText(/modifiées par quelqu'un d'autre/).waitFor({ timeout: 8000 });
+  check("a stale correction is refused with a conflict message; the other change is kept", (await admin("GET", `/admin/customers/${cid}`)).body.firstName === "Autre");
+  await page.getByRole("button", { name: "Recharger" }).click(); await sleep(900);
+
+  // registered customer with the SAME phone: a separate record, read-only
+  const SK = process.env.SUPABASE_LOCAL_SECRET_KEY;
+  if (SK) {
+    const email = `reg-${stamp}@example.test`;
+    await fetch(`${env.SB}/auth/v1/admin/users`, { method: "POST", headers: { apikey: SK, Authorization: `Bearer ${SK}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, password: "Str0ng-pass-1", email_confirm: true }) });
+    const tok = (await (await fetch(`${env.SB}/auth/v1/token?grant_type=password`, { method: "POST", headers: { apikey: env.KEY, "Content-Type": "application/json" }, body: JSON.stringify({ email, password: "Str0ng-pass-1" }) })).json()).access_token;
+    await fetch(`${env.API}/api/v1/me/profile`, { method: "PUT", headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" }, body: JSON.stringify({ firstName: "Reg", lastName: "Istré", dialCode: "+509", phone: state.mainPhone, email }) });
+    await page.goto(`${env.WEB}/fr/admin/customers?q=${state.mainPhone}`); await settle(page, 1000);
+    const both = await bodyText(page);
+    check("a registered customer with the SAME phone is a SEPARATE record next to the guest (never merged)", /Inscrit/.test(both) && /Invité/.test(both) && /2 clients/.test(both));
+    await page.getByRole("link", { name: /Reg Istré/ }).first().click();
+    await page.waitForURL(/customers\/[0-9a-f-]{36}/); await settle(page, 1000);
+    const rid = page.url().match(/customers\/([0-9a-f-]{36})/)[1];
+    check("a registered customer's profile is read-only for staff (owned by the customer)", /appartient à son titulaire/.test(await bodyText(page)) && (await page.getByLabel("Prénom").count()) === 0);
+    const put = await admin("PUT", `/admin/customers/${rid}`, { version: 0, firstName: "X", lastName: "Y" }, key());
+    check("the API refuses to edit it too (customer_managed_by_owner)", put.status === 422 && put.body.code === "customer_managed_by_owner", JSON.stringify(put.body).slice(0, 100));
+    check("customer data never exposes credentials or tokens", !/password|token|jwt|secret/i.test(JSON.stringify((await admin("GET", `/admin/customers/${rid}`)).body)));
+  } else console.log("SKIP  registered-customer checks (set SUPABASE_LOCAL_SECRET_KEY of the LOCAL stack)");
+  await ctx.close();
+});
+
+await run("settings", async () => {
+  section("H. Settings: pickup configuration on the real API; existing reservations keep their snapshot");
+  const { page, ctx } = await staffSession();
+  const orig = (await admin("GET", "/admin/settings/pickup")).body;
+  const origAddress = orig.location.addressLine;
+  await page.goto(`${env.WEB}/fr/admin/settings`); await settle(page, 1800);
+  const st = await bodyText(page);
+  check("settings overview reflects the server: pickup configured, hold period undecided, no invented policies", /Configuré/.test(st) && /Aucune durée n'est définie/.test(st) && /Décision en attente/.test(st));
+  const oldRes = (await admin("GET", `/admin/reservations?q=${state.mainRef}`)).body.items[0];
+  const oldPickup = (await admin("GET", `/admin/reservations/${oldRes.id}`)).body.pickup.location.addressLine;
+  await page.goto(`${env.WEB}/fr/admin/pickup-settings`); await settle(page, 1200);
+  check("the form shows the configuration loaded from the API", (await page.getByLabel("Adresse", { exact: true }).inputValue()) === origAddress);
+  await page.getByLabel("Adresse", { exact: true }).fill("99, avenue du Test");
+  await page.getByRole("button", { name: "Enregistrer" }).last().click();
+  await page.getByRole("dialog").getByRole("button", { name: /Enregistrer|Confirmer/ }).last().click();
+  await sleep(1800);
+  const pub = await publicApi("/store/pickup");
+  check("the public pickup endpoint now serves the new address", pub.location.addressLine === "99, avenue du Test");
+  check("an EXISTING reservation keeps the address it was promised", (await admin("GET", `/admin/reservations/${oldRes.id}`)).body.pickup.location.addressLine === oldPickup && oldPickup !== "99, avenue du Test");
+  const fresh = await apiReserve([{ productId: state.prodId, variantId: await variantId(`${E2E.sku}-S`), quantity: 1, currency: "HTG" }]);
+  check("a NEW reservation snapshots the new address", (await resDetail(fresh.id)).pickup.location.addressLine === "99, avenue du Test");
+  await admin("POST", `/admin/reservations/${fresh.id}/reject`, { reason: "CANNOT_FULFILL" }, key());
+
+  // server validation + conflict
+  await page.reload(); await settle(page, 1200);
+  await page.getByLabel("Téléphone", { exact: true }).fill("abc");
+  await page.getByRole("button", { name: "Enregistrer" }).last().click();
+  await sleep(800);
+  if ((await page.getByRole("dialog").count()) > 0) { await page.getByRole("dialog").getByRole("button", { name: /Enregistrer|Confirmer/ }).last().click(); await sleep(1500); }
+  const vt = await bodyText(page);
+  check("an invalid phone is explained in French (client or server rule) and the typed value stays", /téléphone/i.test(vt) && (await page.getByLabel("Téléphone", { exact: true }).inputValue()) === "abc");
+  await page.reload(); await settle(page, 1200);
+  const cur = (await admin("GET", "/admin/settings/pickup")).body;
+  await admin("PUT", "/admin/settings/pickup", { ...cur, closureInfo: undefined, location: { ...cur.location, city: "Ville modifiée ailleurs" } });
+  await page.getByLabel("Adresse", { exact: true }).fill("Moi, 1 rue");
+  await page.getByRole("button", { name: "Enregistrer" }).last().click();
+  await page.getByRole("dialog").getByRole("button", { name: /Enregistrer|Confirmer/ }).last().click();
+  await page.getByText(/modifiées par quelqu'un d'autre/).waitFor({ timeout: 8000 });
+  check("a stale settings save is refused with a conflict message; the other staff member's change stays", (await admin("GET", "/admin/settings/pickup")).body.location.city === "Ville modifiée ailleurs");
+
+  // restore the original configuration
+  const latest = (await admin("GET", "/admin/settings/pickup")).body;
+  await admin("PUT", "/admin/settings/pickup", { ...latest, location: { ...latest.location, addressLine: origAddress, city: orig.location.city } });
+  check("(original pickup configuration restored)", (await publicApi("/store/pickup")).location.addressLine === origAddress);
   await ctx.close();
 });
 
