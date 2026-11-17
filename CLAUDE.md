@@ -6,7 +6,7 @@ Next.js 16 App Router, React 19, TypeScript strict, Tailwind v4. Single seller, 
 as a furniture/hardware/household specialist — the hero and home must stay category-neutral). Currencies: **HTG and USD** (decided).
 **Retail + wholesale** (per-product quantity price tiers, never wholesale-only). **Commerce model: reservation-first.** Customer reserves online → store reviews → customer visits → pays cash in
 person → collects. There is NO online payment and NO delivery yet. Launch market Haiti; languages `fr` and `ht`.
-Backend (`../ana-depot-api`, Spring Boot) is **not** integrated: everything is a clearly marked demo.
+The **customer storefront is connected to the real backend** (`../ana-depot-api`, Spring Boot): catalog, search, pickup, cart checks, guest reservations, tracking, customer account (`docs/storefront-integration.md`). The **administration screens are still demo** (browser-local data, labelled) until their own phase.
 Design: `docs/design-system.md` (read before changing UI). Business decisions still open: README.
 
 ## Commands
@@ -17,9 +17,7 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
   `(store)/` = customer site; `admin/` = administration (`admin/(app)/` behind the server-side staff gate; unauthenticated visitors go to `/auth/login?next=/admin`).
 - `src/features/<area>` — screens: `home catalog product cart search reservations account auth info admin` (`admin/products`, `admin/categories` for catalog management).
   `src/components/ui|layout` — shared primitives. `src/lib` — pure logic/types. `src/i18n` — translations & helpers.
-- **API boundary `src/lib/api/*`** (async, typed) is the only thing UI calls. `src/lib/mock/*` is SAMPLE DATA, imported only by
-  `lib/api` and the demo stores. `lib/api/reservations.ts` + `lib/stores/*` are the DEMO "backend" (localStorage); replace the
-  bodies with HTTP calls — signatures and error codes are the contract.
+- **API boundary `src/lib/api/*`** (async, typed) is the only thing UI calls. Storefront: `public.ts` (one function per endpoint of `../ana-depot-api/docs/api.md`), `dto.ts`, `map-*.ts`, `*-hooks.ts`, `errors.ts`. **Never add a field, endpoint or status the API contract does not have; never send a price; never search/filter a downloaded catalog; never show success before the server confirmed.** Public reads use the anonymous client (no token). `src/lib/mock/*`, `lib/api/reservations.ts`, `lib/api/catalog-admin.ts` and `lib/stores/{catalog,reservation,pickup}-store.ts` are the **ADMIN-only demo** (localStorage); the storefront must not import them. The only storefront browser state is the cart (`ana.cart.v4`) and tab-scoped sessionStorage (`lib/reservations/access-store.ts`, `pending-submit.ts`).
 - **Authentication is real Supabase Auth** (`@supabase/ssr` cookies; `src/lib/auth/*`, `src/lib/api/auth.ts`). There are NO demo sessions any more —
   never reintroduce a fake sign-in, a "local session", or a success that Supabase did not confirm. Full guide: `docs/authentication.md`.
   - Identity ≠ authorization. Supabase says WHO; the backend (`GET /api/v1/me` → `staff`) says what they may do. Admin access = verified session + `staff === true`,
@@ -41,9 +39,8 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
   reservation needs an operational check; expiry only by configured policy (`holdPeriodDays`, null = none; never hardcode one).
 - **Pickup snapshots:** each reservation stores its own `PickupSnapshot` (location + instructions). Changing global settings
   (`lib/api/reservations.savePickupSettings`) only affects NEW reservations. Per-reservation change = `changePickup` action + event + history.
-- **Customer vs staff data:** `lib/reservations/customer-view.ts` returns a separate `CustomerReservation` type with no internal
-  notes/staff names. Customer screens must use it. Guests need reference **and** phone (`access.ts`); never expose by reference alone.
-- Pickup disabled/not configured ⇒ `submitReservation` refuses (don't rely on the form). MonCash/NatCash are "Bientôt disponible",
+- **Customer vs staff data:** `lib/reservations/customer-view.ts` is the customer view model (built from the API's `CustomerReservationView` by `lib/api/map-reservation.ts`); it cannot express internal notes/staff names. Customer screens use only it. Guests need reference **and** phone (checked by the SERVER; `reservations/access-store.ts` keeps them for the tab only); never expose by reference alone.
+- Pickup disabled/not configured ⇒ the SERVER refuses (422) and the form is blocked too (don't rely on the form). MonCash/NatCash are "Bientôt disponible",
   disabled, and never stored on a reservation.
 
 ## Catalog domain (`src/lib/catalog`, pure + tested)
@@ -53,7 +50,7 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
 - Stock = `stock.ts`: `available = onHand − reserved` (reserved from open reservations). `submitReservation` re-checks status, minimum order and stock;
   `runReservationAction(collect)` deducts stock + writes a `sale` movement. Adjustments: `api/catalog-admin.adjustStock`.
 - Validation (`draft.ts`, `category.ts`, `pricing.ts`) returns CODES; the UI renders `admin.products.errors.<code>` / `admin.categories.errors.<code>` — add a message in fr+ht when adding a code.
-- The catalog lives in the demo store (`stores/catalog-store.ts`) and storefront components read it via hooks (`catalog/hooks.ts`) so admin edits are visible. The API replaces this.
+- STOREFRONT catalog data comes from the API (`lib/api/catalog-hooks.ts` → `map-catalog.ts`). The demo catalog store (`stores/catalog-store.ts`) now serves only the admin screens, so admin edits do NOT appear on the storefront until admin is connected.
 - Catalog lists paginate (12/page): tests must search (`?q=`) rather than assume a product is on page 1.
 
 ## Currency rules (HTG + USD, decided — do not re-ask)

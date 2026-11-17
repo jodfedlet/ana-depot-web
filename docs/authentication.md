@@ -10,7 +10,7 @@ session, `admin@…` meant "staff", `wrong-password` showed an error) has been *
 | Staff sign-in and admin protection (`/admin/**`) | **Real** (Supabase session **and** backend `staff: true`, checked on the server) |
 | Backend JWT validation, `GET /api/v1/me`, staff provisioning | Implemented in `../ana-depot-api` — see `../ana-depot-api/docs/auth.md` |
 | Admin **data** (products, stock, reservations, payments, pickup settings) | **Demo**: browser `localStorage`, labelled "not connected to the server" |
-| Linking account ↔ reservations | **Demo**: the account page lists browser-local sample reservations whose e-mail matches |
+| Linking account ↔ reservations | **Real**: reservations made while signed in are linked by the API to the account; `/account` reads `/me/profile` and `/me/reservations` (see `storefront-integration.md`) |
 
 ## The auth UI: Supabase UI "password-based-auth-nextjs" block
 The only sign-in / sign-up / recovery UI is the **Supabase UI Library block** `password-based-auth-nextjs` (registry `https://supabase.com/library/r/password-based-auth-nextjs.json`),
