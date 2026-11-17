@@ -81,11 +81,11 @@ export const store = {
   },
   home: {
     hero: {
-      eyebrow: "Réservez en ligne · Retirez au magasin",
-      title: "Tout ce qu'il vous faut, au même endroit.",
-      description: "Découvrez des produits de toutes sortes. Réservez en ligne, achetez à l'unité ou en plus grande quantité quand un prix de gros existe, puis retirez votre commande au magasin.",
+      eyebrow: "RÉSERVEZ EN LIGNE · RETIREZ AU MAGASIN",
+      title: "Tout ce qu'il vous faut. En quelques clics.",
+      description: "Découvrez un large choix de produits, réservez facilement en ligne et retirez votre commande au magasin. À l'unité ou en quantité, trouvez ce qui vous convient.",
       primary: "Découvrir les produits",
-      secondary: "Parcourir les catégories",
+      secondary: "Nos catégories",
       imageAlt: "Illustration d'exemple : un assortiment de produits variés — chaise, tuyaux, linge de lit, chaussure, casserole, corde, seau et carton",
     },
     benefits: {

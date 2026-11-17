@@ -83,10 +83,11 @@ export const store: typeof frStore = {
     pickupLive: "Enfòmasyon retrè aktyèl yo",
   },
   home: {
+    // NATIVE REVIEW REQUIRED before production (docs/creole-review.md): initial translation supplied by the business owner, not yet checked by a native speaker.
     hero: {
-      eyebrow: "Rezève sou entènèt · Pran nan magazen an",
-      title: "Tout sa w bezwen, nan yon sèl kote.",
-      description: "Dekouvri tout kalite pwodwi. Rezève sou entènèt, achte pa inite oswa an plis kantite lè gen yon pri an gwo, epi pran kòmand ou nan magazen an.",
+      eyebrow: "FÈ REZÈVASYON SOU ENTÈNÈT · VIN RANMSE NAN MAGAZEN AN",
+      title: "Tout sa w bezwen. Nan kèk klik sèlman.",
+      description: "Dekouvri anpil kalite pwodwi, fè rezèvasyon w fasil sou entènèt epi vin pran kòmann ou nan magazen an. Achte an detay oswa an gwo, selon sa ki disponib.",
       primary: "Dekouvri pwodwi yo",
       secondary: "Gade kategori yo",
       imageAlt: "Ilistrasyon egzanp: yon seleksyon pwodwi diferan — yon chèz, tiyo, dra, yon soulye, yon chodyè, kòd, yon bokit ak yon kartonn",

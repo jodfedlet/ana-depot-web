@@ -11,22 +11,28 @@ import { useCatalogPage, useCategories } from "@/lib/api/catalog-hooks";
 import type { Category } from "@/lib/catalog-types";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 
+/** The headline is one translated string; its sentences are stacked on their own lines (the last one in the brand colour) without splitting the text for screen readers or crawlers. */
+const sentences = (text: string) => text.split(/(?<=[.!?])\s+/).filter(Boolean);
+
 export function Hero() {
   const t = useT();
+  const lines = sentences(t("home.hero.title"));
   return (
     <section aria-labelledby="hero-title" className="border-b border-line bg-sand-100">
-      <div className="container-page grid items-center gap-8 py-10 sm:py-14 lg:grid-cols-[1fr_1.05fr] lg:gap-14 lg:py-0">
-        <div className="max-w-xl lg:py-20">
+      <div className="container-page grid items-center gap-6 py-9 sm:gap-8 sm:py-12 md:grid-cols-[1.2fr_1fr] md:gap-6 md:py-0 lg:grid-cols-[1.2fr_1fr] lg:gap-10">
+        <div className="md:py-16 lg:py-20">
           <p className="text-eyebrow text-brand-700">{t("home.hero.eyebrow")}</p>
-          <h1 id="hero-title" className="text-display mt-4 text-balance">{t("home.hero.title")}</h1>
-          <p className="text-body mt-5 max-w-md text-pretty text-ink-soft sm:text-lg">{t("home.hero.description")}</p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <ButtonLink href="/products" size="lg">{t("home.hero.primary")}</ButtonLink>
-            <ButtonLink href="/#categories" size="lg" variant="outline">{t("home.hero.secondary")}</ButtonLink>
+          <h1 id="hero-title" className="text-display mt-4 md:max-lg:text-[2.5rem]">
+            {lines.map((line, i) => <span key={i} className={i === lines.length - 1 && lines.length > 1 ? "block text-brand-700" : "block"}>{line}{i < lines.length - 1 ? " " : ""}</span>)}
+          </h1>
+          <p className="text-body mt-5 max-w-[30rem] text-pretty text-ink-soft sm:text-lg sm:leading-8">{t("home.hero.description")}</p>
+          <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row md:flex-col lg:flex-row">
+            <ButtonLink href="/products" size="lg" className="w-full shadow-sm active:translate-y-px sm:w-auto sm:px-7 md:w-full lg:w-auto">{t("home.hero.primary")}<ArrowRight aria-hidden className="size-4" /></ButtonLink>
+            <ButtonLink href="/#categories" size="lg" variant="outline" className="w-full active:translate-y-px sm:w-auto md:w-full lg:w-auto">{t("home.hero.secondary")}</ButtonLink>
           </div>
         </div>
-        <div className="relative -mx-4 aspect-[6/5] sm:mx-0 lg:aspect-auto lg:h-full lg:min-h-[34rem] lg:self-stretch">
-          <Image src="/sample/hero.svg" alt={t("home.hero.imageAlt")} fill sizes="(min-width:1024px) 50vw, 100vw" loading="eager" fetchPriority="high" className="object-cover object-bottom lg:object-contain lg:[mask-image:linear-gradient(to_right,transparent,black_9%,black_91%,transparent)]" />
+        <div className="relative -mx-4 aspect-[6/5] sm:mx-0 md:aspect-auto md:h-full md:min-h-[26rem] md:self-stretch lg:min-h-[34rem]">
+          <Image src="/sample/hero.svg" alt={t("home.hero.imageAlt")} fill sizes="(min-width:1024px) 50vw, (min-width:768px) 48vw, 100vw" loading="eager" fetchPriority="high" className="object-cover object-bottom md:object-contain md:[mask-image:linear-gradient(to_right,transparent,black_9%,black_91%,transparent)]" />
         </div>
       </div>
     </section>

@@ -58,12 +58,11 @@ describe("home positioning: Ana Dépôt is a general-merchandise store, not a sp
     expect(fr_).toMatch(/tout ce qu'il vous faut|produits de toutes sortes/i);
     expect(fr_).toMatch(/r[ée]servez en ligne/i);
     expect(fr_).toMatch(/quantit[ée]/i);
-    expect(fr_).toMatch(/gros/i);
+    expect(fr_).toMatch(/[àa] l'unit[ée] ou en quantit[ée]/i);
     expect(fr_).toMatch(/retir(ez|er)/i);
     expect(ht_).toMatch(/tout sa w bezwen|tout kalite pwodwi/i);
-    expect(ht_).toMatch(/rez[èe]ve sou ent[èe]n[èe]t/i);
-    expect(ht_).toMatch(/kantite/i);
-    expect(ht_).toMatch(/gwo/i);
+    expect(ht_).toMatch(/rez[èe]v(e|asyon) .*ent[èe]n[èe]t/i);
+    expect(ht_).toMatch(/an detay oswa an gwo/i);
     expect(ht_).toMatch(/pran .*magazen/i);
   });
   it("keeps the hero headline short and the same story in both languages", () => {
