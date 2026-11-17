@@ -80,7 +80,7 @@ export interface AdminPayment {
 /** One hosted-Checkout attempt (`GET /admin/payment-attempts`). It becomes a payment only after the verified provider webhook; no URL or secret is ever included. */
 export type PaymentAttemptStatus = "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "EXPIRED";
 export interface AdminPaymentAttempt {
-  id: string; reservationId: string; reservationReference: string; currency: string; amount: string; status: PaymentAttemptStatus;
+  id: string; reservationId: string; reservationReference?: string | null; provider?: string; currency: string; amount: string; status: PaymentAttemptStatus;
   providerSessionId: string | null; providerPaymentIntentId: string | null; expiresAt: string | null; paymentId: string | null;
   requiresAttention: boolean; attentionReason: string | null; failureCode: string | null; createdAt: string; updatedAt: string;
 }

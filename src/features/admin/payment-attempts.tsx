@@ -18,6 +18,11 @@ const field = "text-label min-h-11 rounded-control border border-line-strong bg-
 export const attemptTone: Record<PaymentAttemptStatus, Tone> = { PENDING: "warning", PROCESSING: "info", SUCCEEDED: "success", FAILED: "danger", EXPIRED: "neutral" };
 const STATUSES: PaymentAttemptStatus[] = ["PENDING", "PROCESSING", "SUCCEEDED", "FAILED", "EXPIRED"];
 
+/** The reservation an attempt belongs to (a dash if the API did not say). */
+function RefLink({ a }: { a: AdminPaymentAttempt }) {
+  return a.reservationReference ? <Link href={`/admin/reservations/${a.reservationReference}`} className="hover:underline">{a.reservationReference}</Link> : <span className="text-ink-muted">—</span>;
+}
+
 export function AttemptBadge({ attempt }: { attempt: Pick<AdminPaymentAttempt, "status" | "requiresAttention"> }) {
   const t = useT();
   return <span className="inline-flex flex-wrap gap-1"><Badge tone={attemptTone[attempt.status]}>{t(`adminPay.attemptStatus.${attempt.status}`)}</Badge>{attempt.requiresAttention && <Badge tone="danger">{t("adminPay.attention")}</Badge>}</span>;
@@ -47,7 +52,19 @@ export function PaymentAttemptsView() {
           {res.data.items.length === 0 ? (
             <div className="rounded-card border border-line bg-surface"><EmptyState icon={<Search aria-hidden />} title={t("adminPay.emptyTitle")} description={t("adminPay.emptyText")} /></div>
           ) : (
-            <div className="overflow-x-auto rounded-card border border-line bg-surface" aria-busy={res.loading}>
+            <>
+            <ul className="space-y-3 md:hidden" aria-busy={res.loading}>
+              {res.data.items.map((a) => (
+                <li key={a.id} className={`rounded-card border border-line p-4 ${a.requiresAttention ? "bg-warning-bg/40" : "bg-surface"}`}>
+                  <div className="flex items-start justify-between gap-3"><p className="text-label font-semibold tabular-nums">{money(a.amount, a.currency)}</p><AttemptBadge attempt={a} /></div>
+                  <p className="text-caption mt-1 text-ink-soft">{fmt.dateTime(a.createdAt)}</p>
+                  <p className="text-label mt-2 font-semibold" translate="no"><RefLink a={a} /></p>
+                  {a.failureCode && <p className="text-caption mt-1 text-ink-muted">{t("adminPay.columns.failure")}: {a.failureCode}</p>}
+                  {a.providerPaymentIntentId && <p className="text-caption mt-2 font-mono break-all text-ink-muted">{a.providerPaymentIntentId}</p>}
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block" aria-busy={res.loading}>
               <table className="w-full min-w-[52rem] text-left">
                 <caption className="sr-only">{t("adminPay.attemptsTitle")}</caption>
                 <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr>
@@ -59,7 +76,7 @@ export function PaymentAttemptsView() {
                   {res.data.items.map((a) => (
                     <tr key={a.id} className={`text-label align-top font-normal hover:bg-sand-50 ${a.requiresAttention ? "bg-warning-bg/40" : ""}`}>
                       <td className="whitespace-nowrap px-3 py-3 text-ink-soft">{fmt.dateTime(a.createdAt)}</td>
-                      <th scope="row" className="px-3 py-3 text-left font-semibold" translate="no"><Link href={`/admin/reservations/${a.reservationReference}`} className="hover:underline">{a.reservationReference}</Link></th>
+                      <th scope="row" className="px-3 py-3 text-left font-semibold" translate="no"><RefLink a={a} /></th>
                       <td className="px-3 py-3 text-right font-semibold tabular-nums">{money(a.amount, a.currency)}</td>
                       <td className="px-3 py-3"><AttemptBadge attempt={a} />{a.failureCode && <p className="text-caption mt-1 text-ink-muted">{t("adminPay.columns.failure")}: {a.failureCode}</p>}</td>
                       <td className="px-3 py-3 font-mono text-xs break-all text-ink-soft">{a.providerSessionId ?? "—"}</td>
@@ -69,6 +86,7 @@ export function PaymentAttemptsView() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
           {res.data.totalPages > 1 && (
             <nav className="flex items-center justify-between gap-3" aria-label={t("admin.list.pagination")}>

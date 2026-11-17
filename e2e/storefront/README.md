@@ -27,3 +27,7 @@ Screenshots go to `SHOTS_DIR` (default `e2e/storefront/screenshots`, git-ignored
 ## Online payment (`npm run e2e:stripe`)
 `e2e/storefront/stripe.mjs` needs only a running web build (`WEB_URL`, default `http://127.0.0.1:3105`) and no credentials. Every check is **MOCKED**: the API and the Stripe-hosted page are replaced by Playwright
 route handlers. It is not evidence about the real backend or about Stripe. It includes real waits (about 90 s in total) because the polling schedule is real.
+
+`npm run e2e:stripe-real` (`stripe-real.mjs`) runs the online-payment journeys against the REAL API and a LOCAL FAKE Stripe (`../ana-depot-api/dev/fake-stripe.mjs`): guest reservation and pay-at-pickup with no card fields,
+hosted page, signed webhooks (success, delayed, failed, expired, duplicate replay), the ledger, reports, HTG refusal, and the staff screens. Env: `WEB_URL`, `API_URL`, `FAKE_STRIPE_URL` (default `http://127.0.0.1:9199`), the
+staff variables above; the web build needs `NEXT_PUBLIC_CHECKOUT_TEST_ORIGIN=<fake origin>` and the API's Stripe return URL must be `WEB_URL`. Scratch database only. It is NOT a test of real Stripe.
