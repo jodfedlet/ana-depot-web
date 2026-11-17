@@ -22,6 +22,8 @@ import { useSession } from "@/lib/auth/use-session";
 import { useOnline } from "@/lib/pwa/store";
 import { normalizeReference, rememberAccess } from "@/lib/reservations/access-store";
 import { focusFirstInvalid, isBlank } from "@/lib/validation";
+import { OnlinePayPanel } from "@/features/payments/online-pay-panel";
+import { usePayerAccess } from "@/lib/api/online-payment-hooks";
 import { PaymentBalances, PaymentStatusBadge, PickupInfoFor, ReservationStatusBadge, SectionCard, Timeline, orderLinesOf, useCustomerTimeline } from "./shared";
 
 /** /reservations — guest lookup. The reference alone is never enough: the phone number is verified by the server too. */
@@ -117,6 +119,7 @@ export function CustomerReservationDetail({ reference }: { reference: string }) 
   const mineId = useSearchParams().get("mine") ?? undefined;
   const ref = normalizeReference(reference);
   const { outcome, loading, error, reload, verify } = useTrackedReservation(ref, mineId);
+  const payAccess = usePayerAccess(ref, !!mineId);
   const view = outcome?.kind === "ready" ? outcome.view : null;
   const timeline = useCustomerTimeline(view?.events ?? []);
 
@@ -171,6 +174,7 @@ export function CustomerReservationDetail({ reference }: { reference: string }) 
             </dl>
             <div className="mt-3 border-t border-line pt-3"><PaymentBalances balances={view.balances} /></div>
             {view.payment.status !== "paid" && <p className="text-caption mt-3 text-ink-soft">{t("track.detail.payAtStore")}</p>}
+            <div className="mt-3"><OnlinePayPanel view={view} access={payAccess} /></div>
           </SectionCard>
           <SectionCard title={t("pickup.title")}>
             <PickupInfoFor view={view} />

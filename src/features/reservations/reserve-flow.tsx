@@ -26,6 +26,7 @@ import { useCart } from "@/lib/stores/cart-store";
 import { useSession } from "@/lib/auth/use-session";
 import { useOnline } from "@/lib/pwa/store";
 import { type Errors, focusFirstInvalid, isBlank, isValidEmail, isValidPhone } from "@/lib/validation";
+import { usePaymentOptions } from "@/lib/api/online-payment-hooks";
 import { PickupInfo, SectionCard } from "./shared";
 import { Stepper } from "./stepper";
 
@@ -41,6 +42,7 @@ export function ReserveFlow() {
   const router = useLocaleRouter();
   const cart = useCart();
   const online = useOnline();
+  const payOptions = usePaymentOptions();
   const { session } = useSession();
   const pickup = usePickupView();
   const check = useCartCheck(cart.lines);
@@ -228,7 +230,8 @@ export function ReserveFlow() {
                 {view?.status === "available" && <><p className="text-label font-semibold">{view.location.storeName}</p>
                 <p className="text-label font-normal text-ink-soft">{view.location.addressLine}, {view.location.city}</p></>}
                 <p className="text-label mt-3 font-semibold">{t("reserve.review.payment")}</p>
-                <p className="text-label font-normal text-ink-soft">{t("reserve.payment.cashName")}</p>
+                <p className="text-label font-normal text-ink-soft">{t("onlinePay.atPickup")} — {t("onlinePay.atPickupText")}</p>
+                {payOptions.currencies.length > 0 && <p className="text-caption mt-2 text-ink-soft">{t("onlinePay.announce")}</p>}
               </SectionCard>
               <SectionCard title={t("reserve.review.items")}><OrderLines lines={cart.lines} /></SectionCard>
               <SectionCard title={t("reserve.review.totals")}>

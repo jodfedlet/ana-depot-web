@@ -13,6 +13,8 @@ import type { ReservationViewDto } from "@/lib/api/dto";
 import type { CustomerReservation } from "@/lib/reservations/customer-view";
 import { recallSubmittedRaw } from "@/lib/reservations/access-store";
 import { useSession } from "@/lib/auth/use-session";
+import { OnlinePayPanel } from "@/features/payments/online-pay-panel";
+import { usePayerAccess } from "@/lib/api/online-payment-hooks";
 import { PickupInfoFor, ReservationStatusBadge, SectionCard, orderLinesOf } from "./shared";
 
 const subscribeNever = () => () => {};
@@ -29,6 +31,7 @@ export function ConfirmationView({ reference }: { reference: string }) {
   const raw = useSyncExternalStore(subscribeNever, () => recallSubmittedRaw(reference), () => undefined);
   const view = useMemo<CustomerReservation | null | undefined>(() => (raw === undefined ? undefined : raw === null ? null : toCustomerReservation(JSON.parse(raw) as ReservationViewDto)), [raw]);
   const [copied, setCopied] = useState(false);
+  const payAccess = usePayerAccess(reference);
 
   if (view === undefined) return <div role="status" aria-label={t("common.loading")}><Skeleton className="h-10 w-80" /><Skeleton className="mt-6 h-64 w-full" /></div>;
   if (view === null) {
@@ -78,6 +81,7 @@ export function ConfirmationView({ reference }: { reference: string }) {
           <OrderLines lines={orderLinesOf(view)} />
           <MoneyRows label={t("reserve.review.total")} totals={view.totals} className="text-label mt-4 border-t border-line pt-3" valueClassName="text-h3" />
           <p className="text-caption mt-3 text-ink-soft">{t("reserve.review.payment")} : {t("paymentMethod.cash_at_pickup")} — {t(`paymentStatus.${view.payment.status}`)}</p>
+          <div className="mt-3"><OnlinePayPanel view={view} access={payAccess} /></div>
         </SectionCard>
         <SectionCard title={t("reserve.review.pickup")}>
           <PickupInfoFor view={view} />
