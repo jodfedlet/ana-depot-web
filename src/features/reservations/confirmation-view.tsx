@@ -1,44 +1,44 @@
 "use client";
 
 import { CalendarClock, Check, Copy, PackageOpen } from "lucide-react";
-import { useState } from "react";
-import { Alert, DemoNotice } from "@/components/ui/alert";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { OrderLines } from "@/components/ui/order-lines";
 import { MoneyRows } from "@/components/ui/price";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 import { useT } from "@/i18n/provider";
-import { toCustomerView } from "@/lib/reservations/customer-view";
-import { canView } from "@/lib/reservations/access";
-import { useIsClient } from "@/lib/stores/create-persisted-store";
-import { useVerifiedReferences } from "@/lib/stores/guest-refs-store";
-import { useReservations } from "@/lib/stores/reservation-store";
+import { toCustomerReservation } from "@/lib/api/map-reservation";
+import type { ReservationViewDto } from "@/lib/api/dto";
+import type { CustomerReservation } from "@/lib/reservations/customer-view";
+import { recallSubmittedRaw } from "@/lib/reservations/access-store";
 import { useSession } from "@/lib/auth/use-session";
-import { PickupInfo, ReservationStatusBadge, SectionCard } from "./shared";
+import { PickupInfoFor, ReservationStatusBadge, SectionCard, orderLinesOf } from "./shared";
+
+const subscribeNever = () => () => {};
 
 /**
- * Shown right after submission. It states only what happened: the reservation was RECEIVED and
- * is pending review. It never says confirmed, paid, or ready.
+ * Shown right after submission. It displays the server's OWN answer to the submission (the 201 body, kept for this tab), so it costs no extra request, and
+ * states what the server says: normally "received, pending review". It never says confirmed, paid or ready unless the status says so.
+ * Opened without that answer (another browser or tab) it points to tracking, which asks the server with reference + phone.
  */
 export function ConfirmationView({ reference }: { reference: string }) {
   const t = useT();
-  const ready = useIsClient();
-  const reservations = useReservations();
-  const verified = useVerifiedReferences();
   const { session } = useSession();
+  // sessionStorage exists only in the browser: `undefined` while rendering on the server / hydrating, then the stored answer or null
+  const raw = useSyncExternalStore(subscribeNever, () => recallSubmittedRaw(reference), () => undefined);
+  const view = useMemo<CustomerReservation | null | undefined>(() => (raw === undefined ? undefined : raw === null ? null : toCustomerReservation(JSON.parse(raw) as ReservationViewDto)), [raw]);
   const [copied, setCopied] = useState(false);
 
-  if (!ready) return <div role="status" aria-label={t("common.loading")}><Skeleton className="h-10 w-80" /><Skeleton className="mt-6 h-64 w-full" /></div>;
-  const reservation = reservations.find((r) => r.reference === reference);
-  if (!reservation || !canView(reservation, { sessionEmail: session?.email, verifiedReferences: verified })) {
+  if (view === undefined) return <div role="status" aria-label={t("common.loading")}><Skeleton className="h-10 w-80" /><Skeleton className="mt-6 h-64 w-full" /></div>;
+  if (view === null) {
+    // Opened without the access this tab holds (another browser, or a closed tab): the tracking page asks for the phone number.
     return (
       <EmptyState icon={<PackageOpen aria-hidden />} title={t("reserve.confirmation.notFoundTitle")} description={t("reserve.confirmation.notFoundText")}>
-        <ButtonLink href="/reservations">{t("nav.trackReservation")}</ButtonLink>
+        <ButtonLink href={`/reservations/${encodeURIComponent(reference)}`}>{t("nav.trackReservation")}</ButtonLink>
       </EmptyState>
     );
   }
-  const view = toCustomerView(reservation);
-
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(view.reference);
@@ -60,7 +60,7 @@ export function ConfirmationView({ reference }: { reference: string }) {
         </div>
       </header>
 
-      <Alert tone="warning" title={t("reserve.confirmation.notConfirmedTitle")}>{t("reserve.confirmation.notConfirmedText")}</Alert>
+      {view.status === "pending_review" && <Alert tone="warning" title={t("reserve.confirmation.notConfirmedTitle")}>{t("reserve.confirmation.notConfirmedText")}</Alert>}
 
       <section aria-labelledby="ref-title" className="rounded-card border-2 border-brand-700 bg-surface p-5 text-center">
         <h2 id="ref-title" className="text-eyebrow text-ink-muted">{t("reserve.confirmation.reference")}</h2>
@@ -75,12 +75,12 @@ export function ConfirmationView({ reference }: { reference: string }) {
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <SectionCard title={t("reserve.review.items")}>
-          <OrderLines lines={view.lines} />
+          <OrderLines lines={orderLinesOf(view)} />
           <MoneyRows label={t("reserve.review.total")} totals={view.totals} className="text-label mt-4 border-t border-line pt-3" valueClassName="text-h3" />
           <p className="text-caption mt-3 text-ink-soft">{t("reserve.review.payment")} : {t("paymentMethod.cash_at_pickup")} — {t(`paymentStatus.${view.payment.status}`)}</p>
         </SectionCard>
         <SectionCard title={t("reserve.review.pickup")}>
-          <PickupInfo location={view.pickup.location} instructions={view.pickup.instructions} status={view.status} />
+          <PickupInfoFor view={view} />
         </SectionCard>
       </div>
 
@@ -96,10 +96,8 @@ export function ConfirmationView({ reference }: { reference: string }) {
         </ol>
       </section>
 
-      <DemoNotice>{t("demo.reservation")}</DemoNotice>
-
       <div className="flex flex-wrap gap-3">
-        <ButtonLink href={`/reservations/${view.reference}`} size="lg">{t("reserve.confirmation.track")}</ButtonLink>
+        <ButtonLink href={`/reservations/${encodeURIComponent(view.reference)}`} size="lg">{t("reserve.confirmation.track")}</ButtonLink>
         <ButtonLink href="/products" size="lg" variant="outline">{t("reserve.confirmation.continue")}</ButtonLink>
         {!session && <ButtonLink href="/auth/sign-up" size="lg" variant="ghost">{t("reserve.confirmation.createAccount")}</ButtonLink>}
       </div>

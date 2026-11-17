@@ -2,12 +2,16 @@
 
 import { Search, Tag } from "lucide-react";
 import Image from "@/components/ui/smart-image";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 import { MoneyText } from "@/components/ui/price";
 import { useLocaleRouter } from "@/i18n/navigation";
 import { useT } from "@/i18n/provider";
-import { useStorefront } from "@/lib/catalog/hooks";
-import { queryCatalog } from "@/lib/catalog-query";
+import { useCategories } from "@/lib/api/catalog-hooks";
+import { toProduct } from "@/lib/api/map-catalog";
+import { searchProducts } from "@/lib/api/public";
+import { useApiResource } from "@/lib/api/use-resource";
+import { useLocale } from "@/i18n/provider";
 import { cn } from "@/lib/cn";
 import type { Money } from "@/lib/money";
 
@@ -19,30 +23,58 @@ interface Suggestion {
   price?: Money;
 }
 
+const SUGGEST_DELAY_MS = 300;
+const SUGGEST_MIN_CHARS = 2;
+
+type BoxProps = { autoFocus?: boolean; inline?: boolean; onNavigate?: () => void; className?: string };
+
 /**
- * Search combobox (ARIA 1.2 list autocomplete). Suggestions are computed from the demo catalog store, so products
- * the seller adds are searchable at once; this becomes a search-endpoint call when the backend exists.
- * Enter with no highlighted option goes to the full results page.
+ * Search combobox (ARIA 1.2 list autocomplete). Product suggestions come from the API's full-text search (`GET /products/search`, size 5): the
+ * request is sent only after the user pauses typing (300 ms) and at least 2 characters, and a superseded request is aborted. Category suggestions
+ * filter the (small) category list already loaded for navigation. Enter with no highlighted option opens the full results page.
+ * The input starts with the current URL's `q`, so the query survives navigating results.
  */
-export function SearchBox({ autoFocus = false, inline = false, onNavigate, className }: { autoFocus?: boolean; inline?: boolean; onNavigate?: () => void; className?: string }) {
+export function SearchBox(props: BoxProps) {
+  return <Suspense fallback={<SearchBoxInner {...props} initialQuery="" />}><UrlAwareSearchBox {...props} /></Suspense>;
+}
+
+function UrlAwareSearchBox(props: BoxProps) {
+  const q = useSearchParams().get("q") ?? "";
+  return <SearchBoxInner key={q} {...props} initialQuery={q} />;
+}
+
+function SearchBoxInner({ autoFocus = false, inline = false, onNavigate, className, initialQuery }: BoxProps & { initialQuery: string }) {
   const router = useLocaleRouter();
   const t = useT();
+  const locale = useLocale();
   const listId = useId();
-  const { products, categories } = useStorefront();
-  const [query, setQuery] = useState("");
+  const { categories } = useCategories();
+  const [query, setQuery] = useState(initialQuery);
+  const [settled, setSettled] = useState(initialQuery.trim());
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const trimmed = query.trim();
-  const canSuggest = trimmed.length >= 2;
+  const canSuggest = trimmed.length >= SUGGEST_MIN_CHARS;
+
+  // Debounce: `settled` follows the typed text only after a pause.
+  useEffect(() => {
+    if (trimmed === settled) return;
+    const id = window.setTimeout(() => setSettled(trimmed), SUGGEST_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, [trimmed, settled]);
+
+  const suggestKey = open && settled.length >= SUGGEST_MIN_CHARS ? `suggest:${settled}` : null;
+  const suggestions = useApiResource(suggestKey, (signal) => searchProducts({ q: settled }, 5, { signal }));
+  const waiting = canSuggest && (trimmed !== settled || (suggestKey !== null && suggestions.loading));
   const results = useMemo<Suggestion[]>(() => {
     if (!canSuggest) return [];
-    const names = Object.fromEntries(categories.map((c) => [c.slug, c.name]));
     const cats = categories.filter((c) => c.name.toLowerCase().includes(trimmed.toLowerCase())).slice(0, 2).map<Suggestion>((c) => ({ type: "category", label: c.name, href: `/products?category=${c.slug}` }));
-    const prods = queryCatalog(products, { q: trimmed, pageSize: 5 }, names).products.map<Suggestion>((p) => ({ type: "product", label: p.name, href: `/products/${p.slug}`, image: p.images[0], price: p.price }));
+    const items = trimmed === settled ? (suggestions.data?.items ?? []) : [];
+    const prods = items.map((dto) => toProduct(dto, locale)).filter((p) => p !== null).map<Suggestion>((p) => ({ type: "product", label: p.name, href: `/products/${p.slug}`, image: p.images[0], price: p.price }));
     return [...cats, ...prods];
-  }, [canSuggest, trimmed, products, categories]);
+  }, [canSuggest, trimmed, settled, suggestions.data, categories, locale]);
 
   useEffect(() => {
     const close = (e: PointerEvent) => { if (!wrapRef.current?.contains(e.target as Node)) setOpen(false); };
@@ -115,7 +147,9 @@ export function SearchBox({ autoFocus = false, inline = false, onNavigate, class
             </li>
           </ul>
           <p role="status" className="sr-only">{canSuggest ? t("search.count", { count: results.length }) : ""}</p>
-          {canSuggest && results.length === 0 && <p className="text-caption border-t border-line px-3 py-2 text-ink-soft">{t("search.none")}</p>}
+          {canSuggest && waiting && <p role="status" className="text-caption border-t border-line px-3 py-2 text-ink-soft">{t("search.loading")}</p>}
+          {canSuggest && !waiting && suggestions.error != null && <p role="alert" className="text-caption border-t border-line px-3 py-2 text-danger-fg">{t("search.unavailable")}</p>}
+          {canSuggest && !waiting && suggestions.error == null && results.length === 0 && <p className="text-caption border-t border-line px-3 py-2 text-ink-soft">{t("search.none")}</p>}
         </div>
       )}
     </div>

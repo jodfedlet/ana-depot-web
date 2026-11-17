@@ -2,8 +2,8 @@
 
 import { ShoppingBag, Trash2 } from "lucide-react";
 import Image from "@/components/ui/smart-image";
-import { useMemo } from "react";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { MoneyRows, MoneyText, Price, useUnitLabel } from "@/components/ui/price";
@@ -12,35 +12,11 @@ import { EmptyState, Skeleton } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { Link } from "@/i18n/link";
 import { useLocale, useT } from "@/i18n/provider";
-import { type CartLine, lineTotal, sharedRoom } from "@/lib/cart";
+import { lineTotal, sharedRoom } from "@/lib/cart";
 import { unitPriceFor } from "@/lib/catalog/pricing";
-import { useStorefront } from "@/lib/catalog/hooks";
+import { useCartCheck } from "@/lib/api/cart-check";
 import { formatMoney } from "@/lib/money";
 import { useCart } from "@/lib/stores/cart-store";
-
-type Issue = { kind: "unavailable" } | { kind: "insufficient"; available: number };
-
-/** Compares each cart line with the CURRENT catalog (product removed, out of stock, or fewer units than requested). */
-export function useCartIssues(lines: CartLine[]): Record<string, Issue> {
-  const { ready, products } = useStorefront();
-  return useMemo(() => {
-    const out: Record<string, Issue> = {};
-    if (!ready) return out;
-    // Stock is shared by every currency: HTG and USD lines of the same item are compared with the stock together.
-    const demand = new Map<string, number>();
-    for (const l of lines) demand.set(`${l.productId}:${l.variantId ?? ""}`, (demand.get(`${l.productId}:${l.variantId ?? ""}`) ?? 0) + l.quantity);
-    for (const l of lines) {
-      const p = products.find((x) => x.id === l.productId);
-      const v = l.variantId ? p?.variants.find((x) => x.id === l.variantId) : undefined;
-      if (!p || (l.variantId && !v)) { out[l.key] = { kind: "unavailable" }; continue; }
-      const availability = v?.availability ?? p.availability;
-      const available = v?.availableQty ?? p.availableQty;
-      if (availability === "out_of_stock") out[l.key] = { kind: "unavailable" };
-      else if (available !== undefined && (demand.get(`${l.productId}:${l.variantId ?? ""}`) ?? l.quantity) > available) out[l.key] = { kind: "insufficient", available };
-    }
-    return out;
-  }, [lines, products, ready]);
-}
 
 export function CartView() {
   const t = useT();
@@ -48,7 +24,8 @@ export function CartView() {
   const unitLabel = useUnitLabel();
   const cart = useCart();
   const toast = useToast();
-  const issues = useCartIssues(cart.lines);
+  const check = useCartCheck(cart.lines);
+  const issues = check.issues;
 
   if (!cart.ready) return <CartSkeleton />;
 
@@ -61,12 +38,22 @@ export function CartView() {
   }
 
   const blocked = Object.keys(issues).length > 0;
+  const changed = Object.values(issues).some((i) => i.kind === "changed");
+  const shortage = Object.values(issues).some((i) => i.kind === "unavailable" || i.kind === "insufficient");
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12">
       <div>
         {cart.mixedCurrency && <Alert tone="info" title={t("cart.mixedTitle")} className="mb-4">{t("cart.mixedText")}</Alert>}
-        {Object.keys(issues).length > 0 && <Alert tone="warning" live="polite" title={t("cart.issuesTitle")} className="mb-4">{t("cart.issuesText")}</Alert>}
+        {check.loading && !check.checked && <p role="status" className="text-caption mb-4 text-ink-soft">{t("cart.checking")}</p>}
+        {check.error != null && <Alert tone="info" live="polite" className="mb-4">{t("cart.checkFailed")}</Alert>}
+        {shortage && <Alert tone="warning" live="polite" title={t("cart.issuesTitle")} className="mb-4">{t("cart.issuesText")}</Alert>}
+        {changed && (
+          <Alert tone="warning" live="polite" title={t("cart.changedTitle")} className="mb-4">
+            {t("cart.changedText")}
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => cart.replace(check.refreshed)}>{t("cart.updatePrices")}</Button>
+          </Alert>
+        )}
         <ul className="divide-y divide-line border-y border-line" aria-label={t("cart.items")}>
           {cart.lines.map((line) => {
             const issue = issues[line.key];
@@ -88,6 +75,7 @@ export function CartView() {
                   )}
                   {line.pricing.minQty > 1 && <p className="text-caption mt-1 text-ink-muted">{t("pricing.minOrder", { qty: line.pricing.minQty, unit: unitLabel(line.unit, line.pricing.minQty) })}</p>}
                   {issue?.kind === "unavailable" && <p role="alert" className="text-caption mt-2 font-medium text-danger-fg">{t("cart.lineUnavailable")}</p>}
+                  {issue?.kind === "changed" && <p role="alert" className="text-caption mt-2 font-medium text-warning-fg">{t("cart.lineChanged", { before: formatMoney(issue.before, locale), after: formatMoney(issue.after, locale) })}</p>}
                   {issue?.kind === "insufficient" && <p role="alert" className="text-caption mt-2 font-medium text-danger-fg">{t("cart.lineInsufficient", { count: issue.available, unit: unitLabel(line.unit, issue.available) })}</p>}
                 </div>
                 <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:flex-col sm:items-end sm:justify-between">

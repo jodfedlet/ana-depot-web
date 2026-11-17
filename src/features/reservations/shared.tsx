@@ -11,7 +11,8 @@ import { cn } from "@/lib/cn";
 import { type LText, isEmptyLText, pick } from "@/lib/localized";
 import { formatMoney, type Money } from "@/lib/money";
 import type { PickupInstructions, PickupLocation } from "@/lib/pickup/types";
-import type { CustomerEvent } from "@/lib/reservations/customer-view";
+import type { DisplayLine } from "@/components/ui/order-lines";
+import type { CustomerEvent, CustomerReservation } from "@/lib/reservations/customer-view";
 import type { PaymentStatus, ReservationEvent, ReservationStatus } from "@/lib/reservations/types";
 
 const statusTone: Record<ReservationStatus, Tone> = {
@@ -127,16 +128,16 @@ function titleFor(t: TFunction, locale: Locale, type: ReservationEvent["type"], 
 const toneFor = (type: ReservationEvent["type"]): TimelineEntry["tone"] =>
   type === "rejected" || type === "cancelled" ? "danger" : type === "expired" ? "warning" : type === "ready_for_pickup" || type === "collected" || type === "payment_recorded" ? "success" : type === "accepted" ? "info" : "neutral";
 
-/** Events as the CUSTOMER may see them (already sanitized by `toCustomerView`). */
+/** Events as the CUSTOMER may see them (the API's `CustomerReservationView` never carries internal notes or staff identities). */
 export function useCustomerTimeline(events: CustomerEvent[]): TimelineEntry[] {
   const t = useT();
   const locale = useLocale();
   return events.map((e) => ({
     id: e.id,
     at: e.at,
-    title: titleFor(t, locale, e.type, { cancelledBy: e.cancelledBy, amount: e.amount }),
+    title: titleFor(t, locale, e.type, { cancelledBy: e.cancelledBy }),
     note: e.note,
-    detail: e.rejectReason ? t("events.reason", { reason: t(`rejectReasons.${e.rejectReason}`) }) : e.newLocation ? `${e.newLocation.addressLine}, ${e.newLocation.city}` : undefined,
+    detail: e.rejectReason ? t("events.reason", { reason: t(`rejectReasons.${e.rejectReason}`) }) : undefined,
     tone: toneFor(e.type),
   }));
 }
@@ -215,3 +216,34 @@ export const CheckItem = ({ children }: { children: ReactNode }) => (
 );
 
 export { useLText };
+
+/** The reservation's lines for `OrderLines`, with the unit price that applied and the SERVER's line total. */
+export const orderLinesOf = (view: CustomerReservation): DisplayLine[] =>
+  view.lines.map((l) => ({ name: l.name, variantLabel: l.variantLabel, quantity: l.quantity, unitPrice: l.unitPrice, unit: l.unit, priceKind: l.priceKind, lineTotal: l.lineTotal }));
+
+/** Pickup as it was promised when this reservation was made (the snapshot), with the instructions that fit its current status. */
+export function PickupInfoFor({ view }: { view: CustomerReservation }) {
+  const t = useT();
+  if (!view.pickup) return <p className="text-label font-normal text-ink-soft">{t("pickup.snapshotMissing")}</p>;
+  return <PickupInfo location={view.pickup.location} instructions={view.pickup.instructions} status={view.status} />;
+}
+
+/** Per-currency position: total, paid so far, still due. HTG and USD are separate lines and never summed. */
+export function PaymentBalances({ balances }: { balances: CustomerReservation["balances"] }) {
+  const t = useT();
+  const locale = useLocale();
+  return (
+    <ul className="text-label divide-y divide-line font-normal">
+      {balances.map((b) => (
+        <li key={b.currency} className="py-2.5 first:pt-0 last:pb-0">
+          <p className="font-semibold">{b.currency}</p>
+          <dl className="mt-1 grid grid-cols-[1fr_auto] gap-y-0.5 text-ink-soft">
+            <dt>{t("track.detail.balanceTotal")}</dt><dd className="tabular-nums text-ink">{formatMoney(b.total, locale)}</dd>
+            <dt>{t("track.detail.amountPaid")}</dt><dd className="tabular-nums text-ink">{formatMoney(b.paid, locale)}</dd>
+            <dt>{t("track.detail.balanceDue")}</dt><dd className="tabular-nums font-semibold text-ink">{formatMoney(b.due, locale)}</dd>
+          </dl>
+        </li>
+      ))}
+    </ul>
+  );
+}

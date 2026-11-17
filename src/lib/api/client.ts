@@ -7,7 +7,6 @@ import { getBrowserClient } from "@/lib/auth/supabase-browser";
  *  - BROWSER: `browserApiClient()` — uses `NEXT_PUBLIC_API_BASE_URL` and forwards the CURRENT Supabase access token
  *    (read from the session on every call, so refreshed tokens are used; the token is never logged or stored by this code).
  *  - SERVER: `serverApiClient(token)` — uses `API_BASE_URL` (or the public one) with a token the caller already verified.
- * Neither is used by the demo data screens yet; they are the single place a future connected screen should start from.
  */
 export function browserApiClient(options: Partial<ApiClientOptions> = {}) {
   const baseUrl = browserApiBaseUrl();
@@ -22,6 +21,15 @@ export function browserApiClient(options: Partial<ApiClientOptions> = {}) {
     },
     ...options,
   });
+}
+
+/**
+ * Public reads (catalog, pickup, tracking lookup) carry NO token on purpose: the API answers 401 to a present-but-expired bearer token even on a
+ * public endpoint, and a guest-readable page must keep working whatever state the session is in.
+ */
+export function anonymousApiClient(options: Partial<ApiClientOptions> = {}) {
+  const baseUrl = browserApiBaseUrl();
+  return baseUrl ? createApiClient({ baseUrl, ...options }) : null;
 }
 
 export function serverApiClient(accessToken: string | null, options: Partial<ApiClientOptions> = {}) {

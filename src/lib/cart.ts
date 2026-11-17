@@ -1,5 +1,6 @@
 import type { UnitId } from "./catalog/model";
 import { type PriceKind, type PricingSnapshot, snapshotFor, unitPriceFor } from "./catalog/pricing";
+import { inCurrency } from "./catalog/offers";
 import type { Availability, Product, ProductVariant } from "./catalog-types";
 import { type Money, multiplyMoney, sumByCurrency } from "./money";
 
@@ -68,6 +69,7 @@ export function buildCartLine(product: Product, variant: ProductVariant | undefi
 
 export type CartAction =
   | { type: "add"; line: CartLine }
+  | { type: "replace"; lines: CartLine[] }
   | { type: "setQuantity"; key: string; quantity: number }
   | { type: "remove"; key: string }
   | { type: "clear" };
@@ -83,6 +85,8 @@ export function cartReducer(lines: CartLine[], action: CartAction): CartLine[] {
       }
       return [...lines, priced(action.line, action.line.quantity, shareCap(lines, action.line))];
     }
+    case "replace":
+      return action.lines;
     case "setQuantity":
       return lines.map((l) => (l.key === action.key ? priced(l, action.quantity, shareCap(lines, l)) : l));
     case "remove":
@@ -102,4 +106,30 @@ export const lineTotal = (line: CartLine): Money => multiplyMoney(line.unitPrice
  */
 export function cartSubtotals(lines: CartLine[]): Money[] {
   return sumByCurrency(lines.map(lineTotal));
+}
+
+export type LineCheck =
+  | { kind: "ok"; line: CartLine }
+  | { kind: "unavailable" }
+  | { kind: "insufficient"; available: number }
+  | { kind: "changed"; line: CartLine; before: Money; after: Money };
+
+/**
+ * Compares a cart line with the product as the API describes it NOW and returns the line rebuilt from the current prices (quantity kept, never
+ * clamped here: shortages are reported, not hidden). `demand` is the total quantity of this stock position across the cart's currency lines,
+ * because HTG and USD lines of one item share one stock. The cart itself is never the source of truth for prices or stock.
+ */
+export function checkLine(line: CartLine, product: Product | undefined, demand: number): LineCheck {
+  const sellable = product ? inCurrency(product, line.pricing.currency) : null;
+  if (!product || !sellable) return { kind: "unavailable" };
+  const variant = line.variantId ? product.variants.find((v) => v.id === line.variantId) : undefined;
+  if (line.variantId && !variant) return { kind: "unavailable" };
+  if ((variant?.availability ?? product.availability) === "out_of_stock") return { kind: "unavailable" };
+  const available = variant?.availableQty ?? product.availableQty;
+  if (available !== undefined && demand > available) return { kind: "insufficient", available };
+  const rebuilt = buildCartLine(sellable, variant, line.quantity);
+  // Keep the quantity the customer chose; only prices, names and limits are refreshed.
+  const fresh = priced({ ...rebuilt, quantity: line.quantity }, line.quantity, undefined);
+  const priceMoved = fresh.unitPrice.amount !== line.unitPrice.amount || fresh.unitPrice.currency !== line.unitPrice.currency || JSON.stringify(fresh.pricing) !== JSON.stringify(line.pricing);
+  return priceMoved ? { kind: "changed", line: fresh, before: line.unitPrice, after: fresh.unitPrice } : { kind: "ok", line: fresh };
 }

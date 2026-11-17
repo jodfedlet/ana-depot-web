@@ -17,10 +17,13 @@ export interface CatalogFilterData {
   query: CatalogQuery;
   categories: Category[];
   facets: FacetGroup[];
+  /** Always empty today: the API has no brand list endpoint, so no brand filter is offered (see docs). */
   brands: { value: string; count: number }[];
-  priceBounds: { min: number; max: number; currency: string } | null;
-  currencies: { code: string; count: number }[];
-  priceSortGrouped: boolean;
+  /** Set when a currency is selected: price ranges only exist inside one currency. Bounds are unknown (the API does not return them). */
+  priceBounds: { currency: string } | null;
+  currencies: { code: string; count?: number }[];
+  /** A price sort was requested but no currency is selected, so the API cannot order by price. */
+  priceSortNeedsCurrency: boolean;
   total: number;
   /** Minor-unit digits of the catalog currency. */
   digits: number;
@@ -115,7 +118,7 @@ function FilterFields({ data, go }: { data: CatalogFilterData; go: (p: Partial<C
             {data.currencies.map((c) => (
               <li key={c.code}>
                 <Link href={catalogHref(data.basePath, query, { currency: c.code, minPrice: undefined, maxPrice: undefined }, data.digits)} aria-current={query.currency === c.code ? "true" : undefined} className={catLink(query.currency === c.code)}>
-                  {c.code}<span className="ml-1.5 font-normal text-ink-muted">({c.count})</span>
+                  {c.code}{c.count !== undefined && <span className="ml-1.5 font-normal text-ink-muted">({c.count})</span>}
                 </Link>
               </li>
             ))}
@@ -133,12 +136,12 @@ function FilterFields({ data, go }: { data: CatalogFilterData; go: (p: Partial<C
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <label htmlFor="price-min" className="sr-only">{t("catalog.minLabel", { currency: data.priceBounds.currency })}</label>
-                <input id="price-min" inputMode="decimal" placeholder={t("catalog.minPlaceholder", { value: priceMajor.boundsMin ?? "" })} value={min} onChange={(e) => setMin(e.target.value)} className={numberInput} aria-invalid={priceError ? true : undefined} />
+                <input id="price-min" inputMode="decimal" placeholder={t("catalog.minPlaceholder", { value: data.priceBounds.currency })} value={min} onChange={(e) => setMin(e.target.value)} className={numberInput} aria-invalid={priceError ? true : undefined} />
               </div>
               <span aria-hidden className="text-ink-muted">–</span>
               <div className="flex-1">
                 <label htmlFor="price-max" className="sr-only">{t("catalog.maxLabel", { currency: data.priceBounds.currency })}</label>
-                <input id="price-max" inputMode="decimal" placeholder={t("catalog.maxPlaceholder", { value: priceMajor.boundsMax ?? "" })} value={max} onChange={(e) => setMax(e.target.value)} className={numberInput} aria-invalid={priceError ? true : undefined} />
+                <input id="price-max" inputMode="decimal" placeholder={t("catalog.maxPlaceholder", { value: data.priceBounds.currency })} value={max} onChange={(e) => setMax(e.target.value)} className={numberInput} aria-invalid={priceError ? true : undefined} />
               </div>
             </div>
             <p className="text-caption text-ink-muted">{t("catalog.amountsIn", { currency: data.priceBounds.currency })}</p>
@@ -161,7 +164,7 @@ function FilterFields({ data, go }: { data: CatalogFilterData; go: (p: Partial<C
           {f.values.map((v) => (
             <Checkbox
               key={v.id}
-              label={<>{v.label} <span className="font-normal text-ink-muted">({v.count})</span></>}
+              label={v.count === undefined ? v.label : <>{v.label} <span className="font-normal text-ink-muted">({v.count})</span></>}
               checked={query.attributes?.[f.key]?.includes(v.id) ?? false}
               onChange={() => go({ attributes: { ...query.attributes, [f.key]: toggle(query.attributes?.[f.key], v.id) } })}
             />
@@ -220,13 +223,13 @@ export function CatalogToolbar({ data: serverData }: { data: CatalogFilterData }
         </p>
         <div className="ml-auto flex items-center gap-2">
           <label htmlFor="sort" className="text-label hidden text-ink-soft sm:block">{t("catalog.sortBy")}</label>
-          <select id="sort" value={query.sort ?? "featured"} onChange={(e) => go({ sort: e.target.value as SortKey })} className="text-label min-h-11 rounded-control border border-line-strong bg-surface px-3">
-            {sortKeys.map((k) => <option key={k} value={k}>{t(`catalog.sort.${k}`)}</option>)}
+          <select id="sort" value={query.sort ?? (query.q ? "relevance" : "newest")} onChange={(e) => go({ sort: e.target.value as SortKey })} className="text-label min-h-11 rounded-control border border-line-strong bg-surface px-3">
+            {sortKeys.filter((k) => k !== "relevance" || query.q).map((k) => <option key={k} value={k}>{t(`catalog.sort.${k}`)}</option>)}
           </select>
         </div>
       </div>
 
-      {data.priceSortGrouped && <p className="text-caption mt-3 text-ink-soft">{t("catalog.sortGroupedByCurrency")}</p>}
+      {data.priceSortNeedsCurrency && <p className="text-caption mt-3 text-ink-soft">{t("catalog.priceSortNeedsCurrency")}</p>}
 
       {chips.length > 0 && (
         <ul aria-label={t("catalog.activeFilters")} className="mt-4 flex flex-wrap items-center gap-2">

@@ -2,51 +2,18 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { catalogStore } from "../stores/catalog-store";
 import { reservationStore } from "../stores/reservation-store";
 import { stockOf } from "../catalog/stock";
-import { hasVariantsRecord } from "../catalog/model";
 import { adjustStock, saveCategory, saveProduct, setProductStatus } from "./catalog-admin";
-import { resetDemoData, runReservationAction, submitReservation } from "./reservations";
+import { resetDemoData, runReservationAction } from "./reservations";
 import { emptyDraft, emptyDraftPrice } from "../catalog/draft";
-import type { ReservationLine } from "../reservations/types";
 
-const customer = { firstName: "Test", lastName: "Client", dialCode: "+509", phone: "0000 1111" };
 const product = (id: string) => catalogStore.getSnapshot().products.find((p) => p.id === id)!;
-const lineFor = (id: string, quantity: number, variantId?: string): ReservationLine => ({ productId: id, variantId, slug: product(id).slug, name: product(id).sku, quantity, unitPrice: { amount: 100, currency: "HTG" }, image: { src: "/x.svg", alt: "" } });
-const submit = (lines: ReservationLine[]) => submitReservation({ lines, customer, locale: "fr", acknowledgedTerms: true });
 const staff = { kind: "staff", name: "Test" } as const;
 
 beforeEach(() => resetDemoData());
 
-describe("reservation service enforces stock", () => {
-  it("refuses more than the available quantity and accepts exactly the available quantity", async () => {
-    const available = stockOf(product("p-009"), reservationStore.getSnapshot()).available;
-    expect(await submit([lineFor("p-009", available + 1)])).toMatchObject({ ok: false, error: "insufficient_stock" });
-    expect((await submit([lineFor("p-009", available)])).ok).toBe(true);
-    // The new reservation now counts as reserved: nothing is left for a second customer.
-    expect(stockOf(product("p-009"), reservationStore.getSnapshot()).available).toBe(0);
-    expect(await submit([lineFor("p-009", 1)])).toMatchObject({ ok: false, error: "insufficient_stock" });
-  });
-
-  it("checks stock per variant", async () => {
-    const p = product("p-006");
-    expect(hasVariantsRecord(p)).toBe(true);
-    const low = p.variants.reduce((a, b) => (stockOf(p, reservationStore.getSnapshot(), a.id).available <= stockOf(p, reservationStore.getSnapshot(), b.id).available ? a : b));
-    const avail = stockOf(p, reservationStore.getSnapshot(), low.id).available;
-    expect(await submit([lineFor("p-006", avail + 1, low.id)])).toMatchObject({ ok: false, error: "insufficient_stock" });
-  });
-
-  it("refuses inactive, draft and out-of-stock products", async () => {
-    expect(await submit([lineFor("p-016", 1)])).toMatchObject({ ok: false, error: "product_unavailable" }); // inactive
-    expect(await submit([lineFor("p-015", 1)])).toMatchObject({ ok: false, error: "product_unavailable" }); // draft
-    expect(await submit([lineFor("p-011", 1)])).toMatchObject({ ok: false, error: "insufficient_stock" }); // tracked, 0 on hand
-  });
-
-  it("refuses quantities below the product's minimum order", async () => {
-    const p = product("p-002");
-    const min = p.prices[0].minOrderQty!;
-    expect(min).toBeGreaterThan(1);
-    expect(await submit([lineFor("p-002", min - 1, p.variants[0]?.id)])).toMatchObject({ ok: false, error: "below_minimum" });
-  });
-
+// Reservation-time stock rules (no overselling, per variant, minimum order, inactive products) are enforced by the SERVER now (backend tests) and re-checked
+// against live data by the storefront cart (see api/cart-check.test.ts). What is left here is the administration demo: collection deducts stock.
+describe("administration demo: collecting a reservation", () => {
   it("collecting a reservation deducts physical stock once, with a traceable movement", async () => {
     const r = reservationStore.getSnapshot().find((x) => x.reference === "ANA-READY1")!;
     const l = r.lines[0];
@@ -98,7 +65,6 @@ describe("catalog administration", () => {
     expect(await saveProduct({ ...draft, id: saved.data.id, sku: "TST-1", prices: { ...draft.prices, HTG: { ...draft.prices.HTG, retail: "500" } } }, "active", "Test")).toMatchObject({ ok: true });
     expect(product(saved.data.id).status).toBe("active");
     expect(await setProductStatus(saved.data.id, "inactive")).toMatchObject({ ok: true });
-    expect(await submit([{ ...lineFor("p-009", 1), productId: saved.data.id }])).toMatchObject({ ok: false, error: "product_unavailable" });
   });
 
   it("refuses a duplicate SKU and a select attribute without options", async () => {

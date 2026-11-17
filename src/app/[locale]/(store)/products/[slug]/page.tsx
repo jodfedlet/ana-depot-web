@@ -1,22 +1,25 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { ProductPageView } from "@/features/product/product-page-view";
 import { isLocale, locales } from "@/i18n/config";
-import { getSeedProductName, listSeedSlugs } from "@/lib/api/catalog";
 
-/** Prerenders a shell for the sample products; products the seller adds render on demand from the demo store. */
+/**
+ * One placeholder slug per language gives the route a prerendered shell; every real product renders on demand and is loaded from the API in the
+ * browser (no product data is bundled with the app). The page title is set once the product has loaded.
+ */
 export function generateStaticParams() {
-  return locales.flatMap((locale) => listSeedSlugs().map((slug) => ({ locale, slug })));
+  return locales.map((locale) => ({ locale, slug: "produit" }));
 }
 
-export async function generateMetadata({ params }: PageProps<"/[locale]/products/[slug]">): Promise<Metadata> {
-  const { locale, slug } = await params;
-  const name = isLocale(locale) ? getSeedProductName(slug, locale) : undefined;
-  return name ? { title: name } : {};
-}
+export const metadata: Metadata = {};
 
-export default async function ProductPage({ params }: PageProps<"/[locale]/products/[slug]">) {
+async function Content({ params }: Pick<PageProps<"/[locale]/products/[slug]">, "params">) {
   const { locale, slug } = await params;
   if (!isLocale(locale)) notFound();
   return <ProductPageView slug={decodeURIComponent(slug)} />;
+}
+
+export default function ProductPage(props: PageProps<"/[locale]/products/[slug]">) {
+  return <Suspense><Content params={props.params} /></Suspense>;
 }

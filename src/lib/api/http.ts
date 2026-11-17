@@ -1,7 +1,6 @@
 /**
- * Typed HTTP boundary for the Ana Dépôt API (Spring Boot). NOT used by the demo data paths yet: the administration and
- * reservation screens still read browser-local demo stores. When an endpoint exists, the matching function in
- * `lib/api/*` swaps its body for a call through this client (signatures and error codes stay the contract).
+ * Typed HTTP boundary for the Ana Dépôt API (Spring Boot). The storefront (catalog, search, pickup, reservations, tracking, customer account)
+ * goes through it (`lib/api/public.ts`); the administration screens still read browser-local demo stores (out of scope of the storefront phase).
  *
  * Conventions it implements:
  *  - `Authorization: Bearer <Supabase access token>`; the backend validates the token and decides authorization.
@@ -44,7 +43,8 @@ export interface ApiClientOptions {
 
 export const newIdempotencyKey = (): string => crypto.randomUUID();
 
-type Query = Record<string, string | number | boolean | undefined>;
+/** A list value is sent as a repeated parameter (`attr=a:b&attr=c:d`). */
+type Query = Record<string, string | number | boolean | string[] | undefined>;
 interface WriteOptions { idempotencyKey?: string; signal?: AbortSignal }
 
 export function createApiClient({ baseUrl, getAccessToken, fetchImpl = fetch, timeoutMs = 10_000, newId = () => crypto.randomUUID() }: ApiClientOptions) {
@@ -53,7 +53,10 @@ export function createApiClient({ baseUrl, getAccessToken, fetchImpl = fetch, ti
   async function request<T>(method: string, path: string, body?: unknown, opts: WriteOptions & { query?: Query } = {}): Promise<T> {
     const correlationId = newId();
     const url = new URL(`${root}${path}`);
-    for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v));
+    for (const [k, v] of Object.entries(opts.query ?? {})) {
+      if (Array.isArray(v)) v.forEach((x) => url.searchParams.append(k, x));
+      else if (v !== undefined) url.searchParams.set(k, String(v));
+    }
     const headers: Record<string, string> = { Accept: "application/json, application/problem+json", "X-Correlation-Id": correlationId };
     const token = await getAccessToken?.();
     if (token) headers.Authorization = `Bearer ${token}`;

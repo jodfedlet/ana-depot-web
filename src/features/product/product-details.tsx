@@ -5,8 +5,7 @@ import { useUnitLabel } from "@/components/ui/price";
 import { Link } from "@/i18n/link";
 import { useT } from "@/i18n/provider";
 import type { Product } from "@/lib/catalog-types";
-import { pickupAvailability } from "@/lib/pickup/types";
-import { usePickup } from "@/lib/stores/pickup-store";
+import { usePickupView } from "@/lib/api/pickup-hooks";
 
 const section = "border-t border-line py-5";
 
@@ -14,9 +13,8 @@ const section = "border-t border-line py-5";
 export function ProductDetails({ product }: { product: Product }) {
   const t = useT();
   const unitLabel = useUnitLabel();
-  const { settings } = usePickup();
-  const available = pickupAvailability(settings) === "available";
-  const loc = settings.location;
+  const { view } = usePickupView();
+  const loc = view?.status === "available" ? view.location : null;
   const rows = [
     { label: t("product.skuLabel"), value: product.sku },
     { label: t("product.unitLabel"), value: unitLabel(product.unit, 1) + (product.unitNote ? ` — ${product.unitNote}` : "") },
@@ -48,7 +46,7 @@ export function ProductDetails({ product }: { product: Product }) {
         <ul className="mt-3 space-y-3">
           <li className="flex gap-3">
             <MapPin aria-hidden className="mt-0.5 size-5 shrink-0 text-brand-700" />
-            <p className="text-label font-normal text-ink-soft">{available ? <><span className="font-semibold text-ink">{loc.storeName}</span> — {loc.addressLine}, {loc.city}</> : t("product.pickupSoon")}</p>
+            <p className="text-label font-normal text-ink-soft">{loc ? <><span className="font-semibold text-ink">{loc.storeName}</span> — {loc.addressLine}, {loc.city}</> : t("product.pickupSoon")}</p>
           </li>
           <li className="flex gap-3">
             <Wallet aria-hidden className="mt-0.5 size-5 shrink-0 text-brand-700" />

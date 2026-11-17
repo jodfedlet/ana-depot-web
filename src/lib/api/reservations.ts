@@ -1,28 +1,17 @@
 /**
- * Reservation & pickup API boundary (DEMO IMPLEMENTATION).
- *
- * Screens never mutate state directly: they call these async functions, which validate through
- * the workflow engine and return `Result`s, exactly like the Spring Boot API will. Today the
- * "database" is localStorage (src/lib/stores) — nothing is persisted or sent anywhere. Replace
- * the bodies with HTTP calls; the signatures and error codes are the contract.
+ * ADMINISTRATION demo boundary (browser localStorage). The CUSTOMER storefront no longer uses anything here: catalog, pickup, reservations,
+ * tracking and accounts talk to the real API (`lib/api/public.ts`). What remains serves the administration screens, which are not connected to
+ * the server yet (out of scope of the storefront phase) and say so on screen. Nothing here is persisted or sent anywhere.
  */
-import type { Locale } from "@/i18n/config";
-import { type PickupChange, type PickupSettings, pickupAvailability, snapshotFromSettings } from "../pickup/types";
+import type { PickupChange, PickupSettings } from "../pickup/types";
 import { changedGroups, validatePickupSettings } from "../pickup/validate";
-import { type CustomerReservation, toCustomerView } from "../reservations/customer-view";
-import { generateReference, normalizeReference, phoneMatches } from "../reservations/access";
-import type { Actor, Reservation, ReservationCustomer, ReservationLine } from "../reservations/types";
-import { type Action, type ActionError, applyAction, computeTotals } from "../reservations/workflow";
+import type { Actor, Reservation } from "../reservations/types";
+import { type Action, type ActionError, applyAction } from "../reservations/workflow";
 import { seedCatalog, catalogStore } from "../stores/catalog-store";
-import { stockOf } from "../catalog/stock";
-import { hasVariantsRecord, pricingIn } from "../catalog/model";
-import type { CurrencyCode } from "../money";
 import { sampleReservations } from "../mock/reservations";
 import { samplePickupHistory, samplePickupSettings } from "../mock/pickup";
 import { pickupStore } from "../stores/pickup-store";
-import { rememberReference } from "../stores/guest-refs-store";
 import { reservationStore } from "../stores/reservation-store";
-import { isBlank, isValidEmail, isValidPhone } from "../validation";
 
 export type ServiceError =
   | ActionError
@@ -43,78 +32,6 @@ export type Result<T> = { ok: true; data: T } | { ok: false; error: ServiceError
 
 const latency = (ms = 450) => new Promise<void>((r) => setTimeout(r, ms));
 const nowIso = () => new Date().toISOString();
-
-export interface SubmitReservationInput {
-  lines: ReservationLine[];
-  customer: ReservationCustomer;
-  locale: Locale;
-  /** The customer ticked "I understand this is a reservation, not a payment". */
-  acknowledgedTerms: boolean;
-}
-
-export async function submitReservation(input: SubmitReservationInput): Promise<Result<{ reference: string }>> {
-  await latency();
-  // The server (not the form) decides whether a reservation may be created.
-  const { settings } = pickupStore.getSnapshot();
-  const availability = pickupAvailability(settings);
-  if (availability === "disabled") return { ok: false, error: "pickup_disabled" };
-  if (availability === "not_configured") return { ok: false, error: "pickup_not_configured" };
-  if (input.lines.length === 0) return { ok: false, error: "cart_empty" };
-  if (!input.acknowledgedTerms) return { ok: false, error: "terms_not_accepted" };
-  // Stock rules (frontend demonstration of what the API must enforce): only active products, minimum order, and no overselling.
-  const reservations = reservationStore.getSnapshot();
-  const catalog = catalogStore.getSnapshot();
-  // Stock is ONE position per product/variant shared by every currency: demand is summed across lines (HTG + USD lines of the same item add up).
-  const demand = new Map<string, number>();
-  for (const l of input.lines) demand.set(`${l.productId}:${l.variantId ?? ""}`, (demand.get(`${l.productId}:${l.variantId ?? ""}`) ?? 0) + l.quantity);
-  for (const l of input.lines) {
-    const rec = catalog.products.find((p) => p.id === l.productId);
-    if (!rec || rec.status !== "active") return { ok: false, error: "product_unavailable", detail: l.name };
-    // The line must be priced in a currency the product is sold in, with THAT currency's minimum order. Never converted.
-    const pricing = pricingIn(rec, l.unitPrice.currency as CurrencyCode);
-    if (!pricing) return { ok: false, error: "currency_mismatch", detail: l.name };
-    if (l.quantity < Math.max(1, pricing.minOrderQty ?? 1)) return { ok: false, error: "below_minimum", detail: l.name };
-    if (rec.inventory.tracked && (demand.get(`${l.productId}:${l.variantId ?? ""}`) ?? l.quantity) > stockOf(rec, reservations, hasVariantsRecord(rec) ? l.variantId : undefined).available) return { ok: false, error: "insufficient_stock", detail: l.name };
-    if (!rec.inventory.tracked && rec.inventory.manualAvailability === "out_of_stock") return { ok: false, error: "product_unavailable", detail: l.name };
-  }
-  const c = input.customer;
-  if (isBlank(c.firstName) || isBlank(c.lastName) || !isValidPhone(c.phone) || (c.email && !isValidEmail(c.email))) {
-    return { ok: false, error: "contact_invalid" };
-  }
-
-  const existing = new Set(reservationStore.getSnapshot().map((r) => r.reference));
-  let reference = generateReference();
-  while (existing.has(reference)) reference = generateReference();
-
-  const now = nowIso();
-  const id = `res-${Date.now().toString(36)}`;
-  const reservation: Reservation = {
-    id,
-    reference,
-    locale: input.locale,
-    createdAt: now,
-    status: "pending_review", // never accepted, paid or ready on submission
-    customer: { ...c, email: c.email?.trim() || undefined },
-    lines: input.lines,
-    totals: computeTotals(input.lines),
-    payment: { method: "cash_at_pickup", status: "unpaid", records: [] },
-    pickup: snapshotFromSettings(settings, now), // snapshot: later settings changes never alter it
-    events: [{ id: `${id}-e1`, type: "submitted", at: now, actor: { kind: "customer" } }],
-  };
-  reservationStore.set((prev) => [reservation, ...prev]);
-  rememberReference(reference);
-  return { ok: true, data: { reference } };
-}
-
-/** Guest lookup: reference AND phone must match. The error is identical for "not found" and "wrong phone". */
-export async function lookupReservation(referenceInput: string, phoneInput: string): Promise<Result<CustomerReservation>> {
-  await latency();
-  const ref = normalizeReference(referenceInput);
-  const found = reservationStore.getSnapshot().find((r) => r.reference === ref);
-  if (!found || !phoneMatches(found, phoneInput)) return { ok: false, error: "verification_failed" };
-  rememberReference(found.reference);
-  return { ok: true, data: toCustomerView(found) };
-}
 
 /** Staff or customer action. The caller supplies the actor; the real API derives it from the session. */
 export async function runReservationAction(id: string, action: Action, actor: Actor): Promise<Result<Reservation>> {

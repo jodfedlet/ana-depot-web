@@ -5,8 +5,7 @@ import { infoPages, siteConfig } from "@/config/site";
 import { LanguageSelector } from "@/i18n/language-selector";
 import { Link } from "@/i18n/link";
 import { useT } from "@/i18n/provider";
-import { pickupAvailability } from "@/lib/pickup/types";
-import { usePickup } from "@/lib/stores/pickup-store";
+import { usePickupView } from "@/lib/api/pickup-hooks";
 import { useNavItems } from "./use-nav-items";
 import { Wordmark } from "./wordmark";
 
@@ -16,9 +15,8 @@ const linkCls = "text-label font-normal text-ink-soft hover:text-ink hover:under
 export function Footer() {
   const t = useT();
   const nav = useNavItems();
-  const { settings } = usePickup();
-  const loc = settings.location;
-  const hasContact = pickupAvailability({ ...settings, enabled: true }) === "available";
+  const { view } = usePickupView();
+  const loc = view?.status === "available" ? view.location : null;
   return (
     <footer className="mt-24 border-t border-line bg-sand-50">
       <div className="container-page grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
@@ -47,7 +45,7 @@ export function Footer() {
         </nav>
         <div>
           <h2 className={heading}>{t("footer.contact")}</h2>
-          {hasContact ? (
+          {loc ? (
             <address className="text-label space-y-2 font-normal not-italic text-ink-soft">
               <p className="font-semibold text-ink">{loc.storeName}</p>
               <p className="flex gap-2"><MapPin aria-hidden className="mt-0.5 size-4 shrink-0" />{loc.addressLine}, {loc.city}</p>
@@ -60,7 +58,7 @@ export function Footer() {
       </div>
       <div className="border-t border-line">
         <div className="container-page text-caption flex flex-col gap-3 py-5 text-ink-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>© {siteConfig.name}. {t("site.demoNote")}</p>
+          <p>© {siteConfig.name}</p>
           <LanguageSelector />
         </div>
       </div>

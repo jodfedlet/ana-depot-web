@@ -10,7 +10,7 @@ interface Props { searchParams: SearchParams; locale: Locale; mode: "browse" | "
 /**
  * Shared catalog page for /products and /search. The URL carries all filter state, so every filtered view is
  * linkable. Reading searchParams is a request-time API, so it streams inside <Suspense>; the list itself is
- * rendered by <CatalogView>, which reads the demo catalog store (so seller edits appear immediately).
+ * rendered by <CatalogView>, which asks the API for that page of results.
  */
 export function CatalogPage({ searchParams, mode, basePath }: Props) {
   return (

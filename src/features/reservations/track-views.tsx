@@ -1,30 +1,29 @@
 "use client";
 
-import { Lock, PackageSearch } from "lucide-react";
+import { Lock } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
-import { Alert, DemoNotice } from "@/components/ui/alert";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/drawer";
-import { TextAreaField, TextField } from "@/components/ui/field";
+import { Alert } from "@/components/ui/alert";
+import { ApiErrorState } from "@/components/ui/api-error";
+import { Button } from "@/components/ui/button";
+import { TextField } from "@/components/ui/field";
 import { OrderLines } from "@/components/ui/order-lines";
 import { MoneyRows } from "@/components/ui/price";
-import { EmptyState, Skeleton } from "@/components/ui/states";
-import { useToast } from "@/components/ui/toast";
+import { Skeleton } from "@/components/ui/states";
 import { useFormat } from "@/i18n/format";
+import { Link } from "@/i18n/link";
 import { useLocaleRouter } from "@/i18n/navigation";
 import { useT } from "@/i18n/provider";
-import { lookupReservation, runReservationAction } from "@/lib/api/reservations";
-import { canView } from "@/lib/reservations/access";
-import { toCustomerView } from "@/lib/reservations/customer-view";
-import { useIsClient } from "@/lib/stores/create-persisted-store";
-import { useVerifiedReferences } from "@/lib/stores/guest-refs-store";
-import { useReservations } from "@/lib/stores/reservation-store";
+import { apiErrorKey, isSessionProblem } from "@/lib/api/errors";
+import { toCustomerReservation } from "@/lib/api/map-reservation";
+import { lookupReservation } from "@/lib/api/public";
+import { useTrackedReservation } from "@/lib/api/reservation-hooks";
 import { useSession } from "@/lib/auth/use-session";
+import { normalizeReference, rememberAccess } from "@/lib/reservations/access-store";
 import { focusFirstInvalid, isBlank } from "@/lib/validation";
-import { PaymentStatusBadge, PickupInfo, ReservationStatusBadge, SectionCard, Timeline, useCustomerTimeline } from "./shared";
-import { Link } from "@/i18n/link";
+import { PaymentBalances, PaymentStatusBadge, PickupInfoFor, ReservationStatusBadge, SectionCard, Timeline, orderLinesOf, useCustomerTimeline } from "./shared";
 
-/** /reservations — guest lookup. The reference alone is never enough: the phone number is verified too. */
+/** /reservations — guest lookup. The reference alone is never enough: the phone number is verified by the server too. */
 export function LookupForm() {
   const t = useT();
   const router = useLocaleRouter();
@@ -45,10 +44,16 @@ export function LookupForm() {
     setFailure(undefined);
     if (Object.keys(next).length) { window.setTimeout(() => focusFirstInvalid(formRef.current)); return; }
     setLoading(true);
-    const result = await lookupReservation(reference, phone);
-    setLoading(false);
-    if (!result.ok) { setFailure(t(`serviceErrors.${result.error}`)); return; }
-    router.push(`/reservations/${result.data.reference}`);
+    try {
+      const dto = await lookupReservation(reference.trim(), phone.trim());
+      if (!toCustomerReservation(dto)) throw new Error("unreadable");
+      rememberAccess(dto.reference, phone.trim());
+      router.push(`/reservations/${encodeURIComponent(dto.reference)}`);
+    } catch (err) {
+      // Unknown reference and wrong phone are the same answer from the server and the same message here.
+      setFailure(t(apiErrorKey(err)));
+      setLoading(false);
+    }
   };
 
   return (
@@ -67,12 +72,11 @@ export function LookupForm() {
         <Button type="submit" size="lg" full loading={loading}>{t("track.lookup.submit")}</Button>
         <p className="text-caption flex gap-2 text-ink-muted"><Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />{t("track.lookup.privacy")}</p>
       </form>
-      <DemoNotice className="mt-5">{t("demo.reservation")}</DemoNotice>
     </div>
   );
 }
 
-function Gate({ reference }: { reference: string }) {
+function Gate({ reference, verify }: { reference: string; verify: (phone: string) => Promise<import("@/lib/api/http").ApiError | null> }) {
   const t = useT();
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string>();
@@ -82,10 +86,9 @@ function Gate({ reference }: { reference: string }) {
     if (isBlank(phone)) { setError(t("validation.phone")); return; }
     setError(undefined);
     setLoading(true);
-    const result = await lookupReservation(reference, phone);
-    setLoading(false);
-    // On success the verified-references store updates and the detail view replaces this gate.
-    if (!result.ok) setError(t(`serviceErrors.${result.error}`));
+    const failure = await verify(phone.trim());
+    // On success the detail view replaces this gate; on failure the answer is the same whether or not the reference exists.
+    if (failure) { setError(t(apiErrorKey(failure))); setLoading(false); }
   };
   return (
     <div className="mx-auto max-w-md">
@@ -100,43 +103,30 @@ function Gate({ reference }: { reference: string }) {
   );
 }
 
-/** /reservations/[reference] and the confirmation share this rule: only verified viewers see a reservation. */
+/**
+ * /reservations/[reference]. Everything shown is what the API answers now: for a guest, to reference + phone; for a signed-in owner opening
+ * a reservation from their account (`?mine=<id>`), to the session. Internal notes, staff names and ledger entries are not in the response.
+ */
 export function CustomerReservationDetail({ reference }: { reference: string }) {
   const t = useT();
   const fmt = useFormat();
-  const toast = useToast();
-  const ready = useIsClient();
-  const reservations = useReservations();
-  const verified = useVerifiedReferences();
   const { session } = useSession();
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [reason, setReason] = useState("");
-  const [reasonError, setReasonError] = useState<string>();
-  const [cancelling, setCancelling] = useState(false);
-  const [cancelError, setCancelError] = useState<string>();
-
-  const reservation = reservations.find((r) => r.reference === reference.toUpperCase());
-  const view = reservation && canView(reservation, { sessionEmail: session?.email, verifiedReferences: verified }) ? toCustomerView(reservation) : null;
+  const mineId = useSearchParams().get("mine") ?? undefined;
+  const ref = normalizeReference(reference);
+  const { outcome, loading, error, reload, verify } = useTrackedReservation(ref, mineId);
+  const view = outcome?.kind === "ready" ? outcome.view : null;
   const timeline = useCustomerTimeline(view?.events ?? []);
 
-  if (!ready) return <div role="status" aria-label={t("common.loading")}><Skeleton className="h-10 w-72" /><Skeleton className="mt-6 h-64 w-full" /></div>;
+  if (error != null) {
+    return isSessionProblem(error) && mineId
+      ? <Alert tone="warning" live="polite" title={t("apiErrors.session_expired")}><Link href={`/auth/login?next=${encodeURIComponent(`/reservations/${ref}?mine=${mineId}`)}`} className="font-semibold underline underline-offset-2">{t("nav.signIn")}</Link></Alert>
+      : <ApiErrorState error={error} onRetry={reload} />;
+  }
+  if (loading || !outcome) return <div role="status" aria-label={t("common.loading")}><Skeleton className="h-10 w-72" /><Skeleton className="mt-6 h-64 w-full" /></div>;
   // Same screen whether the reference does not exist or the viewer is not verified (no enumeration).
-  if (!view || !reservation) return <Gate reference={reference.toUpperCase()} />;
+  if (!view) return <Gate reference={ref} verify={verify} />;
 
   const latestMessage = [...view.events].reverse().find((e) => e.note);
-  const cancel = async () => {
-    if (isBlank(reason)) { setReasonError(t("validation.reason")); return; }
-    setReasonError(undefined);
-    setCancelError(undefined);
-    setCancelling(true);
-    const result = await runReservationAction(reservation.id, { type: "cancel", reason }, { kind: "customer" });
-    setCancelling(false);
-    if (!result.ok) { setCancelError(t(`serviceErrors.${result.error}`)); return; }
-    setCancelOpen(false);
-    setReason("");
-    toast.show({ tone: "success", message: t("track.detail.cancelledToast") });
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -163,7 +153,7 @@ export function CustomerReservationDetail({ reference }: { reference: string }) 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           <SectionCard title={t("track.detail.items")}>
-            <OrderLines lines={view.lines} />
+            <OrderLines lines={orderLinesOf(view)} />
             <MoneyRows label={t("track.detail.total")} totals={view.totals} className="text-label mt-4 border-t border-line pt-3" valueClassName="text-h3" />
           </SectionCard>
           <SectionCard title={t("track.detail.timeline")}>
@@ -176,28 +166,18 @@ export function CustomerReservationDetail({ reference }: { reference: string }) 
               <div className="flex justify-between gap-3"><dt className="text-ink-soft">{t("track.detail.paymentMethod")}</dt><dd>{t("paymentMethod.cash_at_pickup")}</dd></div>
               <div className="flex items-center justify-between gap-3"><dt className="text-ink-soft">{t("track.detail.paymentStatus")}</dt><dd><PaymentStatusBadge status={view.payment.status} /></dd></div>
             </dl>
-            {view.payment.paid.length > 0 && <MoneyRows label={t("track.detail.amountPaid")} totals={view.payment.paid} className="text-label mt-2 font-normal [&_dt]:text-ink-soft" />}
+            <div className="mt-3 border-t border-line pt-3"><PaymentBalances balances={view.balances} /></div>
             {view.payment.status !== "paid" && <p className="text-caption mt-3 text-ink-soft">{t("track.detail.payAtStore")}</p>}
           </SectionCard>
           <SectionCard title={t("pickup.title")}>
-            <PickupInfo location={view.pickup.location} instructions={view.pickup.instructions} status={view.status} />
+            <PickupInfoFor view={view} />
           </SectionCard>
           <SectionCard title={t("track.detail.contact")}>
             <p className="text-label">{view.customer.name}</p>
             <p className="text-label font-normal text-ink-soft">{view.customer.phone}{view.customer.email && <><br />{view.customer.email}</>}</p>
           </SectionCard>
-          {view.canCancel && <Button variant="danger" full onClick={() => setCancelOpen(true)}>{t("track.detail.cancel")}</Button>}
         </div>
       </div>
-
-      <Drawer open={cancelOpen} onClose={() => setCancelOpen(false)} title={t("track.detail.cancelTitle")} side="center"
-        footer={<div className="flex flex-wrap justify-end gap-3"><Button variant="ghost" onClick={() => setCancelOpen(false)} disabled={cancelling}>{t("track.detail.keep")}</Button><Button variant="danger" loading={cancelling} onClick={cancel}>{t("track.detail.cancelConfirm")}</Button></div>}>
-        <p className="text-label font-normal text-ink-soft">{t("track.detail.cancelText")}</p>
-        <TextAreaField className="mt-4" label={t("track.detail.cancelReason")} value={reason} onChange={(e) => { setReason(e.target.value); setReasonError(undefined); }} error={reasonError} />
-        {cancelError && <Alert tone="danger" live="assertive" className="mt-4">{cancelError}</Alert>}
-      </Drawer>
     </div>
   );
 }
-
-export { PackageSearch, EmptyState, ButtonLink };

@@ -2,23 +2,27 @@
 
 import { Banknote, ChevronDown, ShoppingBag } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Alert, DemoNotice } from "@/components/ui/alert";
+import { Alert } from "@/components/ui/alert";
+import { ApiErrorState } from "@/components/ui/api-error";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Checkbox, SelectField, TextField } from "@/components/ui/field";
 import { OrderLines } from "@/components/ui/order-lines";
 import { MoneyRows, MoneyTotals } from "@/components/ui/price";
-import { unitPriceFor } from "@/lib/catalog/pricing";
-import { EmptyState } from "@/components/ui/states";
+import { EmptyState, Skeleton } from "@/components/ui/states";
 import { dialCodes, market } from "@/config/market";
+import { termsConfig } from "@/config/terms";
 import { Link } from "@/i18n/link";
 import { useLocaleRouter } from "@/i18n/navigation";
 import { useLText, useLocale, useT } from "@/i18n/provider";
-import { submitReservation } from "@/lib/api/reservations";
+import { useCartCheck } from "@/lib/api/cart-check";
+import { apiErrorKey, fieldProblems, isUncertainOutcome, problemOf } from "@/lib/api/errors";
+import { usePickupView } from "@/lib/api/pickup-hooks";
+import { newIdempotencyKey, submitReservation } from "@/lib/api/public";
 import { cn } from "@/lib/cn";
-import { pickupAvailability } from "@/lib/pickup/types";
+import { rememberAccess, rememberSubmitted } from "@/lib/reservations/access-store";
+import { clearPending, keyFor } from "@/lib/reservations/pending-submit";
 import { useCart } from "@/lib/stores/cart-store";
-import { usePickup } from "@/lib/stores/pickup-store";
 import { useSession } from "@/lib/auth/use-session";
 import { type Errors, focusFirstInvalid, isBlank, isValidEmail, isValidPhone } from "@/lib/validation";
 import { PickupInfo, SectionCard } from "./shared";
@@ -36,8 +40,9 @@ export function ReserveFlow() {
   const router = useLocaleRouter();
   const cart = useCart();
   const { session } = useSession();
-  const { settings } = usePickup();
-  const availability = pickupAvailability(settings);
+  const pickup = usePickupView();
+  const check = useCartCheck(cart.lines);
+  const terms = termsConfig();
 
   const [step, setStep] = useState<StepId>("contact");
   const [contact, setContact] = useState<Contact>({ firstName: "", lastName: "", dialCode: market.defaultDialCode, phone: "", email: "" });
@@ -47,6 +52,8 @@ export function ReserveFlow() {
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
+  /** The request left the browser and no answer came back: it may or may not have been recorded. Retrying with the SAME key is safe. */
+  const [uncertain, setUncertain] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const firstRender = useRef(true);
@@ -86,29 +93,52 @@ export function ReserveFlow() {
   };
 
   const submit = async () => {
+    if (!terms) return; // no published terms: there is nothing to accept (the button is disabled too)
     if (!acknowledged) { setAckError(true); return; }
+    if (Object.keys(check.issues).length > 0) { setSubmitError(t("reserve.review.cartChanged")); return; }
     setAckError(false);
     setSubmitting(true);
     setSubmitError(undefined);
-    const result = await submitReservation({
-      lines: cart.lines.map((l) => ({ productId: l.productId, variantId: l.variantId, slug: l.slug, name: l.name, variantLabel: l.variantLabel, quantity: l.quantity, unitPrice: l.unitPrice, unit: l.unit, priceKind: l.priceKind, tierMinQty: unitPriceFor(l.pricing, l.quantity).tier?.minQty, image: l.image })),
-      customer: { firstName: contact.firstName.trim(), lastName: contact.lastName.trim(), dialCode: contact.dialCode, phone: contact.phone.trim(), email: contact.email.trim() || undefined },
+    setUncertain(false);
+    // Only identifiers, quantities and currencies are sent: the server finds the product, picks the price (retail, sale or wholesale tier) and snapshots it.
+    const body = {
+      lines: cart.lines.map((l) => ({ productId: l.productId, variantId: l.variantId, quantity: l.quantity, currency: l.unitPrice.currency })),
+      contact: { firstName: contact.firstName.trim(), lastName: contact.lastName.trim(), dialCode: contact.dialCode, phone: contact.phone.trim(), email: contact.email.trim() || undefined },
       locale,
       acknowledgedTerms: acknowledged,
-    });
-    if (!result.ok) {
-      setSubmitError(t(`serviceErrors.${result.error}`) + (result.detail ? ` (${result.detail})` : ""));
+    };
+    // One key per attempt, reused if the SAME request is sent again after an uncertain outcome (see lib/reservations/pending-submit.ts).
+    const key = keyFor(JSON.stringify([body, !!session]), newIdempotencyKey);
+    try {
+      const dto = await submitReservation(body, key, { signedIn: !!session });
+      clearPending();
+      rememberAccess(dto.reference, body.contact.phone);
+      rememberSubmitted(dto, dto.reference);
+      setPlaced(true);
+      cart.clear();
+      router.push(`/reserve/confirmation/${encodeURIComponent(dto.reference)}`);
+    } catch (e) {
+      const unsure = isUncertainOutcome(e);
+      if (!unsure) clearPending(); // a definite answer: the next attempt is a new request
+      setUncertain(unsure);
+      const fields = fieldProblems(e);
+      const mapped: ContactErrors = {};
+      if (fields["contact.firstName"]) mapped.firstName = t("validation.firstName");
+      if (fields["contact.lastName"]) mapped.lastName = t("validation.lastName");
+      if (fields["contact.phone"] || fields["contact.dialCode"]) mapped.phone = t("validation.phone");
+      if (fields["contact.email"]) mapped.email = t("validation.email");
+      if (Object.keys(mapped).length) { setErrors(mapped); setStep("contact"); }
+      setSubmitError(problemOf(e)?.status === 401 ? t("apiErrors.session_expired") : t(apiErrorKey(e)));
+      if (problemOf(e)?.code === "insufficient_stock" || problemOf(e)?.code === "product_unavailable") check.reload();
       setSubmitting(false);
-      return;
     }
-    setPlaced(true);
-    cart.clear();
-    router.push(`/reserve/confirmation/${result.data.reference}`);
   };
 
   const heading = "text-h2 outline-none";
   const totals = cart.subtotals;
-  const unavailable = availability !== "available";
+  const view = pickup.view;
+  const unavailable = view?.status !== "available";
+  const termsMissing = terms === null;
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-14">
@@ -156,13 +186,15 @@ export function ReserveFlow() {
 
               <section aria-labelledby="loc-title" className="space-y-3">
                 <h3 id="loc-title" className="text-h3">{t("reserve.pickup.locationTitle")}</h3>
-                {availability === "available" && (
-                  <div className="rounded-card border border-line bg-surface p-4"><PickupInfo location={settings.location} instructions={settings.instructions} /></div>
+                {pickup.error != null && <ApiErrorState className="py-6" error={pickup.error} onRetry={pickup.reload} />}
+                {pickup.error == null && !view && <div role="status" aria-label={t("common.loading")}><Skeleton className="h-40 w-full" /></div>}
+                {view?.status === "available" && (
+                  <div className="rounded-card border border-line bg-surface p-4"><PickupInfo location={view.location} instructions={view.instructions} /></div>
                 )}
-                {availability === "disabled" && (
-                  <Alert tone="warning" live="polite" title={t("reserve.pickup.disabledTitle")}>{lt(settings.unavailableMessage) || t("pickup.unavailableDefault")}</Alert>
+                {view?.status === "disabled" && (
+                  <Alert tone="warning" live="polite" title={t("reserve.pickup.disabledTitle")}>{lt(view.message) || t("pickup.unavailableDefault")}</Alert>
                 )}
-                {availability === "not_configured" && (
+                {view?.status === "not_configured" && (
                   <Alert tone="warning" live="polite" title={t("reserve.pickup.notConfiguredTitle")}>{t("reserve.pickup.notConfiguredText")}</Alert>
                 )}
               </section>
@@ -191,8 +223,8 @@ export function ReserveFlow() {
                 <p className="text-label font-normal text-ink-soft">{contact.dialCode} {contact.phone}{contact.email && <> · {contact.email}</>}</p>
               </SectionCard>
               <SectionCard title={t("reserve.review.pickup")} action={<button type="button" onClick={() => setStep("pickup")} className="text-label min-h-9 px-2 font-semibold text-brand-700 underline underline-offset-2">{t("common.edit")}</button>}>
-                <p className="text-label font-semibold">{settings.location.storeName}</p>
-                <p className="text-label font-normal text-ink-soft">{settings.location.addressLine}, {settings.location.city}</p>
+                {view?.status === "available" && <><p className="text-label font-semibold">{view.location.storeName}</p>
+                <p className="text-label font-normal text-ink-soft">{view.location.addressLine}, {view.location.city}</p></>}
                 <p className="text-label mt-3 font-semibold">{t("reserve.review.payment")}</p>
                 <p className="text-label font-normal text-ink-soft">{t("reserve.payment.cashName")}</p>
               </SectionCard>
@@ -208,15 +240,22 @@ export function ReserveFlow() {
                 <ul className="text-label mt-3 list-disc space-y-1.5 pl-5 font-normal text-ink">
                   <li>{t("reserve.review.t1")}</li><li>{t("reserve.review.t2")}</li><li>{t("reserve.review.t3")}</li><li>{t("reserve.review.t4")}</li><li>{t("reserve.review.t5")}</li>
                 </ul>
-                <Checkbox className="mt-4" label={t("reserve.review.accept")} checked={acknowledged} onChange={(e) => { setAcknowledged(e.target.checked); setAckError(false); }} aria-invalid={ackError || undefined} />
-                {ackError && <p role="alert" className="text-caption mt-2 font-medium text-danger-fg">{t("reserve.review.acceptRequired")}</p>}
+                {terms ? (
+                  <>
+                    <Checkbox className="mt-4" label={<>{t("reserve.review.accept")}{" "}<span className="font-normal text-ink-soft">({t("reserve.review.termsVersion", { version: terms.version })}{terms.url && <> · <Link href={terms.url} className="font-semibold text-brand-700 underline underline-offset-2">{t("reserve.review.readTerms")}</Link></>})</span></>} checked={acknowledged} onChange={(e) => { setAcknowledged(e.target.checked); setAckError(false); }} aria-invalid={ackError || undefined} />
+                    {ackError && <p role="alert" className="text-caption mt-2 font-medium text-danger-fg">{t("reserve.review.acceptRequired")}</p>}
+                  </>
+                ) : (
+                  <Alert tone="warning" live="polite" className="mt-4" title={t("reserve.review.termsMissingTitle")}>{t("reserve.review.termsMissingText")}</Alert>
+                )}
               </section>
 
-              <DemoNotice>{t("demo.reservation")}</DemoNotice>
-              {submitError && <Alert tone="danger" live="assertive" title={t("reserve.review.errorTitle")}>{submitError}</Alert>}
-              {unavailable && <Alert tone="warning" live="polite" title={t("reserve.pickup.disabledTitle")}>{availability === "disabled" ? lt(settings.unavailableMessage) || t("pickup.unavailableDefault") : t("reserve.pickup.notConfiguredText")}</Alert>}
+              {Object.keys(check.issues).length > 0 && <Alert tone="warning" live="polite" title={t("cart.issuesTitle")}>{t("reserve.review.cartChanged")} <Link href="/cart" className="font-semibold underline underline-offset-2">{t("reserve.review.backToCart")}</Link></Alert>}
+              {check.error != null && <Alert tone="info" live="polite">{t("cart.checkFailed")}</Alert>}
+              {submitError && <Alert tone="danger" live="assertive" title={t("reserve.review.errorTitle")}>{submitError}{uncertain && <span className="mt-1 block">{t("reserve.review.uncertain")}</span>}</Alert>}
+              {unavailable && view && <Alert tone="warning" live="polite" title={t("reserve.pickup.disabledTitle")}>{view.status === "disabled" ? lt(view.message) || t("pickup.unavailableDefault") : t("reserve.pickup.notConfiguredText")}</Alert>}
               <div className="flex flex-wrap gap-3">
-                <Button size="lg" loading={submitting} disabled={unavailable} onClick={submit}>{submitting ? t("reserve.review.submitting") : t("reserve.review.submit")}</Button>
+                <Button size="lg" loading={submitting} disabled={unavailable || termsMissing || Object.keys(check.issues).length > 0} onClick={submit}>{submitting ? t("reserve.review.submitting") : uncertain ? t("reserve.review.retry") : t("reserve.review.submit")}</Button>
                 <Button variant="ghost" size="lg" disabled={submitting} onClick={() => setStep("pickup")}>{t("common.back")}</Button>
               </div>
             </div>

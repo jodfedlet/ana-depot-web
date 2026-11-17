@@ -1,5 +1,6 @@
 "use client";
 
+import { Package } from "lucide-react";
 import Image from "@/components/ui/smart-image";
 import { useT } from "@/i18n/provider";
 import type { UnitId } from "@/lib/catalog/model";
@@ -15,7 +16,10 @@ export interface DisplayLine {
   unitPrice: Money;
   unit?: UnitId;
   priceKind?: PriceKind;
-  image: { src: string; alt: string };
+  /** Absent for reservation lines: the server snapshots name, unit and price, not pictures. */
+  image?: { src: string; alt: string };
+  /** The server-computed line total (reservations). Without it (the cart) it is quantity × unit price, an estimate. */
+  lineTotal?: Money;
 }
 
 /** Read-only list of reserved lines: quantity, unit, the unit price that applied, and the line total. */
@@ -27,7 +31,7 @@ export function OrderLines({ lines }: { lines: DisplayLine[] }) {
       {lines.map((l, i) => (
         <li key={`${l.name}-${l.variantLabel}-${i}`} className="flex gap-3 py-3 first:pt-0 last:pb-0">
           <div className="relative size-16 shrink-0 overflow-hidden rounded-control bg-sand-100">
-            <Image src={l.image.src} alt={l.image.alt} fill sizes="64px" className="object-cover" />
+            {l.image ? <Image src={l.image.src} alt={l.image.alt} fill sizes="64px" className="object-cover" /> : <span aria-hidden className="grid size-full place-items-center text-ink-muted"><Package className="size-6" /></span>}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-label">{l.name}</p>
@@ -37,7 +41,7 @@ export function OrderLines({ lines }: { lines: DisplayLine[] }) {
               {l.priceKind === "wholesale" && <span className="ml-2 font-semibold text-accent-700">{t("pricing.wholesaleTag")}</span>}
             </p>
           </div>
-          <p className="text-label shrink-0"><MoneyText value={multiplyMoney(l.unitPrice, l.quantity)} /></p>
+          <p className="text-label shrink-0"><MoneyText value={l.lineTotal ?? multiplyMoney(l.unitPrice, l.quantity)} /></p>
         </li>
       ))}
     </ul>

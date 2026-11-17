@@ -1,17 +1,17 @@
 "use client";
 
 import { Alert, DemoNotice } from "@/components/ui/alert";
+import { ApiErrorState } from "@/components/ui/api-error";
+import { Skeleton } from "@/components/ui/states";
 import { PickupInfo } from "@/features/reservations/shared";
 import { useLText, useT } from "@/i18n/provider";
-import { pickupAvailability } from "@/lib/pickup/types";
-import { usePickup } from "@/lib/stores/pickup-store";
+import { usePickupView } from "@/lib/api/pickup-hooks";
 
 /** Info page content. "how" is real (it describes the implemented model); "pickup" shows live settings; others wait for business text. */
 export function InfoBody({ kind }: { kind: "how" | "pickup" | "placeholder" }) {
   const t = useT();
   const lt = useLText();
-  const { settings } = usePickup();
-  const availability = pickupAvailability(settings);
+  const { view, loading, error, reload } = usePickupView();
 
   if (kind === "how") {
     return (
@@ -25,15 +25,16 @@ export function InfoBody({ kind }: { kind: "how" | "pickup" | "placeholder" }) {
     );
   }
   if (kind === "pickup") {
+    if (error != null) return <div className="mt-6"><ApiErrorState error={error} onRetry={reload} /></div>;
+    if (loading || !view) return <div className="mt-6" role="status" aria-label={t("common.loading")}><Skeleton className="h-48 w-full" /></div>;
     return (
       <div className="mt-6">
-        {availability === "disabled" && <Alert tone="warning" className="mb-6">{lt(settings.unavailableMessage) || t("pickup.unavailableDefault")}</Alert>}
-        {availability === "not_configured" ? (
-          <DemoNotice title={t("pickup.notConfiguredTitle")}>{t("pickup.notConfiguredText")}</DemoNotice>
-        ) : (
+        {view.status === "disabled" && <Alert tone="warning" className="mb-6">{lt(view.message) || t("pickup.unavailableDefault")}</Alert>}
+        {view.status === "not_configured" && <Alert tone="info" title={t("pickup.notConfiguredTitle")}>{t("pickup.notConfiguredText")}</Alert>}
+        {view.status === "available" && (
           <div className="rounded-card border border-line bg-surface p-5">
             <h2 className="text-h3 mb-3">{t("info.pickupLive")}</h2>
-            <PickupInfo location={settings.location} instructions={settings.instructions} />
+            <PickupInfo location={view.location} instructions={view.instructions} />
           </div>
         )}
       </div>

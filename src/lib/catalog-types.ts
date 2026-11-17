@@ -85,8 +85,9 @@ export interface Product {
   hasWholesale: boolean;
 }
 
-export type SortKey = "featured" | "newest" | "price-asc" | "price-desc" | "name-asc";
-export const sortKeys: SortKey[] = ["featured", "newest", "price-asc", "price-desc", "name-asc"];
+/** `relevance` is only offered with a text query (it is the API's ranking); without a key the API default applies (relevance with a query, newest without). */
+export type SortKey = "relevance" | "newest" | "price-asc" | "price-desc" | "name-asc";
+export const sortKeys: SortKey[] = ["relevance", "newest", "price-asc", "price-desc", "name-asc"];
 
 export interface CatalogQuery {
   q?: string;
@@ -110,21 +111,15 @@ export interface CatalogQuery {
 export interface FacetGroup {
   key: string;
   name: string;
-  values: { id: string; label: string; count: number }[];
+  /** `count` is absent: the API does not return facet counts and none is computed here. */
+  values: { id: string; label: string; count?: number }[];
 }
 
+/** One page of results exactly as the API returned it (order = the API's ranking/sort; `page` is 1-based here, zero-based on the wire). */
 export interface CatalogResult {
   products: Product[];
   total: number;
   page: number;
   pageCount: number;
   pageSize: number;
-  facets: FacetGroup[];
-  brands: { value: string; count: number }[];
-  /** Null when the products in scope use several currencies and none is selected: prices are never compared across currencies. */
-  priceBounds: { min: number; max: number; currency: string } | null;
-  /** Currencies present in scope (before the currency filter), with product counts. */
-  currencies: { code: string; count: number }[];
-  /** True when the results are sorted by price but contain several currencies (grouped by currency, never converted). */
-  priceSortGrouped: boolean;
 }

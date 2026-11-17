@@ -1,30 +1,34 @@
 "use client";
 
 import { Compass, PackageSearch, SearchX } from "lucide-react";
-import { useMemo } from "react";
 import { Breadcrumbs, type Crumb } from "@/components/ui/breadcrumbs";
+import { ApiErrorState } from "@/components/ui/api-error";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/states";
 import { useT } from "@/i18n/provider";
-import { useStorefront } from "@/lib/catalog/hooks";
-import { activeFilterCount, catalogHref, queryCatalog } from "@/lib/catalog-query";
+import { useCatalogPage, useCategories } from "@/lib/api/catalog-hooks";
+import { activeFilterCount, catalogHref } from "@/lib/catalog-query";
 import type { CatalogQuery } from "@/lib/catalog-types";
 import { market } from "@/config/market";
-import { currencyDigits, minorToMajor } from "@/lib/money";
+import { SUPPORTED_CURRENCIES, currencyDigits, minorToMajor } from "@/lib/money";
 import { CatalogSkeleton } from "./catalog-skeleton";
 import { CatalogToolbar, FilterSidebar, type CatalogFilterData } from "./filter-panel";
 import { Pagination } from "./pagination";
 import { ProductGrid } from "./product-card";
 
+/**
+ * The product list. Everything shown comes from the API: the list and its order (including full-text relevance), the totals, the prices and the
+ * availability. The browser sends the URL's filters and renders the page it gets back; it never filters, ranks or searches a downloaded catalog.
+ */
 export function CatalogView({ query, mode, basePath }: { query: CatalogQuery; mode: "browse" | "search"; basePath: string }) {
   const t = useT();
-  const { ready, categories, products } = useStorefront();
-  const names = useMemo(() => Object.fromEntries(categories.map((c) => [c.slug, c.name])), [categories]);
-  const result = useMemo(() => queryCatalog(products, query, names), [products, query, names]);
+  const cats = useCategories();
+  const page = useCatalogPage(query);
+  const { categories } = cats;
   const category = query.category ? categories.find((c) => c.slug === query.category) : undefined;
 
-  if (!ready) return <CatalogSkeleton />;
-  if (query.category && !category) {
+  if (cats.error && !cats.categories.length) return <div className="container-page py-16"><ApiErrorState error={cats.error} onRetry={cats.reload} /></div>;
+  if (page.categoryMissing) {
     return (
       <div className="container-page py-16">
         <EmptyState icon={<Compass aria-hidden />} title={t("errorPage.notFoundTitle")} description={t("errorPage.notFoundText")}>
@@ -33,13 +37,19 @@ export function CatalogView({ query, mode, basePath }: { query: CatalogQuery; mo
       </div>
     );
   }
+  if (!page.result && page.error) return <div className="container-page py-16"><ApiErrorState error={page.error} onRetry={page.reload} /></div>;
+  if (!page.result) return <CatalogSkeleton />;
+  const { result } = page;
 
-  const currency = result.priceBounds?.currency ?? market.defaultProductCurrency; // minor digits only (both launch currencies use 2)
+  const currency = query.currency ?? market.defaultProductCurrency; // minor digits only (both launch currencies use 2)
   const digits = currencyDigits(currency);
   const major = (n?: number) => (n === undefined ? undefined : minorToMajor(n, currency));
   const data: CatalogFilterData = {
-    basePath, query, categories, facets: result.facets, brands: result.brands, priceBounds: result.priceBounds, currencies: result.currencies, priceSortGrouped: result.priceSortGrouped, total: result.total, digits,
-    priceMajor: { min: major(query.minPrice), max: major(query.maxPrice), boundsMin: major(result.priceBounds?.min), boundsMax: major(result.priceBounds?.max) },
+    basePath, query, categories, facets: page.facets, brands: [], priceBounds: query.currency ? { currency: query.currency } : null,
+    currencies: SUPPORTED_CURRENCIES.map((code) => ({ code })),
+    priceSortNeedsCurrency: (query.sort === "price-asc" || query.sort === "price-desc") && !query.currency,
+    total: result.total, digits,
+    priceMajor: { min: major(query.minPrice), max: major(query.maxPrice) },
   };
 
   const searching = mode === "search";
@@ -48,6 +58,7 @@ export function CatalogView({ query, mode, basePath }: { query: CatalogQuery; mo
   const crumbs: Crumb[] = searching ? [home, { label: t("catalog.search") }] : category ? [home, { label: t("catalog.shop"), href: "/products" }, { label: category.name }] : [home, { label: t("catalog.shop") }];
   const filters = activeFilterCount(query);
   const clear = catalogHref(basePath, query, { currency: undefined, minPrice: undefined, maxPrice: undefined, inStockOnly: false, wholesaleOnly: false, brands: [], attributes: {} }, digits);
+  const stale = page.loading;
 
   return (
     <div className="container-page py-6 sm:py-8">
@@ -64,7 +75,8 @@ export function CatalogView({ query, mode, basePath }: { query: CatalogQuery; mo
         <FilterSidebar data={data} />
         <div>
           <CatalogToolbar data={data} />
-          <div className="mt-6">
+          {page.error != null && <ApiErrorState className="py-6" error={page.error} onRetry={page.reload} />}
+          <div className={stale ? "mt-6 opacity-60 transition-opacity" : "mt-6"} aria-busy={stale}>
             {result.products.length > 0 ? (
               <>
                 <h2 className="sr-only">{t("catalog.productsHeading")}</h2>
@@ -76,7 +88,7 @@ export function CatalogView({ query, mode, basePath }: { query: CatalogQuery; mo
                 <ButtonLink href="/products">{t("catalog.browseAll")}</ButtonLink>
               </EmptyState>
             ) : (
-              <EmptyState icon={<SearchX aria-hidden />} title={searching ? t("catalog.noResultsTitle", { q: query.q ?? "" }) : t("catalog.emptyFiltersTitle")} description={filters > 0 ? t("catalog.emptyFiltersText") : t("catalog.noResultsText")}>
+              <EmptyState icon={<SearchX aria-hidden />} title={searching ? t("catalog.noResultsTitle", { q: query.q ?? "" }) : t("catalog.emptyFiltersTitle")} description={filters > 0 ? t("catalog.emptyFiltersText") : searching ? t("catalog.noResultsTextLimits") : t("catalog.noResultsText")}>
                 {filters > 0 && <ButtonLink href={clear}>{t("catalog.clearFilters")}</ButtonLink>}
                 <ButtonLink href="/products" variant="outline">{t("catalog.browseAll")}</ButtonLink>
               </EmptyState>

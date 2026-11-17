@@ -1,72 +1,59 @@
 import type { Locale } from "@/i18n/config";
+import type { UnitId } from "../catalog/model";
+import type { PriceKind } from "../catalog/pricing";
 import type { Money } from "../money";
 import type { PickupInstructions, PickupLocation } from "../pickup/types";
-import { customerCanCancel, paidTotals } from "./workflow";
-import type { EventType, PaymentStatus, RejectReason, Reservation, ReservationLine, ReservationStatus } from "./types";
+import type { EventType, PaymentStatus, RejectReason, ReservationStatus } from "./types";
 
 /**
- * What a customer is allowed to see. This is a SEPARATE TYPE from `Reservation` on purpose:
- * internal notes, staff names and payment staff details cannot be expressed here, so a
- * customer-facing screen cannot render them by accident. The real API must return this shape.
+ * What a customer sees of a reservation: the shape of the API's `CustomerReservationView` (see `lib/api/map-reservation.ts`).
+ * It is a SEPARATE TYPE from the staff `Reservation` on purpose: internal notes, staff names, ledger entries and payment references
+ * cannot be expressed here, so a customer-facing screen cannot render them by accident. Every amount comes from the server
+ * (nothing here is recomputed from the cart or from local state).
  */
 export interface CustomerEvent {
   id: string;
   type: EventType;
   at: string;
-  /** Message written for the customer. */
+  /** Message the store marked as visible to the customer. */
   note?: string;
-  amount?: Money;
-  /** For pickup_changed: the new location. */
-  newLocation?: PickupLocation;
   cancelledBy?: "customer" | "store";
   rejectReason?: RejectReason;
 }
 
+export interface CustomerLine {
+  productId: string;
+  variantId?: string;
+  name: string;
+  variantLabel?: string;
+  quantity: number;
+  unit?: UnitId;
+  /** The unit price that applied when the reservation was made (a snapshot: later catalog changes never alter it). */
+  unitPrice: Money;
+  lineTotal: Money;
+  priceKind: PriceKind;
+  tierMinQty?: number;
+}
+
+export interface CustomerBalance { currency: string; total: Money; paid: Money; due: Money }
+
 export interface CustomerReservation {
+  id: string;
   reference: string;
   createdAt: string;
   locale: Locale;
   status: ReservationStatus;
   customer: { name: string; phone: string; email?: string };
-  lines: ReservationLine[];
+  lines: CustomerLine[];
   /** One total per currency; never merged. */
   totals: Money[];
+  /** One entry per currency present: total, paid and still due. */
+  balances: CustomerBalance[];
   payment: { status: PaymentStatus; paid: Money[] };
-  pickup: { location: PickupLocation; instructions: PickupInstructions };
+  /** The pickup information as promised when the reservation was made; null when the snapshot holds no readable location. */
+  pickup: { location: PickupLocation; instructions: PickupInstructions } | null;
+  readyAt?: string;
   expiresAt?: string;
   canCancel: boolean;
   events: CustomerEvent[];
-}
-
-export function toCustomerView(r: Reservation): CustomerReservation {
-  const events: CustomerEvent[] = [];
-  for (const e of r.events) {
-    // A note-only internal event is invisible to customers.
-    if (e.type === "note_added" && !e.customerNote) continue;
-    // Payment events show the amount, never who recorded it or any internal note.
-    events.push({
-      id: e.id,
-      type: e.type,
-      at: e.at,
-      note: e.customerNote,
-      amount: e.type === "payment_recorded" ? e.detail?.amount : undefined,
-      newLocation: e.type === "pickup_changed" ? e.detail?.toPickup : undefined,
-      cancelledBy: e.type === "cancelled" ? (e.detail?.cancelledBy === "customer" ? "customer" : "store") : undefined,
-      rejectReason: e.type === "rejected" ? e.detail?.rejectReason : undefined,
-    });
-  }
-  return {
-    reference: r.reference,
-    createdAt: r.createdAt,
-    locale: r.locale,
-    status: r.status,
-    customer: { name: `${r.customer.firstName} ${r.customer.lastName}`.trim(), phone: `${r.customer.dialCode} ${r.customer.phone}`, email: r.customer.email },
-    lines: r.lines,
-    totals: r.totals,
-    payment: { status: r.payment.status, paid: paidTotals(r) },
-    pickup: { location: r.pickup.location, instructions: r.pickup.instructions },
-    expiresAt: r.expiresAt,
-    canCancel: customerCanCancel(r),
-    events,
-  };
 }

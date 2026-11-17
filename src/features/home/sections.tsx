@@ -3,12 +3,13 @@
 import { ArrowRight, PackageSearch, Percent, ShoppingBag, Store, Wallet } from "lucide-react";
 import Image from "@/components/ui/smart-image";
 import { ButtonLink } from "@/components/ui/button";
-import { ProductCard, ProductGrid } from "@/features/catalog/product-card";
+import { ApiErrorState } from "@/components/ui/api-error";
+import { ProductGrid } from "@/features/catalog/product-card";
 import { Link } from "@/i18n/link";
 import { useT } from "@/i18n/provider";
-import { useStorefront } from "@/lib/catalog/hooks";
+import { useCatalogPage, useCategories } from "@/lib/api/catalog-hooks";
 import type { Category } from "@/lib/catalog-types";
-import { Skeleton } from "@/components/ui/states";
+import { EmptyState, Skeleton } from "@/components/ui/states";
 
 export function Hero() {
   const t = useT();
@@ -109,36 +110,33 @@ export function PromoBand() {
   );
 }
 
-/** Home merchandising, read from the demo catalog store (so the seller's categories and products appear at once). */
+/** Home merchandising from the API: the active categories and the latest published products (the API's `newest` order; no "featured" flag exists). */
 export function HomeCatalogSections() {
   const t = useT();
-  const { ready, categories, products } = useStorefront();
-  if (!ready) return <div className="container-page mt-14"><Skeleton className="h-8 w-56" /><div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="aspect-square" />)}</div></div>;
-  const featured = products.slice(0, 8);
-  const arrivals = products.filter((p) => p.isNew).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3);
+  const cats = useCategories();
+  const latest = useCatalogPage({ sort: "newest", pageSize: 8 });
+  const loading = (cats.loading && !cats.categories.length) || (latest.loading && !latest.result);
+  if (loading) return <div className="container-page mt-14" role="status" aria-label={t("common.loading")}><Skeleton className="h-8 w-56" /><div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="aspect-[4/3]" />)}</div></div>;
+  if (cats.error != null && !cats.categories.length) return <div className="container-page mt-14"><ApiErrorState error={cats.error} onRetry={cats.reload} /></div>;
+  const products = latest.result?.products ?? [];
+  if (!cats.categories.length && !products.length) {
+    return <div className="container-page mt-14"><EmptyState icon={<PackageSearch aria-hidden />} title={t("home.emptyTitle")} description={t("home.emptyText")} /></div>;
+  }
   return (
     <>
-      <section id="categories" aria-labelledby="categories-title" className="container-page mt-14 sm:mt-20 scroll-mt-28">
-        <SectionHeading id="categories-title" title={t("home.categories")} link={{ label: t("home.allProducts"), href: "/products" }} />
-        <CategoryGrid categories={categories} />
-      </section>
-      <section aria-labelledby="featured-title" className="container-page mt-14 sm:mt-20">
-        <SectionHeading id="featured-title" title={t("home.featured")} link={{ label: t("home.viewAll"), href: "/products" }} />
-        <ProductGrid products={featured} />
-      </section>
-      <div className="mt-14 sm:mt-20"><PromoBand /></div>
-      {arrivals.length > 0 && (
-        <section aria-labelledby="arrivals-title" className="container-page mt-14 sm:mt-20">
-          <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="flex flex-col justify-center sm:col-span-2 lg:col-span-1 lg:pr-6">
-              <h2 id="arrivals-title" className="text-h2">{t("home.arrivals.title")}</h2>
-              <p className="text-body mt-2 text-ink-soft">{t("home.arrivals.text")}</p>
-              <Link href="/products?sort=newest" className="text-label mt-4 inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-700 hover:underline underline-offset-2">{t("home.arrivals.cta")} <ArrowRight aria-hidden className="size-4" /></Link>
-            </div>
-            {arrivals.map((p) => <ProductCard key={p.id} product={p} />)}
-          </div>
+      {cats.categories.length > 0 && (
+        <section id="categories" aria-labelledby="categories-title" className="container-page mt-14 sm:mt-20 scroll-mt-28">
+          <SectionHeading id="categories-title" title={t("home.categories")} link={{ label: t("home.allProducts"), href: "/products" }} />
+          <CategoryGrid categories={cats.categories} />
         </section>
       )}
+      {products.length > 0 && (
+        <section aria-labelledby="featured-title" className="container-page mt-14 sm:mt-20">
+          <SectionHeading id="featured-title" title={t("home.featured")} link={{ label: t("home.viewAll"), href: "/products?sort=newest" }} />
+          <ProductGrid products={products} />
+        </section>
+      )}
+      <div className="mt-14 sm:mt-20"><PromoBand /></div>
     </>
   );
 }

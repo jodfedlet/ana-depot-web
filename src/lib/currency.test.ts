@@ -7,14 +7,14 @@ import { snapshotFor, unitPriceFor, validatePricing } from "./catalog/pricing";
 import { seedCategories, seedProducts } from "./mock/catalog-seed";
 import { catalogStore } from "./stores/catalog-store";
 import { reservationStore } from "./stores/reservation-store";
+import { samplePickupSettings } from "./mock/pickup";
+import { snapshotFromSettings } from "./pickup/types";
 import { balances, computeTotals, paidTotals, paymentStatusOf } from "./reservations/workflow";
 import { type Reservation, reservationLineTotal } from "./reservations/types";
-import { resetDemoData, runReservationAction, submitReservation } from "./api/reservations";
+import { resetDemoData, runReservationAction } from "./api/reservations";
 import { saveProduct } from "./api/catalog-admin";
 import { sampleReservations } from "./mock/reservations";
 import { sumByCurrency } from "./money";
-import { queryCatalog } from "./catalog-query";
-import { stockOf } from "./catalog/stock";
 
 const rec = (slug: string) => seedProducts.find((p) => p.slug === slug)!;
 const category = (slug: string) => seedCategories.find((c) => c.slug === slug)!;
@@ -193,7 +193,19 @@ const line = (slug: string, quantity: number, variantIndex?: number) => {
   return { productId: l.productId, variantId: l.variantId, slug: l.slug, name: l.name, variantLabel: l.variantLabel, quantity: l.quantity, unitPrice: l.unitPrice, unit: l.unit, priceKind: l.priceKind, tierMinQty: unitPriceFor(l.pricing, l.quantity).tier?.minQty, image: l.image };
 };
 const customer = { firstName: "Test", lastName: "Client", dialCode: "+509", phone: "0000 1111" };
-const submit = (lines: ReturnType<typeof line>[]) => submitReservation({ lines, customer, locale: "fr", acknowledgedTerms: true });
+/**
+ * Administration demo only: builds a pending reservation in the demo store so the PAYMENT workflow (which the admin screens still use) can be tested.
+ * Customer submission itself is the API's job now (see the backend tests and api/map-reservation.test.ts).
+ */
+let seeded = 0;
+const submit = async (lines: ReturnType<typeof line>[]) => {
+  const now = "2026-11-15T09:00:00.000Z";
+  const id = `res-test-${++seeded}`;
+  const reference = `ANA-TEST${seeded}`;
+  const r: Reservation = { id, reference, locale: "fr", createdAt: now, status: "pending_review", customer, lines, totals: computeTotals(lines), payment: { method: "cash_at_pickup", status: "unpaid", records: [] }, pickup: snapshotFromSettings(samplePickupSettings, now), events: [{ id: `${id}-e1`, type: "submitted", at: now, actor: { kind: "customer" } }] };
+  reservationStore.set((prev) => [r, ...prev]);
+  return { ok: true as const, data: { reference } };
+};
 
 describe("reservations snapshot price, unit, tier and currency", () => {
   beforeEach(() => resetDemoData());
@@ -207,31 +219,12 @@ describe("reservations snapshot price, unit, tier and currency", () => {
     expect(r.lines.map(reservationLineTotal)).toEqual([{ amount: 560000, currency: "HTG" }, { amount: 4500, currency: "USD" }]);
     expect(r.lines.map((l) => l.unit)).toEqual(["set", "pair"]);
   });
-
-  it("stores the applied wholesale tier and price, and later price changes do not alter the reservation", async () => {
-    const res = await submit([line("baskets-sport", 12, 0)]); // USD tier: 12+ pairs
-    if (!res.ok) throw new Error(res.error);
-    const before = structuredClone(reservationStore.getSnapshot().find((x) => x.reference === res.data.reference)!);
-    expect(before.lines[0]).toMatchObject({ priceKind: "wholesale", tierMinQty: 12, unitPrice: { amount: 2300, currency: "USD" }, quantity: 12 });
-    expect(before.totals).toEqual([{ amount: 27600, currency: "USD" }]);
-    // the seller changes the product's price and currency afterwards
-    catalogStore.set((s) => ({ ...s, products: s.products.map((p) => (p.slug === "baskets-sport" ? { ...p, prices: [{ ...p.prices[0], currency: "HTG" as const, retail: 999900 }] } : p)) }));
-    const after = reservationStore.getSnapshot().find((x) => x.reference === res.data.reference)!;
-    expect(after.lines).toEqual(before.lines);
-    expect(after.totals).toEqual(before.totals);
-  });
-
-  it("refuses a line whose currency does not match the product's currency (no implicit conversion)", async () => {
-    const l = line("casserole-set", 1);
-    expect(await submit([{ ...l, unitPrice: { amount: l.unitPrice.amount, currency: "USD" } }])).toMatchObject({ ok: false, error: "currency_mismatch" });
-  });
 });
 
 describe("payments keep their currency and balances stay per currency", () => {
   beforeEach(() => resetDemoData());
   const mixedReady = async () => {
     const res = await submit([line("casserole-set", 1), line("sandales-cuir", 2, 0)]); // 2 800 HTG + 30 USD
-    if (!res.ok) throw new Error(res.error);
     const id = reservationStore.getSnapshot().find((x) => x.reference === res.data.reference)!.id;
     await runReservationAction(id, { type: "accept" }, staff);
     await runReservationAction(id, { type: "markReady", pickupConfirmed: true }, staff);
@@ -302,11 +295,6 @@ describe("ONE stock position shared by HTG and USD (mattress, large size: 3 unit
   const view = display("matelas-mousse");
   const large = view.variants.find((v) => v.availableQty === 3)!;
   const inCur = (c: string) => inCurrency(view, c)!;
-  const lineIn = (c: string, qty: number) => {
-    const l = buildCartLine(inCur(c), inCur(c).variants.find((v) => v.id === large.id), qty);
-    return { productId: l.productId, variantId: l.variantId, slug: l.slug, name: l.name, variantLabel: l.variantLabel, quantity: qty, unitPrice: l.unitPrice, unit: l.unit, priceKind: l.priceKind, image: l.image };
-  };
-
   it("the same item in HTG and in USD is two cart lines (two prices) whose quantities together cannot exceed the stock", () => {
     let lines = cartReducer([], { type: "add", line: buildCartLine(inCur("HTG"), inCur("HTG").variants.find((v) => v.id === large.id), 2) });
     lines = cartReducer(lines, { type: "add", line: buildCartLine(inCur("USD"), inCur("USD").variants.find((v) => v.id === large.id), 2) });
@@ -317,37 +305,5 @@ describe("ONE stock position shared by HTG and USD (mattress, large size: 3 unit
     const up = cartReducer(lines, { type: "setQuantity", key: lines[1].key, quantity: 3 });
     expect(up[1].quantity).toBe(1);
     expect(cartSubtotals(up).map((t) => t.currency)).toEqual(["HTG", "USD"]);
-  });
-
-  it("a reservation counts stock across currencies: 2 HTG + 2 USD of 3 is refused, 2 HTG + 1 USD is accepted", async () => {
-    expect(await submitReservation({ lines: [lineIn("HTG", 2), lineIn("USD", 2)], customer, locale: "fr", acknowledgedTerms: true })).toMatchObject({ ok: false, error: "insufficient_stock" });
-    const ok = await submitReservation({ lines: [lineIn("HTG", 2), lineIn("USD", 1)], customer, locale: "fr", acknowledgedTerms: true });
-    expect(ok.ok).toBe(true);
-    if (!ok.ok) return;
-    const r = reservationStore.getSnapshot().find((x) => x.reference === ok.data.reference)!;
-    expect(r.totals).toEqual([{ amount: 1640000, currency: "HTG" }, { amount: 11000, currency: "USD" }]);
-    // the stock is now fully reserved whichever currency the next customer picks
-    const rec2 = catalogStore.getSnapshot().products.find((p) => p.slug === "matelas-mousse")!;
-    expect(stockOf(rec2, reservationStore.getSnapshot(), large.id).available).toBe(0);
-    expect(await submitReservation({ lines: [lineIn("USD", 1)], customer, locale: "fr", acknowledgedTerms: true })).toMatchObject({ ok: false, error: "insufficient_stock" });
-  });
-
-  it("a line in a currency the product is not sold in is refused (casserole is HTG-only)", async () => {
-    const l = line("casserole-set", 1);
-    expect(await submit([{ ...l, unitPrice: { amount: 1000, currency: "USD" } }])).toMatchObject({ ok: false, error: "currency_mismatch" });
-  });
-});
-
-describe("catalog filter by currency with a two-currency product", () => {
-  const all = seedProducts.filter((p) => p.status === "active").map((p) => toProduct(p, category(p.categorySlug), "fr", []));
-  it("the mattress appears under both currencies with each price; HTG-only and USD-only products only under theirs", () => {
-    const names = (c: string) => queryCatalog(all, { currency: c, pageSize: 50 }).products.map((p) => [p.slug, p.price.currency]);
-    expect(names("HTG")).toContainEqual(["matelas-mousse", "HTG"]);
-    expect(names("USD")).toContainEqual(["matelas-mousse", "USD"]);
-    expect(names("HTG").map((x) => x[0])).not.toContain("baskets-sport");
-    expect(names("USD").map((x) => x[0])).not.toContain("casserole-set");
-    const counts = queryCatalog(all, { pageSize: 50 }).currencies;
-    expect(counts.map((c) => c.code)).toEqual(["HTG", "USD"]);
-    expect(counts[0].count + counts[1].count).toBeGreaterThan(all.length); // the mattress counts in both
   });
 });
