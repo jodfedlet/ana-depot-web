@@ -87,3 +87,28 @@ revalidation, tracking labels) and must be before launch.
 
 ## Open items
 See the final report of the phase and `../ana-depot-api/CLAUDE.md` (open business decisions: wholesale visibility, minimum order, units, hold period, cancellation policy, notification channel, payments policy, legal text).
+
+## Online payment (hosted Stripe Checkout)
+Contract: `../ana-depot-api/docs/payments-stripe.md`. The web side has no Stripe package, no Stripe.js, no publishable key and no card field: it only asks the backend for a Checkout Session
+and navigates the browser to the URL the backend returns. The backend is the only thing that decides whether a payment succeeded (signed webhook → ledger).
+
+| Piece | Where |
+|---|---|
+| API calls (`GET /store/payment-options`, `POST /reservations/{ref}/payments/checkout-session`, `POST …/payments/status`) | `src/lib/api/online-payments.ts` (+ hooks `online-payment-hooks.ts`) |
+| Pure rules (redirect-target check, polling schedule, per-currency split, reference shape) | `src/lib/payments/online.ts` |
+| "How do I pay?" panel (tracking + confirmation pages) | `src/features/payments/online-pay-panel.tsx` |
+| Return pages | `/[locale]/payment/return?reference=…&attempt=…`, `/[locale]/payment/cancelled?reference=…` (noindex) |
+| Staff | `features/admin/payment-attempts.tsx`, payment panel and payments list (method badge + filter) |
+
+Behaviour:
+* Pay at pickup is always the first, default way and needs no card. The reservation flow is unchanged.
+* The backend accepts payments only while a reservation is READY_FOR_PICKUP, so before that the online option is only *announced* (review step, confirmation page); the button appears once ready.
+* One button per currency still owed, only for currencies listed by `payment-options` (HTG is offered only if the merchant account can really process it). Nothing is combined or converted.
+* The session is created on click only. The `Idempotency-Key` is reused for an uncertain retry of the same reference + currency and renewed after any definite answer.
+* Before `window.location.assign`, the URL must be `https` on `stripe.com` or a subdomain (defence in depth).
+* The return page asks the backend (guest: reference + the phone remembered for this tab, otherwise a small phone form; signed-in: token) and shows pending / processing / confirmed / failed / expired.
+  It polls at 2 s, 4 s, 8 s then 15 s (about two minutes), stops at a final answer, then offers "Vérifier à nouveau".
+* Stripe off or no eligible currency ⇒ no online option anywhere; reservations and pay-at-pickup are unaffected.
+* Static copy that used to say "no online payment" now says "you are not asked to pay now / pay at pickup", which stays true with Stripe on.
+
+Verification: `npm run e2e:stripe` (e2e/storefront/stripe.mjs) is **MOCKED** (Playwright route handlers replace the API and the Stripe page): it proves what the web side shows and requests, not the backend nor Stripe.

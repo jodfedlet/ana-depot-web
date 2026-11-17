@@ -14,6 +14,7 @@
     "e2e:unavailable": "node e2e/unavailable/run.mjs",
     "e2e:storefront": "node e2e/storefront/run.mjs",
     "e2e:admin": "node e2e/admin/run.mjs",
+    "e2e:stripe": "node e2e/storefront/stripe.mjs",
     "e2e:pwa": "node e2e/pwa/run.mjs"
   },
   "dependencies": {

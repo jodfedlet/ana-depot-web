@@ -23,3 +23,7 @@ export SUPABASE_LOCAL_SECRET_KEY=...   # optional, LOCAL stack only: enables the
 npm run e2e:storefront
 ```
 Screenshots go to `SHOTS_DIR` (default `e2e/storefront/screenshots`, git-ignored). The suite restores its own baseline stock at the start.
+
+## Online payment (`npm run e2e:stripe`)
+`e2e/storefront/stripe.mjs` needs only a running web build (`WEB_URL`, default `http://127.0.0.1:3105`) and no credentials. Every check is **MOCKED**: the API and the Stripe-hosted page are replaced by Playwright
+route handlers. It is not evidence about the real backend or about Stripe. It includes real waits (about 90 s in total) because the polling schedule is real.
