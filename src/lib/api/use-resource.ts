@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useState } from "react";
 
 export interface Resource<T> {
   /** The latest successful result. It stays available (stale) while the next one loads, so lists do not flash empty between pages. */
@@ -20,22 +20,21 @@ interface Slot<T> { key: string; tick: number; data?: T; error?: unknown; failed
  * response for an old key can never overwrite a newer one. State is only set from the promise callbacks, never synchronously in the effect.
  */
 export function useApiResource<T>(key: string | null, load: (signal: AbortSignal) => Promise<T>, initial?: T): Resource<T> {
-  // `initial` is the answer for the FIRST `key`, already fetched on the server (the page was server-rendered with it): it is shown at once, no loading state and
-  // no second request. Any later key, or `reload()`, loads normally.
+  // `initial` is the answer for the FIRST `key`, already fetched on the server (the page was server-rendered with it, from a cache that can be up to a minute old): it is
+  // shown at once with no loading state, and is then REVALIDATED in the background so a price or stock change is never left on screen. A failed background revalidation keeps
+  // the server's answer instead of replacing the page with an error. Any later key, or `reload()`, loads normally.
   const [seed] = useState(() => (initial !== undefined && key !== null ? { key, data: initial } : null));
   const [slot, setSlot] = useState<Slot<T> | null>(() => (seed ? { key: seed.key, tick: 0, data: seed.data, failed: false } : null));
   const [tick, setTick] = useState(0);
-  const seedPending = useRef(seed !== null);
   const run = useEffectEvent((signal: AbortSignal) => load(signal));
 
   useEffect(() => {
     if (key === null) return;
-    if (seedPending.current && seed?.key === key && tick === 0) { seedPending.current = false; return; }
-    seedPending.current = false;
+    const silent = seed !== null && seed.key === key && tick === 0;
     const controller = new AbortController();
     run(controller.signal).then(
       (data) => { if (!controller.signal.aborted) setSlot({ key, tick, data, failed: false }); },
-      (error: unknown) => { if (!controller.signal.aborted) setSlot((prev) => ({ key, tick, data: prev?.data, error, failed: true })); },
+      (error: unknown) => { if (!controller.signal.aborted && !silent) setSlot((prev) => ({ key, tick, data: prev?.data, error, failed: true })); },
     );
     return () => controller.abort();
   }, [key, tick, seed]);

@@ -2,7 +2,7 @@
  * STOREFRONT browser suite — LOCAL STACK (real Spring Boot API + local Supabase + MinIO), not mocks and not a hosted project.
  * Prerequisites and how to run: e2e/storefront/README.md. Seed data first (e2e/storefront/seed.py).
  */
-import { admin, adminProduct, bodyText, check, env, key, launch, mailFor, linkOf, money, newPage, overflow, pageErrors, productBySlug, results, section, settle, shot, sleep, uniqPhone } from "./lib.mjs";
+import { admin, adminProduct, bodyText, check, env, key, launch, mailFor, linkOf, money, newPage, overflow, pageErrors, productBySlug, publicApi, results, section, settle, shot, sleep, uniqPhone } from "./lib.mjs";
 
 const browser = await launch();
 const run = async (name, fn) => { try { await fn(); } catch (e) { check(`${name}: script`, false, String(e.message).split("\n")[0]); } };
@@ -41,7 +41,9 @@ await run("browse", async () => {
   await settle(page);
   const t = await bodyText(page);
   check("home: categories come from the API", ["Maison", "Vêtements", "Outils"].every((c) => t.includes(c)));
-  check("home: latest products come from the API, with price and currency", t.includes("Article de test 14") && t.includes(money(114, "HTG")) && /Derniers produits/.test(t));
+  const newest = (await publicApi("/products?sort=newest&size=8")).items[0];
+  const newestPrice = newest.prices[0];
+  check("home: latest products come from the API, with price and currency", t.includes(newest.name.fr) && t.includes(money(Number(newestPrice.salePrice ?? newestPrice.retailPrice), newestPrice.currency)) && /Derniers produits/.test(t), newest.name.fr);
   check("home: general-merchandise positioning is kept (no furniture-only copy)", t.includes("Tout ce qu'il vous faut"));
   check("home: pickup address in the footer is the one from the API", t.includes("Magasin de vérification (données de test)"));
   check("home: no 'demo/sample store' wording on the live storefront", !/fictifs|exemple|démo/i.test(t.replace(/Magasin de vérification \(données de test\)/g, "")));
@@ -49,18 +51,27 @@ await run("browse", async () => {
   const ls = await page.evaluate(() => Object.keys(localStorage));
   check("no demo business data in localStorage after browsing", !ls.some((k) => /ana\.demo\./.test(k)), ls.join(","));
   await shot(page, "01-home-1280");
-  await page.goto(`${env.WEB}/fr/products?category=outils`);
+  // a product whose image object really exists in the store (other suites may have deleted seeded objects)
+  let withImage = null;
+  for (const p of (await publicApi("/products?size=40")).items) {
+    const url = p.images?.[0]?.url;
+    if (url && (await fetch(url, { method: "HEAD" }).catch(() => ({ ok: false }))).ok) { withImage = p; break; }
+  }
+  await page.goto(`${env.WEB}/fr/products/${withImage?.slug}`);
   await settle(page);
   const imgs = await page.evaluate(() => [...document.images].filter((i) => i.src.includes(":9000")).map((i) => ({ ok: i.complete && i.naturalWidth > 0, src: i.src })));
-  check("product images load from the configured public asset URL (MinIO standing in for R2)", imgs.length >= 1 && imgs.every((i) => i.ok), `${imgs.length} images`);
+  check("product images load from the configured public asset URL (MinIO standing in for R2)", withImage !== null && imgs.length >= 1 && imgs.every((i) => i.ok), `${imgs.length} images`);
+  await page.goto(`${env.WEB}/fr/products`);
+  await settle(page);
   await page.getByRole("link", { name: "Tous les produits" }).first().click();
   await settle(page);
   const list = await bodyText(page);
-  check("listing: pagination from the API (19 products, 12 per page)", /19 produits/.test(list) && (await page.getByRole("navigation", { name: /Pagination/i }).count()) > 0);
+  const totalProducts = (await publicApi("/products?size=1")).totalItems;
+  check(`listing: pagination from the API (${totalProducts} products, 12 per page)`, new RegExp(`${totalProducts} produits`).test(list) && (await page.getByRole("navigation", { name: /Pagination/i }).count()) > 0);
   await shot(page, "02-products-1280");
   await page.goto(`${env.WEB}/fr/products?page=2`);
   await settle(page);
-  check("listing: page 2 shows the remaining products", (await page.locator("article").count()) === 7, String(await page.locator("article").count()));
+  check("listing: page 2 shows the remaining products", (await page.locator("article").count()) === Math.min(12, totalProducts - 12), String(await page.locator("article").count()));
 });
 
 // ================= 2. search =================
@@ -474,9 +485,15 @@ await run("pickup-disabled", async () => {
 await run("errors", async () => {
   section("13. Error handling: network, 429, 5xx, timeout (requests faked in the browser; the app's reaction is what is tested)");
   const { page } = await newPage(browser);
+  // The plain listing is rendered on the SERVER (its first answer is in the HTML), so a browser-side failure must not blank it...
   await page.route("**/api/v1/products**", (r) => r.abort("failed"));
   await page.goto(`${env.WEB}/fr/products`);
   await settle(page);
+  check("server-rendered listing stays usable when the browser cannot reach the API", (await page.locator("article").count()) > 0 && !/Connexion impossible/.test(await bodyText(page)));
+  // ...while a filtered listing is loaded by the browser, which is where the error states are exercised.
+  await page.goto(`${env.WEB}/fr/products?stock=1`);
+  // the client retries an idempotent GET a few times with backoff before giving up: wait for the final message
+  await page.getByText("Connexion impossible").first().waitFor({ timeout: 20000 }).catch(() => {});
   let t = await bodyText(page);
   check("network failure: translated message and a retry button", /Connexion impossible/.test(t) && (await page.getByRole("button", { name: "Réessayer" }).count()) > 0);
   await page.unroute("**/api/v1/products**");
@@ -484,12 +501,12 @@ await run("errors", async () => {
   await settle(page);
   check("retry recovers once the network is back", (await page.locator("article").count()) > 0);
   await page.route("**/api/v1/products**", (r) => r.fulfill({ status: 429, headers: { "Retry-After": "30", "Content-Type": "application/problem+json" }, body: JSON.stringify({ status: 429, code: "rate_limited", detail: "Too many requests" }) }));
-  await page.goto(`${env.WEB}/fr/products`); await settle(page);
+  await page.goto(`${env.WEB}/fr/products?stock=1`); await settle(page);
   t = await bodyText(page);
   check("429: translated 'too many requests' message", /Trop de demandes/.test(t) && !/rate_limited|Too many/.test(t));
   await page.unroute("**/api/v1/products**");
   await page.route("**/api/v1/products**", (r) => r.fulfill({ status: 500, headers: { "Content-Type": "application/problem+json" }, body: JSON.stringify({ status: 500, code: "internal_error", detail: "java.lang.NullPointerException at com.anadepot.Secret.line(42)" }) }));
-  await page.goto(`${env.WEB}/fr/products`); await settle(page);
+  await page.goto(`${env.WEB}/fr/products?stock=1`); await settle(page);
   t = await bodyText(page);
   check("5xx: generic message, the stack trace/internal detail is never shown", /Une erreur est survenue de notre côté/.test(t) && !/NullPointer|anadepot|Secret/.test(t));
   await shot(page, "14-error-state-1280");

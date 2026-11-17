@@ -41,7 +41,8 @@ export const launch = () => chromium.launch({ executablePath: chromiumPath(), ar
 
 export const pageErrors = [];
 export async function newPage(browser, { width = 1280, height = 900 } = {}) {
-  const ctx = await browser.newContext({ viewport: { width, height } });
+  // the app's service worker (PWA) would answer API calls itself, which `page.route` cannot see: the suite fakes network failures, so it runs without one
+  const ctx = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => pageErrors.push(`pageerror ${page.url()}: ${e.message}`));
   page.on("console", (m) => {
