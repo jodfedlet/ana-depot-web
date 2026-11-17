@@ -36,6 +36,15 @@ When staff change the catalog, `lib/api/admin/storefront-refresh.ts` calls `POST
 ## Structured data (`lib/seo/jsonld.ts`, tested)
 Organization (name from `siteConfig`, URL), WebSite (+ SearchAction pointing at the real search page), BreadcrumbList, Product + Offer. One `Offer` per currency with its own `priceCurrency` (HTG and USD are never combined; the sale price is the offer price); `AggregateOffer` (low/high) when variants carry their own price in a currency; availability only from the API. **Not emitted, on purpose:** ratings, reviews, shipping, return policy, address, phone, opening hours, wholesale tiers (not part of schema.org offers). The one `dangerouslySetInnerHTML` of the app is `components/seo/json-ld.tsx`; the serializer escapes `<`, `>`, `&`.
 
+## Measured (Lighthouse 12, mobile emulation, simulated slow 4G, production build, local stack)
+Before = the same app without server rendering; after = this work. 5 interleaved runs each, medians (the dev machine was heavily loaded by other builds, so TBT is very noisy: treat it as not significantly changed).
+| Page | Perf score | LCP | FCP | TBT | CLS | SEO score |
+|---|---|---|---|---|---|---|
+| Home | 67 -> 72 | 2.77 s -> 2.61 s | 1.10 s -> 1.13 s | 2.3 s -> 1.1 s (noisy) | 0 -> 0 | 92 -> 100 |
+| Listing | 50 -> 67 | **5.05 s -> 2.68 s** | 1.35 s -> 1.36 s | 2.4 s -> 3.5 s (noisy) | 0.044 -> 0 | 100 -> 100 |
+| Product | 66 -> 66 | 2.64 s -> 3.21 s (within run-to-run spread) | 1.20 s -> 1.17 s | 1.3 s -> 1.6 s (noisy) | 0 -> 0 | 100 -> 100 |
+The first baseline run (3 runs, quieter machine) had measured a product-page CLS of 0.73 (the footer jumped when the skeleton was replaced by content); the interleaved re-measurement did not reproduce it, so no CLS gain is claimed there. What is structural, not statistical: the product, listing and home HTML now contain the content (no skeleton -> content swap), the SEO audit passes (canonical, meta description, crawlable links), and JavaScript is unchanged (~285 KB transferred; the largest chunk is the Supabase client, loaded on every page, a candidate for a later split). Total blocking time is dominated by hydration of that bundle: reducing it needs bundle work (lazy-loading the auth client), not SEO work, and was not attempted here.
+
 ## Not covered / open
 - Real search-engine indexing, Search Console, hosted deployment and CDN behaviour were not verified (local stack only).
 - `lastmod`, product reviews and an organization logo/address need data the API/owner does not provide yet.
