@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Geist } from "next/font/google";
 import { notFound } from "next/navigation";
+import { PwaRuntime } from "@/features/pwa/pwa-runtime";
 import { ToastProvider } from "@/components/ui/toast";
 import { type Locale, isLocale, locales } from "@/i18n/config";
 import { I18nProvider } from "@/i18n/provider";
@@ -36,6 +37,7 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[lo
           >
             {t("common.skipToContent")}
           </a>
+          <PwaRuntime />
           <ToastProvider>{children}</ToastProvider>
         </I18nProvider>
       </body>

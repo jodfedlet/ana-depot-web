@@ -17,6 +17,7 @@ import { unitPriceFor } from "@/lib/catalog/pricing";
 import { useCartCheck } from "@/lib/api/cart-check";
 import { formatMoney } from "@/lib/money";
 import { useCart } from "@/lib/stores/cart-store";
+import { useOnline } from "@/lib/pwa/store";
 
 export function CartView() {
   const t = useT();
@@ -25,6 +26,7 @@ export function CartView() {
   const cart = useCart();
   const toast = useToast();
   const check = useCartCheck(cart.lines);
+  const online = useOnline();
   const issues = check.issues;
 
   if (!cart.ready) return <CartSkeleton />;
@@ -46,7 +48,8 @@ export function CartView() {
       <div>
         {cart.mixedCurrency && <Alert tone="info" title={t("cart.mixedTitle")} className="mb-4">{t("cart.mixedText")}</Alert>}
         {check.loading && !check.checked && <p role="status" className="text-caption mb-4 text-ink-soft">{t("cart.checking")}</p>}
-        {check.error != null && <Alert tone="info" live="polite" className="mb-4">{t("cart.checkFailed")}</Alert>}
+        {!online && <Alert tone="warning" live="polite" className="mb-4">{t("pwa.cartOffline")}</Alert>}
+        {online && check.error != null && <Alert tone="info" live="polite" className="mb-4">{t("cart.checkFailed")}</Alert>}
         {shortage && <Alert tone="warning" live="polite" title={t("cart.issuesTitle")} className="mb-4">{t("cart.issuesText")}</Alert>}
         {changed && (
           <Alert tone="warning" live="polite" title={t("cart.changedTitle")} className="mb-4">
@@ -98,7 +101,8 @@ export function CartView() {
         <h2 id="summary-title" className="text-h3 mb-4">{t("cart.summary")}</h2>
         {cart.subtotals.length > 0 && <MoneyRows label={t("cart.subtotal")} totals={cart.subtotals} className="text-label font-normal text-ink-soft" valueClassName="text-h3 text-ink" />}
         <p className="text-caption mt-3 text-ink-muted">{t("cart.note")}</p>
-        <ButtonLink href="/reserve" size="lg" full className="mt-5" aria-disabled={blocked || undefined} tabIndex={blocked ? -1 : undefined}>{t("cart.reserve")}</ButtonLink>
+        <ButtonLink href="/reserve" size="lg" full className="mt-5" aria-disabled={blocked || !online || undefined} tabIndex={blocked || !online ? -1 : undefined}>{t("cart.reserve")}</ButtonLink>
+        {!online && <p className="text-caption mt-2 text-center font-medium text-warning-fg">{t("pwa.reserveOffline")}</p>}
         <p className="text-caption mt-3 text-center font-medium text-ink">{t("cart.noOnlinePayment")}</p>
         <p className="text-caption mt-1 text-center text-ink-soft">{t("cart.guest")}</p>
       </aside>

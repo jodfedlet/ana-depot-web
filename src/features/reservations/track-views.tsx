@@ -19,6 +19,7 @@ import { toCustomerReservation } from "@/lib/api/map-reservation";
 import { lookupReservation } from "@/lib/api/public";
 import { useTrackedReservation } from "@/lib/api/reservation-hooks";
 import { useSession } from "@/lib/auth/use-session";
+import { useOnline } from "@/lib/pwa/store";
 import { normalizeReference, rememberAccess } from "@/lib/reservations/access-store";
 import { focusFirstInvalid, isBlank } from "@/lib/validation";
 import { PaymentBalances, PaymentStatusBadge, PickupInfoFor, ReservationStatusBadge, SectionCard, Timeline, orderLinesOf, useCustomerTimeline } from "./shared";
@@ -28,6 +29,7 @@ export function LookupForm() {
   const t = useT();
   const router = useLocaleRouter();
   const { session } = useSession();
+  const online = useOnline();
   const formRef = useRef<HTMLFormElement>(null);
   const [reference, setReference] = useState("");
   const [phone, setPhone] = useState("");
@@ -69,7 +71,8 @@ export function LookupForm() {
         {failure && <Alert tone="danger" live="assertive" title={t("track.lookup.errorTitle")}>{failure}</Alert>}
         <TextField label={t("track.lookup.reference")} hint={t("track.lookup.referenceHint")} autoComplete="off" autoCapitalize="characters" spellCheck={false} value={reference} onChange={(e) => { setReference(e.target.value); setErrors((x) => ({ ...x, reference: undefined })); }} error={errors.reference} />
         <TextField label={t("track.lookup.phone")} type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setErrors((x) => ({ ...x, phone: undefined })); }} error={errors.phone} />
-        <Button type="submit" size="lg" full loading={loading}>{t("track.lookup.submit")}</Button>
+        {!online && <Alert tone="warning" live="polite">{t("pwa.lookupOffline")}</Alert>}
+        <Button type="submit" size="lg" full loading={loading} disabled={!online}>{t("track.lookup.submit")}</Button>
         <p className="text-caption flex gap-2 text-ink-muted"><Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />{t("track.lookup.privacy")}</p>
       </form>
     </div>

@@ -24,6 +24,7 @@ import { rememberAccess, rememberSubmitted } from "@/lib/reservations/access-sto
 import { clearPending, keyFor } from "@/lib/reservations/pending-submit";
 import { useCart } from "@/lib/stores/cart-store";
 import { useSession } from "@/lib/auth/use-session";
+import { useOnline } from "@/lib/pwa/store";
 import { type Errors, focusFirstInvalid, isBlank, isValidEmail, isValidPhone } from "@/lib/validation";
 import { PickupInfo, SectionCard } from "./shared";
 import { Stepper } from "./stepper";
@@ -39,6 +40,7 @@ export function ReserveFlow() {
   const lt = useLText();
   const router = useLocaleRouter();
   const cart = useCart();
+  const online = useOnline();
   const { session } = useSession();
   const pickup = usePickupView();
   const check = useCartCheck(cart.lines);
@@ -253,9 +255,10 @@ export function ReserveFlow() {
               {Object.keys(check.issues).length > 0 && <Alert tone="warning" live="polite" title={t("cart.issuesTitle")}>{t("reserve.review.cartChanged")} <Link href="/cart" className="font-semibold underline underline-offset-2">{t("reserve.review.backToCart")}</Link></Alert>}
               {check.error != null && <Alert tone="info" live="polite">{t("cart.checkFailed")}</Alert>}
               {submitError && <Alert tone="danger" live="assertive" title={t("reserve.review.errorTitle")}>{submitError}{uncertain && <span className="mt-1 block">{t("reserve.review.uncertain")}</span>}</Alert>}
+              {!online && <Alert tone="warning" live="polite">{t("pwa.reserveOffline")}</Alert>}
               {unavailable && view && <Alert tone="warning" live="polite" title={t("reserve.pickup.disabledTitle")}>{view.status === "disabled" ? lt(view.message) || t("pickup.unavailableDefault") : t("reserve.pickup.notConfiguredText")}</Alert>}
               <div className="flex flex-wrap gap-3">
-                <Button size="lg" loading={submitting} disabled={unavailable || termsMissing || Object.keys(check.issues).length > 0} onClick={submit}>{submitting ? t("reserve.review.submitting") : uncertain ? t("reserve.review.retry") : t("reserve.review.submit")}</Button>
+                <Button size="lg" loading={submitting} disabled={!online || unavailable || termsMissing || Object.keys(check.issues).length > 0} onClick={submit}>{submitting ? t("reserve.review.submitting") : uncertain ? t("reserve.review.retry") : t("reserve.review.submit")}</Button>
                 <Button variant="ghost" size="lg" disabled={submitting} onClick={() => setStep("pickup")}>{t("common.back")}</Button>
               </div>
             </div>

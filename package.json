@@ -13,7 +13,8 @@
     "e2e:stub": "node e2e/stub-supabase/run.mjs",
     "e2e:unavailable": "node e2e/unavailable/run.mjs",
     "e2e:storefront": "node e2e/storefront/run.mjs",
-    "e2e:admin": "node e2e/admin/run.mjs"
+    "e2e:admin": "node e2e/admin/run.mjs",
+    "e2e:pwa": "node e2e/pwa/run.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
