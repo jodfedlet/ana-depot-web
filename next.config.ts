@@ -29,7 +29,11 @@ const legacyAuthPaths: Record<string, string> = {
 
 securityWarnings().forEach((w) => console.warn(`[security] ${w}`));
 
+/** Names the service worker's caches (src/app/sw.js/route.ts): one value per build, so a new build replaces the old caches. Pin with PWA_VERSION. */
+const pwaVersion = process.env.PWA_VERSION || Date.now().toString(36);
+
 const nextConfig: NextConfig = {
+  env: { PWA_VERSION: pwaVersion },
   async headers() {
     return securityHeaders();
   },
