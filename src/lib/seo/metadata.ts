@@ -50,4 +50,4 @@ export function pageMetadata(seo: PageSeo, origin: string | null = siteOrigin())
 export const noindexMetadata = (title: string): Metadata => ({ title, robots: { index: false, follow: false } });
 
 /** The path prefixes (locale-less) that robots.txt keeps crawlers out of. These pages also carry `noindex`. */
-export const PRIVATE_PATHS = ["/admin", "/account", "/auth", "/reserve", "/reservations", "/cart", "/search"] as const;
+export const PRIVATE_PATHS = ["/admin", "/account", "/auth", "/reserve", "/reservations", "/cart", "/search", "/payment"] as const;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Product } from "@/lib/catalog-types";
 import { breadcrumbJsonLd, decimalPrice, jsonLdString, organizationJsonLd, productJsonLd, productOffers, websiteJsonLd } from "./jsonld";
-import { pageMetadata } from "./metadata";
+import { PRIVATE_PATHS, pageMetadata } from "./metadata";
 import { absoluteUrl, languageAlternates, localizedPath, seoWarnings, siteOrigin } from "./site";
 import { buildSitemap } from "./sitemap";
 import { plainSnippet } from "./text";
@@ -123,6 +123,12 @@ describe("JSON-LD", () => {
   });
 });
 
+describe("private paths (robots.txt)", () => {
+  it("keeps account, auth, reservation, cart, search and payment pages out of crawling", () => {
+    for (const p of ["/admin", "/account", "/auth", "/reserve", "/reservations", "/cart", "/search", "/payment"]) expect(PRIVATE_PATHS).toContain(p);
+  });
+});
+
 describe("sitemap", () => {
   const source = { categories: [{ slug: "maison" }], products: [{ slug: "tee-shirt" }] };
   it("lists public pages in both languages with hreflang alternates and no private pages", () => {
@@ -132,7 +138,7 @@ describe("sitemap", () => {
     expect(urls).toContain(`${ORIGIN}/ht/products/tee-shirt`);
     expect(urls).toContain(`${ORIGIN}/fr/categories/maison`);
     expect(urls).toContain(`${ORIGIN}/fr/info/how-it-works`);
-    expect(urls.some((u) => /\/(admin|account|auth|cart|search|reserve|reservations)(\/|$)/.test(u))).toBe(false);
+    expect(urls.some((u) => /\/(admin|account|auth|cart|search|reserve|reservations|payment)(\/|$)/.test(u))).toBe(false);
     expect(urls.some((u) => /\/info\/(terms|privacy|returns)$/.test(u))).toBe(false);
     expect(urls.some((u) => u.includes("?"))).toBe(false);
     const product = entries.find((e) => e.url === `${ORIGIN}/fr/products/tee-shirt`);
