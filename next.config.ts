@@ -2,6 +2,7 @@ import path from "node:path";
 import type { NextConfig } from "next";
 import { validateSupabaseConfig } from "./src/lib/auth/config";
 import { securityHeaders, securityWarnings } from "./src/lib/security/headers";
+import { seoWarnings } from "./src/lib/seo/site";
 
 /**
  * NEXT_PUBLIC_* values are inlined into the browser bundle at BUILD time, so a secret placed there would ship to every visitor even though the
@@ -28,6 +29,7 @@ const legacyAuthPaths: Record<string, string> = {
 };
 
 securityWarnings().forEach((w) => console.warn(`[security] ${w}`));
+seoWarnings().forEach((w) => console.warn(`[seo] ${w}`));
 
 /** Names the service worker's caches (src/app/sw.js/route.ts): one value per build, so a new build replaces the old caches. Pin with PWA_VERSION. */
 const pwaVersion = process.env.PWA_VERSION || Date.now().toString(36);
