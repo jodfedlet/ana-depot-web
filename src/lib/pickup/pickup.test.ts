@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { samplePickupSettings } from "../mock/pickup";
+import type { PickupSettingsDto } from "../api/admin/dto";
+import { toSettings } from "../admin/pickup-form";
 import { pickupAvailability, sameAddress } from "./types";
 import { changedGroups, validatePickupSettings } from "./validate";
 
-const clone = () => structuredClone(samplePickupSettings);
+/** A complete configuration shaped like the API's (MOCKED data: validation rules only, nothing about the real store). */
+const dto: PickupSettingsDto = {
+  enabled: true, unavailableMessage: { fr: "", ht: "" }, holdPeriodDays: null, version: 1, updatedAt: null, updatedBy: null,
+  location: { storeName: "Test store", addressLine: "1 test street", city: "Test city", region: "R", country: "HT", phone: "+509 0000 0000", email: "t@example.test",
+    schedule: [1, 2, 3, 4, 5].map((day) => ({ day, open: true, from: "09:00", to: "17:00" })), additionalLocationInfo: { fr: "", ht: "" }, closureInfo: { fr: "", ht: "" } },
+  instructions: { general: { fr: "x", ht: "x" }, contact: { fr: "", ht: "" }, accepted: { fr: "", ht: "" }, ready: { fr: "", ht: "" }, policy: { fr: "", ht: "" } },
+};
+const clone = () => toSettings(dto);
 
 describe("pickup availability", () => {
   it("is available only when enabled and essentials are present", () => {
@@ -16,7 +24,7 @@ describe("pickup availability", () => {
 });
 
 describe("pickup validation", () => {
-  it("accepts the sample configuration", () => {
+  it("accepts a complete configuration", () => {
     expect(validatePickupSettings(clone())).toEqual({});
   });
   it("requires essentials while enabled but not while disabled", () => {

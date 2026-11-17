@@ -50,37 +50,6 @@ export interface PickupSettings {
   updatedBy: string;
 }
 
-/**
- * Copy of the location + instructions as communicated to a customer. Reservations keep their
- * snapshot forever: changing the global settings never rewrites it.
- */
-export interface PickupSnapshot {
-  location: PickupLocation;
-  instructions: PickupInstructions;
-  capturedAt: string;
-  /** "default" = copied from global settings; "override" = changed for this reservation by staff. */
-  origin: "default" | "override";
-}
-
-export interface PickupChange {
-  id: string;
-  at: string;
-  by: string;
-  before: PickupSettings;
-  after: PickupSettings;
-  /** Field group names that changed (e.g. "address", "schedule", "enabled"). */
-  changed: string[];
-}
-
-export function snapshotFromSettings(settings: PickupSettings, now: string): PickupSnapshot {
-  return {
-    location: structuredClone(settings.location),
-    instructions: structuredClone(settings.instructions),
-    capturedAt: now,
-    origin: "default",
-  };
-}
-
 /** Pickup can accept new reservations only when enabled AND the business has completed the essentials. */
 export type PickupAvailability = "available" | "disabled" | "not_configured";
 export function pickupAvailability(s: PickupSettings): PickupAvailability {

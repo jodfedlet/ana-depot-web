@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, ClipboardList, MapPin, PackagePlus, Tags, Users } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { AdminErrorState } from "@/components/ui/admin-error";
 import { Badge } from "@/components/ui/badge";
@@ -87,21 +87,6 @@ export function Dashboard() {
               <p className="text-caption text-ink-soft">{t(`status.${s}`)}</p>
               <p className="mt-1 font-display text-2xl tabular-nums">{overview.reservationsCreated[s.toUpperCase()] ?? 0}</p>
             </li>
-          ))}
-        </ul>
-      </section>
-
-      <section aria-labelledby="quick-title">
-        <h2 id="quick-title" className="text-h3 mb-3">{t("adminDash.quick")}</h2>
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-          {([
-            { href: "/admin/products/new", icon: PackagePlus, label: t("adminDash.quickProduct") },
-            { href: "/admin/inventory", icon: Boxes, label: t("adminDash.quickStock") },
-            { href: "/admin/reservations?status=PENDING_REVIEW", icon: ClipboardList, label: t("adminDash.quickPending") },
-            { href: "/admin/categories", icon: Tags, label: t("adminDash.quickCategories") },
-            { href: "/admin/customers", icon: Users, label: t("adminDash.quickCustomers") },
-          ]).map(({ href, icon: Icon, label }) => (
-            <li key={href}><Link href={href} className="text-label flex min-h-14 items-center gap-3 rounded-card border border-line bg-surface px-4 py-3 font-semibold hover:border-line-strong"><Icon aria-hidden className="size-5 shrink-0 text-brand-700" />{label}</Link></li>
           ))}
         </ul>
       </section>

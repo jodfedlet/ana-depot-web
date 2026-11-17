@@ -33,6 +33,9 @@ export const adminLive: typeof frAdminLive = {
     emptyFiltered: "Pa gen rezilta pou filtè sa yo.",
   },
   adminDash: {
+    showEmpty: "Montre jou ki pa gen vant yo tou",
+    hideEmpty: "Kache jou ki pa gen vant yo",
+    noSalesDays: "Pa gen vant retire pandan peryòd sa a.",
     period: "Peryòd",
     from: "Soti",
     to: "Rive",
@@ -192,6 +195,10 @@ export const adminLive: typeof frAdminLive = {
     chooseCategory: "Chwazi yon kategori pou kòmanse: li detèmine karakteristik ak varyant yo.",
   },
   adminInv: {
+    howTo: "Kijan pou li chif sa yo",
+    explainShort: "Disponib = an stòk − rezève.",
+    states: "Tout eta",
+    onHandShort: "An stòk",
     shared: "Stòk la pataje ant HTG ak USD: yon pri nan yon monnen pa kreye yon dezyèm stòk.",
     sortAvailable: "Disponib, soti nan pi ba rive nan pi wo",
     clearProduct: "Wè tout pwodwi yo",
@@ -213,6 +220,9 @@ export const adminLive: typeof frAdminLive = {
     initial: "Kantite inisyal",
   },
   adminRes: {
+    open: "Louvri",
+    moreFilters: "Plis filtè",
+    quickAll: "Tout",
     notFoundText: "Rezèvasyon sa a pa egziste.",
     snapshotNote: "Non, pri ak inite jan yo te ye lè yo te fè rezèvasyon an: yo pa chanje lè katalòg la chanje.",
     priceKind: { RETAIL: "Pri nòmal", SALE: "Pri pwomosyon", WHOLESALE: "Pri an gwo (depi {qty})" },

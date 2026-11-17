@@ -2,10 +2,6 @@ import type { adminOps as frAdminOps } from "../fr/admin-ops";
 
 /** Must satisfy the French shape. Needs native review. */
 export const adminOps: typeof frAdminOps = {
-  connection: {
-    title: "Pa konekte ak sèvè a",
-    text: "Seksyon sa a itilize done egzanp ki sere sèlman nan navigatè sa a. Chanjman yo pa pataje, yo pa anrejistre sou sèvè a epi yo pa konsène okenn vrè kliyan. N ap ajoute koneksyon ak sèvè a modil pa modil.",
-  },
   dashboardOps: {
     quickTitle: "Aksyon rapid",
     createProduct: "Kreye yon pwodwi",

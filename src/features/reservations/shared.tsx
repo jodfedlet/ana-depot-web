@@ -13,7 +13,7 @@ import { formatMoney, type Money } from "@/lib/money";
 import type { PickupInstructions, PickupLocation } from "@/lib/pickup/types";
 import type { DisplayLine } from "@/components/ui/order-lines";
 import type { CustomerEvent, CustomerReservation } from "@/lib/reservations/customer-view";
-import type { PaymentStatus, ReservationEvent, ReservationStatus } from "@/lib/reservations/types";
+import type { EventType, PaymentStatus, ReservationStatus } from "@/lib/reservations/types";
 
 const statusTone: Record<ReservationStatus, Tone> = {
   pending_review: "warning",
@@ -118,14 +118,14 @@ export interface TimelineEntry {
   tone: "neutral" | "success" | "danger" | "warning" | "info";
 }
 
-function titleFor(t: TFunction, locale: Locale, type: ReservationEvent["type"], opts: { cancelledBy?: "customer" | "store"; amount?: Money }): string {
+function titleFor(t: TFunction, locale: Locale, type: EventType, opts: { cancelledBy?: "customer" | "store"; amount?: Money }): string {
   switch (type) {
     case "cancelled": return opts.cancelledBy === "customer" ? t("events.cancelledByCustomer") : t("events.cancelledByStore");
     case "payment_recorded": return t("events.payment_recorded", { amount: opts.amount ? formatMoney(opts.amount, locale) : "" });
     default: return t(`events.${type}`);
   }
 }
-const toneFor = (type: ReservationEvent["type"]): TimelineEntry["tone"] =>
+const toneFor = (type: EventType): TimelineEntry["tone"] =>
   type === "rejected" || type === "cancelled" ? "danger" : type === "expired" ? "warning" : type === "ready_for_pickup" || type === "collected" || type === "payment_recorded" ? "success" : type === "accepted" ? "info" : "neutral";
 
 /** Events as the CUSTOMER may see them (the API's `CustomerReservationView` never carries internal notes or staff identities). */
@@ -140,28 +140,6 @@ export function useCustomerTimeline(events: CustomerEvent[]): TimelineEntry[] {
     detail: e.rejectReason ? t("events.reason", { reason: t(`rejectReasons.${e.rejectReason}`) }) : undefined,
     tone: toneFor(e.type),
   }));
-}
-
-/** Full events for STAFF, including staff names and internal notes. */
-export function useAdminTimeline(events: ReservationEvent[]): TimelineEntry[] {
-  const t = useT();
-  const locale = useLocale();
-  return events.map((e) => {
-    const parts: string[] = [];
-    if (e.actor.kind === "staff") parts.push(t("events.by", { name: e.actor.name }));
-    if (e.detail?.rejectReason) parts.push(t("events.reason", { reason: t(`rejectReasons.${e.detail.rejectReason}`) }));
-    if (e.detail?.cancelReason) parts.push(t("events.reason", { reason: e.detail.cancelReason }));
-    if (e.detail?.fromPickup && e.detail.toPickup) parts.push(`${e.detail.fromPickup.addressLine}, ${e.detail.fromPickup.city} → ${e.detail.toPickup.addressLine}, ${e.detail.toPickup.city}`);
-    return {
-      id: e.id,
-      at: e.at,
-      title: titleFor(t, locale, e.type, { cancelledBy: e.detail?.cancelledBy === "customer" ? "customer" : "store", amount: e.detail?.amount }),
-      note: e.customerNote,
-      internalNote: e.internalNote,
-      detail: parts.join(" · ") || undefined,
-      tone: toneFor(e.type),
-    };
-  });
 }
 
 const dot: Record<TimelineEntry["tone"], string> = {

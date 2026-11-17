@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AdminErrorState } from "@/components/ui/admin-error";
 import { Skeleton } from "@/components/ui/states";
 import { useFormat } from "@/i18n/format";
@@ -9,7 +10,8 @@ import { reportPayments, reportProducts, reportReservations, reportSales, report
 import type { CurrencyMap, PaymentsReport, ProductsReport, ReservationsReport, SalesReport, StockReport } from "@/lib/api/admin/dto";
 import { SUPPORTED_CURRENCIES } from "@/lib/money";
 import { cn } from "@/lib/cn";
-import { PeriodFilter, RefreshButton, useMoneyText, useUrlState } from "./common";
+import { Button } from "@/components/ui/button";
+import { CurrencyFigures, PeriodFilter, RefreshButton, useMoneyText, useUrlState } from "./common";
 
 const TABS = ["sales", "payments", "products", "reservations", "stock"] as const;
 type Tab = (typeof TABS)[number];
@@ -25,7 +27,7 @@ const select = "text-label min-h-11 rounded-control border border-line-strong bg
 /** Money cells: one column per supported currency, never summed. */
 function CurrencyCells({ values }: { values: CurrencyMap | undefined }) {
   const money = useMoneyText();
-  return <>{SUPPORTED_CURRENCIES.map((c) => <td key={c} className="text-price px-3 py-2.5 text-right">{values && values[c] !== undefined ? money(values[c], c) : "—"}</td>)}</>;
+  return <>{SUPPORTED_CURRENCIES.map((c) => <td key={c} className="text-price px-2 py-2.5 text-right">{values && values[c] !== undefined ? money(values[c], c) : "—"}</td>)}</>;
 }
 const CurrencyHeads = ({ label }: { label: string }) => <>{SUPPORTED_CURRENCIES.map((c) => <th key={c} scope="col" className="px-3 py-2 text-right font-medium"><span className="sr-only">{label} </span>{c}</th>)}</>;
 
@@ -49,10 +51,12 @@ export function ReportsView() {
     }
   });
   const money = useMoneyText();
+  const [showEmpty, setShowEmpty] = useState(false);
   const result = res.data && res.data.tab === tab ? res.data : null;
+  const isZero = (m: CurrencyMap | undefined) => !m || Object.values(m).every((v) => Number(v) === 0);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6">
       <p className="text-caption text-ink-soft">{t("adminDash.moneyNote")}</p>
       <div role="tablist" aria-label={t("admin.reports.title")} className="flex flex-wrap gap-1 border-b border-line">
         {TABS.map((x) => (
@@ -80,39 +84,48 @@ export function ReportsView() {
       {res.error != null ? <AdminErrorState error={res.error} onRetry={res.reload} />
         : !result ? <div role="status" aria-label={t("adminCommon.loading")}><Skeleton className="h-64 w-full" /></div>
         : (
-          <section aria-busy={res.loading} className="rounded-card border border-line bg-surface">
+          <section aria-busy={res.loading} className="min-w-0 max-w-full overflow-hidden rounded-card border border-line bg-surface">
             {result.tab !== "stock" && <p className="text-caption border-b border-line px-5 py-3 text-ink-soft">{t("adminDash.periodShown", { from: result.data.period.from, to: result.data.period.to })}</p>}
 
-            {result.tab === "sales" && (
-              <>
-                <p className="text-caption px-5 pt-3 text-ink-muted">{t("adminDash.salesNote")}</p>
-                <div className="overflow-x-auto">
-                  <table className="text-label w-full min-w-[34rem] text-left font-normal">
-                    <thead className="text-caption text-ink-muted"><tr><th scope="col" className="px-5 py-2 font-medium">{t("adminDash.bucketStart")}</th><th scope="col" className="px-3 py-2 text-right font-medium">{t("adminDash.reservationsCount")}</th><CurrencyHeads label={t("adminDash.value")} /></tr></thead>
-                    <tbody className="divide-y divide-line">
-                      {result.data.buckets.map((b) => <tr key={b.start}><th scope="row" className="px-5 py-2.5 font-normal">{fmt.date(b.start, "short")}</th><td className="px-3 py-2.5 text-right tabular-nums">{b.reservations}</td><CurrencyCells values={b.collected} /></tr>)}
-                      <tr className="bg-sand-50 font-semibold"><th scope="row" className="px-5 py-2.5">{t("adminDash.salesTotal")}</th><td className="px-3 py-2.5 text-right tabular-nums">{result.data.reservations}</td><CurrencyCells values={result.data.totals} /></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
+            {result.tab === "sales" && (() => {
+              const active = result.data.buckets.filter((b) => b.reservations > 0 || !isZero(b.collected));
+              const rows = showEmpty ? result.data.buckets : active;
+              return (
+                <>
+                  <div className="grid gap-4 border-b border-line p-5 sm:grid-cols-2">
+                    <div><p className="text-caption font-medium text-ink-soft">{t("adminDash.salesTotal")} · {t("adminDash.reservationsCount")}</p><p className="font-display text-3xl tabular-nums">{result.data.reservations}</p></div>
+                    <div className="text-lg"><CurrencyFigures values={result.data.totals} /></div>
+                  </div>
+                  <p className="text-caption px-5 pt-3 text-ink-muted">{t("adminDash.salesNote")}</p>
+                  {rows.length === 0 ? <p className="text-label px-5 py-8 text-center font-normal text-ink-soft">{t("adminDash.noSalesDays")}</p> : (
+                    <div className="overflow-x-auto">
+                      <table className="text-label w-full min-w-[20rem] text-left font-normal">
+                        <thead className="text-caption text-ink-muted"><tr><th scope="col" className="px-4 py-2 font-medium">{t("adminDash.bucketStart")}</th><th scope="col" className="px-2 py-2 text-right font-medium">{t("adminDash.reservationsCount")}</th><CurrencyHeads label={t("adminDash.value")} /></tr></thead>
+                        <tbody className="divide-y divide-line">{rows.map((b) => <tr key={b.start}><th scope="row" className="px-4 py-2.5 font-normal">{fmt.date(b.start, "short")}</th><td className="px-2 py-2.5 text-right tabular-nums">{b.reservations}</td><CurrencyCells values={b.collected} /></tr>)}</tbody>
+                      </table>
+                    </div>
+                  )}
+                  {active.length < result.data.buckets.length && <div className="border-t border-line px-5 py-3"><Button variant="ghost" size="sm" onClick={() => setShowEmpty((v) => !v)}>{showEmpty ? t("adminDash.hideEmpty") : t("adminDash.showEmpty")}</Button></div>}
+                </>
+              );
+            })()}
 
             {result.tab === "payments" && (
               <>
                 <p className="text-caption px-5 pt-3 text-ink-muted">{t("adminDash.paymentsNote")}</p>
                 {SUPPORTED_CURRENCIES.map((c) => (
                   <div key={c} className="overflow-x-auto border-t border-line first:border-t-0">
-                    <table className="text-label w-full min-w-[34rem] text-left font-normal">
-                      <caption className="text-label px-5 pb-1 pt-3 text-left font-semibold">{c}</caption>
+                    <table className="text-label w-full min-w-[24rem] text-left font-normal">
+                      <caption className="text-label px-4 pb-1 pt-3 text-left font-semibold">{c}</caption>
                       <thead className="text-caption text-ink-muted"><tr><th scope="col" className="px-5 py-2 font-medium">{t("adminDash.bucketStart")}</th>{(["payReceived", "payReversed", "payAdjustments", "payNet"] as const).map((k) => <th key={k} scope="col" className="px-3 py-2 text-right font-medium">{t(`adminDash.${k}`)}</th>)}</tr></thead>
                       <tbody className="divide-y divide-line">
-                        {result.data.buckets.map((b) => <tr key={b.start}><th scope="row" className="px-5 py-2.5 font-normal">{b.start ? fmt.date(b.start, "short") : ""}</th>{([b.received, b.reversed, b.adjustments, b.net]).map((m, i) => <td key={i} className="text-price px-3 py-2.5 text-right">{m[c] !== undefined ? money(m[c], c) : "—"}</td>)}</tr>)}
-                        <tr className="bg-sand-50 font-semibold"><th scope="row" className="px-5 py-2.5">{t("adminDash.salesTotal")}</th>{([result.data.totals.received, result.data.totals.reversed, result.data.totals.adjustments, result.data.totals.net]).map((m, i) => <td key={i} className="text-price px-3 py-2.5 text-right">{m[c] !== undefined ? money(m[c], c) : "—"}</td>)}</tr>
+                        <tr className="bg-sand-50 font-semibold"><th scope="row" className="px-4 py-2.5">{t("adminDash.salesTotal")}</th>{([result.data.totals.received, result.data.totals.reversed, result.data.totals.adjustments, result.data.totals.net]).map((m, i) => <td key={i} className="text-price px-2 py-2.5 text-right">{m[c] !== undefined ? money(m[c], c) : "—"}</td>)}</tr>
+                        {result.data.buckets.filter((b) => showEmpty || ![b.received, b.reversed, b.adjustments, b.net].every((m) => Number(m[c] ?? 0) === 0)).map((b) => <tr key={b.start}><th scope="row" className="px-4 py-2.5 font-normal">{b.start ? fmt.date(b.start, "short") : ""}</th>{([b.received, b.reversed, b.adjustments, b.net]).map((m, i) => <td key={i} className="text-price px-2 py-2.5 text-right">{m[c] !== undefined ? money(m[c], c) : "—"}</td>)}</tr>)}
                       </tbody>
                     </table>
                   </div>
                 ))}
+                <div className="border-t border-line px-5 py-3"><Button variant="ghost" size="sm" onClick={() => setShowEmpty((v) => !v)}>{showEmpty ? t("adminDash.hideEmpty") : t("adminDash.showEmpty")}</Button></div>
               </>
             )}
 

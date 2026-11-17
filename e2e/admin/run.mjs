@@ -764,6 +764,46 @@ await run("settings", async () => {
   await ctx.close();
 });
 
+await run("responsive-i18n", async () => {
+  section("I. Mobile 390px, Haitian Creole, and no demo wording anywhere in the administration");
+  const m = await staffSession({ width: 390, height: 844 });
+  const mp = m.page;
+  const res = (await admin("GET", `/admin/reservations?q=${state.mainRef}`)).body.items[0];
+  const cust = (await admin("GET", `/admin/customers?q=${state.mainPhone}&kind=GUEST`)).body.items[0];
+  const pages = [["dashboard", "/fr/admin"], ["reservations", "/fr/admin/reservations"], ["reservation-detail", `/fr/admin/reservations/${state.mainRef}`], ["payments", "/fr/admin/payments"], ["products", "/fr/admin/products"], ["product-edit", `/fr/admin/products/${state.prodId}`], ["categories", "/fr/admin/categories"], ["category-edit", `/fr/admin/categories/${state.catId}`], ["inventory", "/fr/admin/inventory"], ["customers", "/fr/admin/customers"], ["customer-detail", `/fr/admin/customers/${cust?.id}`], ["reports", "/fr/admin/reports?tab=sales"], ["settings", "/fr/admin/settings"], ["pickup-settings", "/fr/admin/pickup-settings"]];
+  let n = 40;
+  const demo = [];
+  for (const [name, path] of pages) {
+    await mp.goto(`${env.WEB}${path}`);
+    await settle(mp, 1300);
+    check(`390px: admin ${name} has no horizontal page overflow`, (await overflow(mp)) <= 0, String(await overflow(mp)));
+    if (/démonstration|données de démo|navigateur uniquement|Données d'exemple/i.test(await bodyText(mp))) demo.push(name);
+    await shot(mp, `admin-${n++}-mobile-${name}-390`);
+  }
+  check("no administration page mentions demo/simulated data", demo.length === 0, demo.join(","));
+  await mp.goto(`${env.WEB}/fr/admin`); await settle(mp, 1000);
+  await mp.getByRole("button", { name: /Ouvrir le menu|menu/i }).first().click();
+  await sleep(400);
+  check("390px: the navigation drawer opens and lists every module", (await mp.getByRole("dialog").getByRole("link").count()) >= 9);
+  await m.ctx.close();
+
+  const h = await staffSession();
+  const hp = h.page;
+  let raw = [];
+  for (const [name, path] of [["dashboard", "/ht/admin"], ["products", "/ht/admin/products"], ["product-edit", `/ht/admin/products/${state.prodId}`], ["inventory", "/ht/admin/inventory"], ["reservations", "/ht/admin/reservations"], ["reservation-detail", `/ht/admin/reservations/${state.mainRef}`], ["customers", "/ht/admin/customers"], ["reports", "/ht/admin/reports"], ["settings", "/ht/admin/settings"], ["categories", "/ht/admin/categories"]]) {
+    await hp.goto(`${env.WEB}${path}`);
+    await settle(hp, 1300);
+    const t = await bodyText(hp);
+    if (/\b(adminCommon|adminDash|adminCat|adminProd|adminInv|adminRes|adminCust|apiErrors|fieldErrors|dataState)\.[a-zA-Z_]+/.test(t) || /\[i18n\]/.test(t)) raw.push(name);
+  }
+  check("Haitian Creole admin pages show no raw message keys", raw.length === 0, raw.join(","));
+  await hp.goto(`${env.WEB}/ht/admin`); await settle(hp, 1200);
+  const ht = await bodyText(hp);
+  check("Haitian Creole admin dashboard is localized (Creole labels, data from the API)", /Tablo|Rezèvasyon|Pwodwi|Peman/.test(ht));
+  await shot(hp, "admin-60-dashboard-ht-1280");
+  await h.ctx.close();
+});
+
 console.log(`\n${results.filter((r) => r.ok).length} passed, ${results.filter((r) => !r.ok).length} failed`);
 console.log(pageErrors.length ? `page errors:\n${pageErrors.join("\n")}` : "no unexpected page errors");
 await browser.close();

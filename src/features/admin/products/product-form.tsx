@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { ActionError, AdminErrorState } from "@/components/ui/admin-error";
 import { Badge } from "@/components/ui/badge";

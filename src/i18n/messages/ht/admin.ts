@@ -3,11 +3,6 @@ import type { admin as frAdmin } from "../fr/admin";
 /** Must satisfy the French shape: a missing or extra key is a compile error. */
 export const admin: typeof frAdmin = {
   brand: "Administrasyon",
-  demo: {
-    banner: "Done egzanp: rezèvasyon sa yo se fo e yo rete nan navigatè sa a. Pa gen okenn vrè kliyan ki konsène e pa gen mesaj ki voye.",
-    notified: "N ap fè kliyan an konnen (demo: pa gen mesaj ki voye).",
-    saved: "Anrejistre nan navigatè sa a sèlman (demo).",
-  },
   nav: {
     label: "Navigasyon administrasyon an",
     dashboard: "Tablo bò",
@@ -33,8 +28,6 @@ export const admin: typeof frAdmin = {
     account: "Kont",
     signedInAs: "Konekte kòm {name}",
     signOut: "Dekonekte",
-    resetDemo: "Remete done demo yo a zewo",
-    resetDone: "Done demo yo remèt a zewo.",
   },
   guard: {
     loading: "Administrasyon an ap chaje…",
@@ -106,7 +99,6 @@ export const admin: typeof frAdmin = {
   detail: {
     back: "Tounen nan rezèvasyon yo",
     notFoundTitle: "Nou pa jwenn rezèvasyon an",
-    notFoundText: "Referans sa a pa nan done demo yo.",
     title: "Rezèvasyon {reference}",
     sections: { customer: "Kliyan", products: "Pwodwi", info: "Rezèvasyon", payment: "Peman", pickup: "Kote pou pran pwodwi yo", notes: "Nòt ak mesaj", history: "Istwa", actions: "Aksyon" },
     labels: {
@@ -340,7 +332,7 @@ export const admin: typeof frAdmin = {
       disabling: "Atansyon: retrè a pral dezaktive e pa gen okenn rezèvasyon ki ap ka voye ankò.",
       confirm: "Anrejistre",
     },
-    saved: "Paramèt yo anrejistre (demo: pa gen anyen ki voye bay yon sèvè).",
+    saved: "Paramèt yo anrejistre.",
     noChanges: "Pa gen chanjman pou anrejistre.",
   },
 };

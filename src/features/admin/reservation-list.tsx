@@ -18,6 +18,7 @@ import { RefreshButton, useMoneyText, useUrlState } from "./common";
 const field = "text-label min-h-11 rounded-control border border-line-strong bg-surface px-3";
 const lower = <T extends string>(s: T) => s.toLowerCase() as Lowercase<T>;
 const PAGE = 20;
+const QUICK = ["PENDING_REVIEW", "CONFIRMED", "READY_FOR_PICKUP", "COLLECTED"] as const;
 
 /** Reservation list: every filter, the search and the paging are the API's (`GET /admin/reservations`); filters live in the URL. */
 export function ReservationList() {
@@ -35,18 +36,28 @@ export function ReservationList() {
 
   return (
     <div className="space-y-4">
-      <form role="search" onSubmit={(e) => e.preventDefault()} className="grid gap-3 rounded-card border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[minmax(0,2fr)_repeat(6,1fr)]">
-        <div className="relative sm:col-span-2 lg:col-span-4 xl:col-span-1">
+      <form role="search" onSubmit={(e) => e.preventDefault()} className="space-y-3 rounded-card border border-line bg-surface p-4">
+        <div className="relative">
           <label htmlFor="rq" className="sr-only">{t("admin.list.search")}</label>
           <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
           <input id="rq" type="search" defaultValue={q} key={q} placeholder={t("admin.list.search")} onKeyDown={(e) => { if (e.key === "Enter") url.set({ q: (e.target as HTMLInputElement).value || undefined }); }} onBlur={(e) => { if (e.target.value !== q) url.set({ q: e.target.value || undefined }); }} className={`${field} w-full pl-9`} />
         </div>
-        <Sel id="rs" label={t("admin.list.status")} value={status} onChange={(v) => url.set({ status: v || undefined })} all={t("admin.list.allStatuses")} options={reservationStatuses.map((s) => [s.toUpperCase(), t(`status.${s}`)])} />
-        <Sel id="rp" label={t("admin.detail.labels.paymentStatus")} value={pay} onChange={(v) => url.set({ paymentStatus: v || undefined })} all={t("admin.list.allStatuses")} options={(["UNPAID", "PARTIAL", "PAID"] as const).map((s) => [s, t(`paymentStatus.${lower(s)}`)])} />
-        <Sel id="rc" label={t("adminProd.currency")} value={currency} onChange={(v) => url.set({ currency: v || undefined })} all={t("adminDash.allCurrencies")} options={SUPPORTED_CURRENCIES.map((c) => [c, c])} />
-        <div><label htmlFor="rf" className="text-caption mb-1 block text-ink-muted">{t("admin.list.from")}</label><input id="rf" type="date" value={from} onChange={(e) => url.set({ from: e.target.value || undefined })} className={`${field} w-full`} /></div>
-        <div><label htmlFor="rt" className="text-caption mb-1 block text-ink-muted">{t("admin.list.to")}</label><input id="rt" type="date" value={to} onChange={(e) => url.set({ to: e.target.value || undefined })} className={`${field} w-full`} /></div>
-        <Sel id="ro" label={t("admin.list.sort")} value={sort} onChange={(v) => url.set({ sort: v || undefined })} all={t("admin.list.sortOptions.newest")} options={[["OLDEST", t("admin.list.sortOptions.oldest")]]} />
+        <div role="group" aria-label={t("admin.list.status")} className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {[["", t("adminRes.quickAll")], ...QUICK.map((s) => [s, t(`status.${lower(s)}`)])].map(([v, label]) => (
+            <button key={v} type="button" aria-pressed={status === v} onClick={() => url.set({ status: v || undefined })} className={`text-label min-h-10 shrink-0 rounded-full border px-3.5 font-semibold ${status === v ? "border-brand-700 bg-brand-50 text-brand-800" : "border-line-strong bg-surface text-ink-soft hover:text-ink"}`}>{label}</button>
+          ))}
+        </div>
+        <details open={!!(pay || currency || from || to || sort || (status && !QUICK.includes(status as (typeof QUICK)[number])))} className="group">
+          <summary className="text-label min-h-10 cursor-pointer list-none font-semibold text-brand-700 hover:underline">{t("adminRes.moreFilters")}{(pay || currency || from || to || sort) ? ` · ${[pay, currency, from, to, sort].filter(Boolean).length}` : ""}</summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <Sel id="rs" label={t("admin.list.status")} value={status} onChange={(v) => url.set({ status: v || undefined })} all={t("admin.list.allStatuses")} options={reservationStatuses.map((s) => [s.toUpperCase(), t(`status.${s}`)])} />
+            <Sel id="rp" label={t("admin.detail.labels.paymentStatus")} value={pay} onChange={(v) => url.set({ paymentStatus: v || undefined })} all={t("admin.list.allStatuses")} options={(["UNPAID", "PARTIAL", "PAID"] as const).map((s) => [s, t(`paymentStatus.${lower(s)}`)])} />
+            <Sel id="rc" label={t("adminProd.currency")} value={currency} onChange={(v) => url.set({ currency: v || undefined })} all={t("adminDash.allCurrencies")} options={SUPPORTED_CURRENCIES.map((c) => [c, c])} />
+            <div><label htmlFor="rf" className="text-caption mb-1 block text-ink-muted">{t("admin.list.from")}</label><input id="rf" type="date" value={from} onChange={(e) => url.set({ from: e.target.value || undefined })} className={`${field} w-full`} /></div>
+            <div><label htmlFor="rt" className="text-caption mb-1 block text-ink-muted">{t("admin.list.to")}</label><input id="rt" type="date" value={to} onChange={(e) => url.set({ to: e.target.value || undefined })} className={`${field} w-full`} /></div>
+            <Sel id="ro" label={t("admin.list.sort")} value={sort} onChange={(v) => url.set({ sort: v || undefined })} all={t("admin.list.sortOptions.newest")} options={[["OLDEST", t("admin.list.sortOptions.oldest")]]} />
+          </div>
+        </details>
       </form>
 
       {res.error != null && !res.data ? <AdminErrorState error={res.error} onRetry={res.reload} /> : !res.data ? <div role="status" aria-label={t("adminCommon.loading")}><Skeleton className="h-72 w-full" /></div> : (
@@ -70,7 +81,7 @@ export function ReservationList() {
                         <td className="px-3 py-3">{amounts(r)}</td>
                         <td className="px-3 py-3"><PaymentStatusBadge status={lower(r.paymentStatus)} /></td>
                         <td className="px-3 py-3"><ReservationStatusBadge status={lower(r.status)} /></td>
-                        <td className="px-3 py-3"><Link href={`/admin/reservations/${r.reference}`} aria-label={t("admin.list.openNamed", { reference: r.reference })} className="inline-flex min-h-9 items-center gap-1 font-semibold text-brand-700 hover:underline">{t("admin.products.edit")}<ChevronRight aria-hidden className="size-4" /></Link></td>
+                        <td className="px-3 py-3"><Link href={`/admin/reservations/${r.reference}`} aria-label={t("admin.list.openNamed", { reference: r.reference })} className="inline-flex min-h-9 items-center gap-1 font-semibold text-brand-700 hover:underline">{t("adminRes.open")}<ChevronRight aria-hidden className="size-4" /></Link></td>
                       </tr>
                     ))}
                   </tbody>
@@ -81,7 +92,7 @@ export function ReservationList() {
                   <li key={r.id} className="rounded-card border border-line bg-surface p-4">
                     <div className="flex items-start justify-between gap-3"><div><p className="text-label font-semibold" translate="no">{r.reference}</p><p className="text-label font-normal">{r.contact.firstName} {r.contact.lastName}</p><p className="text-caption text-ink-soft">{r.contact.dialCode} {r.contact.phone}</p></div><ReservationStatusBadge status={lower(r.status)} /></div>
                     <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-ink-soft"><div><p className="text-caption">{t("admin.list.columns.submitted")}</p><p className="text-label text-ink">{fmt.dateTime(r.createdAt)}</p></div><div><p className="text-caption">{t("admin.list.columns.payment")}</p><PaymentStatusBadge status={lower(r.paymentStatus)} /></div><div className="col-span-2">{amounts(r)}</div></div>
-                    <Link href={`/admin/reservations/${r.reference}`} aria-label={t("admin.list.openNamed", { reference: r.reference })} className="text-label mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-line-strong font-semibold">{t("admin.products.edit")}</Link>
+                    <Link href={`/admin/reservations/${r.reference}`} aria-label={t("admin.list.openNamed", { reference: r.reference })} className="text-label mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-line-strong font-semibold">{t("adminRes.open")}</Link>
                   </li>
                 ))}
               </ul>

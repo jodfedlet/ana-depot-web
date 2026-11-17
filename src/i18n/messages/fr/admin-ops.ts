@@ -1,9 +1,5 @@
 /** Administration — connexion au serveur, paiements, rapports, paramètres, tableau de bord (argent). Le français définit la forme. */
 export const adminOps = {
-  connection: {
-    title: "Non connecté au serveur",
-    text: "Cette section utilise des données de démonstration enregistrées uniquement dans ce navigateur. Les modifications ne sont ni partagées ni enregistrées sur le serveur et ne concernent aucun vrai client. La connexion au serveur sera ajoutée module par module.",
-  },
   dashboardOps: {
     quickTitle: "Actions rapides",
     createProduct: "Créer un produit",

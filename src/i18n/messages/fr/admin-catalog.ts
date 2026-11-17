@@ -321,7 +321,7 @@ export const adminCatalog = {
   customers: {
     title: "Clients",
     subtitle: "Personnes ayant passé au moins une réservation.",
-    note: "Il n'y a pas de comptes clients : cette liste est construite à partir des réservations (démonstration).",
+    note: "Il n'y a pas de comptes clients : cette liste est construite à partir des réservations",
     search: "Rechercher par nom, téléphone ou e-mail",
     count: { one: "{count} client", other: "{count} clients" },
     reservations: { one: "{count} réservation", other: "{count} réservations" },

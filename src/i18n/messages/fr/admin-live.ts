@@ -31,6 +31,9 @@ export const adminLive = {
     emptyFiltered: "Aucun résultat pour ces filtres.",
   },
   adminDash: {
+    showEmpty: "Afficher aussi les jours sans vente",
+    hideEmpty: "Masquer les jours sans vente",
+    noSalesDays: "Aucune vente retirée pendant cette période.",
     period: "Période",
     from: "Du",
     to: "Au",
@@ -191,6 +194,10 @@ export const adminLive = {
     chooseCategory: "Choisissez une catégorie pour commencer : elle détermine les caractéristiques et les variantes.",
   },
   adminInv: {
+    howTo: "Comment lire ces chiffres",
+    explainShort: "Disponible = en stock − réservé.",
+    states: "Tous les états",
+    onHandShort: "En stock",
     shared: "Le stock est partagé entre HTG et USD : un prix dans une devise ne crée pas un second stock.",
     sortAvailable: "Disponible, du plus bas au plus haut",
     clearProduct: "Voir tous les produits",
@@ -212,6 +219,9 @@ export const adminLive = {
     initial: "Quantité initiale",
   },
   adminRes: {
+    open: "Ouvrir",
+    moreFilters: "Plus de filtres",
+    quickAll: "Toutes",
     notFoundText: "Cette réservation n'existe pas.",
     snapshotNote: "Noms, prix et unités tels qu'ils étaient au moment de la réservation : ils ne changent pas quand le catalogue change.",
     priceKind: { RETAIL: "Prix normal", SALE: "Prix promotionnel", WHOLESALE: "Prix de gros (dès {qty})" },

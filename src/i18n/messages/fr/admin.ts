@@ -1,10 +1,5 @@
 export const admin = {
   brand: "Administration",
-  demo: {
-    banner: "Données d'exemple : ces réservations sont fictives et restent dans ce navigateur. Aucun vrai client n'est concerné et aucun message n'est envoyé.",
-    notified: "Le client sera notifié (démonstration : aucun message n'est envoyé).",
-    saved: "Enregistré dans ce navigateur uniquement (démonstration).",
-  },
   nav: {
     label: "Navigation de l'administration",
     dashboard: "Tableau de bord",
@@ -30,8 +25,6 @@ export const admin = {
     account: "Compte",
     signedInAs: "Connecté en tant que {name}",
     signOut: "Se déconnecter",
-    resetDemo: "Réinitialiser les données de démonstration",
-    resetDone: "Données de démonstration réinitialisées.",
   },
   guard: {
     loading: "Chargement de l'administration…",
@@ -103,7 +96,6 @@ export const admin = {
   detail: {
     back: "Retour aux réservations",
     notFoundTitle: "Réservation introuvable",
-    notFoundText: "Cette référence n'existe pas dans les données de démonstration.",
     title: "Réservation {reference}",
     sections: { customer: "Client", products: "Produits", info: "Réservation", payment: "Paiement", pickup: "Lieu de retrait", notes: "Notes et messages", history: "Historique", actions: "Actions" },
     labels: {
@@ -337,7 +329,7 @@ export const admin = {
       disabling: "Attention : le retrait va être désactivé et plus aucune réservation ne pourra être envoyée.",
       confirm: "Enregistrer",
     },
-    saved: "Paramètres enregistrés (démonstration : rien n'est envoyé à un serveur).",
+    saved: "Paramètres enregistrés.",
     noChanges: "Aucune modification à enregistrer.",
   },
 };

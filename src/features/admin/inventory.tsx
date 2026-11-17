@@ -46,11 +46,22 @@ export function InventoryView() {
   const [threshold, setThreshold] = useState<AdminPosition | null>(null);
   const [register, setRegister] = useState<string | null>(null);
   const refresh = () => { res.reload(); missing.reload(); announceAdminChange(); };
-  const name = (p: AdminPosition) => `${lt({ fr: p.productName.fr ?? "", ht: p.productName.ht ?? "" })}${p.variantSku ? ` · ${p.variantSku}` : ""}`;
+  const base = (p: AdminPosition) => lt({ fr: p.productName.fr ?? "", ht: p.productName.ht ?? "" });
+  const name = (p: AdminPosition) => `${base(p)}${p.variantSku ? ` · ${p.variantSku}` : ""}`;
+  const actions = (p: AdminPosition) => (
+    <div className="flex flex-wrap gap-1.5">
+      {p.tracked && <Button size="sm" variant="outline" onClick={() => setAdjust(p)}>{t("admin.inventory.adjust")}</Button>}
+      {p.tracked && <Button size="sm" variant="ghost" onClick={() => setThreshold(p)}>{t("adminInv.threshold")}</Button>}
+      <Button size="sm" variant="ghost" onClick={() => setHistory(p)}>{t("admin.inventory.history")}</Button>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
-      <p className="text-caption text-ink-soft">{t("admin.inventory.explain")} {t("adminInv.shared")}</p>
+      <details className="text-caption text-ink-soft">
+        <summary className="text-label min-h-9 cursor-pointer list-none font-normal"><span className="font-semibold text-ink">{t("adminInv.explainShort")}</span> <span className="font-semibold text-brand-700 hover:underline">{t("adminInv.howTo")}</span></summary>
+        <p className="mt-1">{t("admin.inventory.explain")} {t("adminInv.shared")}</p>
+      </details>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="relative sm:col-span-2 lg:col-span-1">
           <label htmlFor="iq" className="sr-only">{t("admin.inventory.search")}</label>
@@ -58,7 +69,7 @@ export function InventoryView() {
           <input id="iq" type="search" defaultValue={q} key={q} placeholder={t("admin.inventory.search")} onKeyDown={(e) => { if (e.key === "Enter") url.set({ q: (e.target as HTMLInputElement).value || undefined }); }} onBlur={(e) => { if (e.target.value !== q) url.set({ q: e.target.value || undefined }); }} className={`${field} w-full pl-9`} />
         </div>
         <div><label htmlFor="is" className="text-caption mb-1 block text-ink-muted">{t("admin.inventory.filterLabel")}</label>
-          <select id="is" value={state} onChange={(e) => url.set({ state: e.target.value || undefined })} className={`${field} w-full`}><option value="">{t("admin.list.allStatuses")}</option>{STATES.map((s) => <option key={s} value={s}>{t(`admin.inventory.states.${s.toLowerCase() as "ok"}`)}</option>)}</select></div>
+          <select id="is" value={state} onChange={(e) => url.set({ state: e.target.value || undefined })} className={`${field} w-full`}><option value="">{t("adminInv.states")}</option>{STATES.map((s) => <option key={s} value={s}>{t(`admin.inventory.states.${s.toLowerCase() as "ok"}`)}</option>)}</select></div>
         <div><label htmlFor="iso" className="text-caption mb-1 block text-ink-muted">{t("admin.list.sort")}</label>
           <select id="iso" value={sort} onChange={(e) => url.set({ sort: e.target.value || undefined })} className={`${field} w-full`}><option value="">{t("adminProd.sort.UPDATED")}</option><option value="AVAILABLE_ASC">{t("adminInv.sortAvailable")}</option></select></div>
         {productId && <div className="flex items-end"><Button variant="ghost" onClick={() => url.set({ productId: undefined })}>{t("adminInv.clearProduct")}</Button></div>}
@@ -80,7 +91,7 @@ export function InventoryView() {
       ) : (
         <div aria-busy={res.loading}>
           <p role="status" className="text-label mb-2 font-normal text-ink-soft">{t("adminCommon.results", { count: res.data.totalItems })}</p>
-          <div className="overflow-x-auto rounded-card border border-line bg-surface">
+          <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
             <table className="w-full min-w-[52rem] text-left">
               <caption className="sr-only">{t("admin.inventory.title")}</caption>
               <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr>
@@ -93,22 +104,34 @@ export function InventoryView() {
               <tbody className="divide-y divide-line">
                 {res.data.items.map((p) => (
                   <tr key={p.id} className="text-label align-top font-normal hover:bg-sand-50">
-                    <th scope="row" className="px-3 py-3 text-left font-normal"><Link href={`/admin/products/${p.productId}`} className="font-semibold hover:underline">{name(p)}</Link><p className="text-caption text-ink-soft">{p.productSku} · {t(`admin.products.statuses.${p.productStatus.toLowerCase() as "draft"}`)}</p></th>
+                    <th scope="row" className="px-3 py-3 text-left font-normal"><Link href={`/admin/products/${p.productId}`} className="font-semibold hover:underline">{base(p)}</Link><p className="text-caption text-ink-soft">{p.variantSku ?? p.productSku} · {t(`admin.products.statuses.${p.productStatus.toLowerCase() as "draft"}`)}</p></th>
                     <td className="px-3 py-3"><Badge tone={stateTone[p.state]}>{t(`admin.inventory.states.${p.state.toLowerCase() as "ok"}`)}</Badge></td>
                     <td className="px-3 py-3 text-right tabular-nums">{p.onHand ?? "—"}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{p.reserved ?? "—"}</td>
                     <td className="px-3 py-3 text-right font-semibold tabular-nums">{p.available ?? "—"}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{p.lowStockThreshold ?? "—"}</td>
-                    <td className="px-3 py-3 text-right"><div className="flex flex-wrap justify-end gap-1.5">
-                      {p.tracked && <Button size="sm" variant="outline" onClick={() => setAdjust(p)}>{t("admin.inventory.adjust")}</Button>}
-                      {p.tracked && <Button size="sm" variant="ghost" onClick={() => setThreshold(p)}>{t("adminInv.threshold")}</Button>}
-                      <Button size="sm" variant="ghost" onClick={() => setHistory(p)}>{t("admin.inventory.history")}</Button>
-                    </div></td>
+                    <td className="px-3 py-3 text-right"><div className="flex justify-end">{actions(p)}</div></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <ul className="space-y-3 md:hidden">
+            {res.data.items.map((p) => (
+              <li key={p.id} className="rounded-card border border-line bg-surface p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><Link href={`/admin/products/${p.productId}`} className="text-label font-semibold hover:underline">{base(p)}</Link><p className="text-caption text-ink-soft">{p.variantSku ?? p.productSku}</p></div>
+                  <Badge tone={stateTone[p.state]}>{t(`admin.inventory.states.${p.state.toLowerCase() as "ok"}`)}</Badge>
+                </div>
+                <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-control bg-sand-50 p-2"><dt className="text-caption text-ink-soft">{t("adminInv.onHandShort")}</dt><dd className="font-display text-xl tabular-nums">{p.onHand ?? "—"}</dd></div>
+                  <div className="rounded-control bg-sand-50 p-2"><dt className="text-caption text-ink-soft">{t("admin.inventory.columns.reserved")}</dt><dd className="font-display text-xl tabular-nums">{p.reserved ?? "—"}</dd></div>
+                  <div className="rounded-control bg-brand-50 p-2"><dt className="text-caption text-ink-soft">{t("admin.inventory.columns.available")}</dt><dd className="font-display text-xl tabular-nums">{p.available ?? "—"}</dd></div>
+                </dl>
+                <div className="mt-3">{actions(p)}</div>
+              </li>
+            ))}
+          </ul>
           {res.data.totalPages > 1 && (
             <nav className="mt-4 flex items-center justify-between gap-3" aria-label={t("admin.list.pagination")}>
               <Button variant="outline" size="sm" disabled={page <= 0} onClick={() => url.set({ page: String(page - 1) }, true)}>{t("adminCommon.previous")}</Button>
@@ -217,7 +240,7 @@ function RegisterDialog({ productId, onClose, onDone }: { productId: string; onC
   const lt = useLText();
   const toast = useToast();
   const action = useAction();
-  const res = useAdminResource<AdminProduct>(`register:${productId}`, (signal) => getProduct(productId, { signal }));
+  const res = useAdminResource<AdminProduct>(`stock-product:${productId}`, (signal) => getProduct(productId, { signal }));
   const [variantId, setVariantId] = useState("");
   const [tracked, setTracked] = useState(true);
   const [initial, setInitial] = useState("0");
