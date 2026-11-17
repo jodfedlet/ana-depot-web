@@ -77,6 +77,13 @@ export interface AdminPayment {
   id: string; reservationId: string; reservationReference: string; amount: string; currency: string; method: string; receivedAt: string; recordedAt: string; recordedBy: string | null;
   reference: string | null; note: string | null; reversed: boolean; reversal: { at: string; reason: string; by: string | null } | null;
 }
+/** One hosted-Checkout attempt (`GET /admin/payment-attempts`). It becomes a payment only after the verified provider webhook; no URL or secret is ever included. */
+export type PaymentAttemptStatus = "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "EXPIRED";
+export interface AdminPaymentAttempt {
+  id: string; reservationId: string; reservationReference: string; currency: string; amount: string; status: PaymentAttemptStatus;
+  providerSessionId: string | null; providerPaymentIntentId: string | null; expiresAt: string | null; paymentId: string | null;
+  requiresAttention: boolean; attentionReason: string | null; failureCode: string | null; createdAt: string; updatedAt: string;
+}
 export interface PaymentOutcome { payment: AdminPayment; paymentStatus: PaymentStatus; balances: AdminBalance[] }
 export interface ReservationPayments { paymentStatus: PaymentStatus; balances: AdminBalance[]; payments: AdminPayment[] }
 export interface LedgerEntry { id: string; type: "PAYMENT_RECEIVED" | "PAYMENT_REVERSAL" | "ADJUSTMENT"; amount: string; currency: string; paymentId: string | null; reversesEntryId: string | null; reason: string | null; at: string; createdBy: string | null; correlationId: string | null }

@@ -1,7 +1,7 @@
 import { adminApi as api } from "./client";
 import { refreshesStorefront } from "./storefront-refresh";
 import type {
-  AdminCategory, AdminCategorySummary, AdminCustomer, AdminMovement, AdminPayment, AdminPosition, AdminProduct, AdminProductSummary, AdminReservation, AdminReservationSummary,
+  AdminCategory, AdminCategorySummary, AdminCustomer, AdminMovement, AdminPayment, AdminPaymentAttempt, AdminPosition, AdminProduct, AdminProductSummary, AdminReservation, AdminReservationSummary,
   CategoryProductLine, CategoryRequest, LedgerEntry, OverviewReport, PageDto, PaymentOutcome, PaymentsReport, PickupSettingsDto, ProductRequest, ProductsReport, Reconciliation,
   ReservationPayments, ReservationsReport, SalesReport, StockReport, UploadTicket, AdminImage,
 } from "./dto";
@@ -72,6 +72,7 @@ export const addReservationNote = (id: string, visibility: "INTERNAL" | "CUSTOME
 
 // ---- payments ----
 export const listPayments = (q: Q, o?: Opts) => api.get<PageDto<AdminPayment>>("/payments", q, o);
+export const listPaymentAttempts = (q: Q, o?: Opts) => api.get<PageDto<AdminPaymentAttempt>>("/payment-attempts", q, o);
 export const getReservationPayments = (id: string, o?: Opts) => api.get<ReservationPayments>(`/reservations/${id}/payments`, undefined, o);
 export const getLedger = (id: string, o?: Opts) => api.get<LedgerEntry[]>(`/reservations/${id}/ledger`, undefined, o);
 export const getReconciliation = (id: string, o?: Opts) => api.get<Reconciliation>(`/reservations/${id}/reconciliation`, undefined, o);

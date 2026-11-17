@@ -13,13 +13,14 @@ import { useToast } from "@/components/ui/toast";
 import { useFormat } from "@/i18n/format";
 import { useT } from "@/i18n/provider";
 import type { AdminPayment, AdminReservation } from "@/lib/api/admin/dto";
-import { adjustPayments, getLedger, getReconciliation, getReservationPayments, recordPayment, reversePayment } from "@/lib/api/admin/endpoints";
+import { adjustPayments, getLedger, getReconciliation, getReservationPayments, listPaymentAttempts, recordPayment, reversePayment } from "@/lib/api/admin/endpoints";
 import { useAction, useAdminResource } from "@/lib/api/admin/hooks";
 import { announceAdminChange } from "@/lib/api/admin/signals";
 import { isTransientError } from "@/lib/api/errors";
 import { attemptKey, endAttempt } from "@/lib/api/idempotency";
 import { isOverpaid } from "@/lib/admin/money";
 import { PaymentStatusBadge } from "@/features/reservations/shared";
+import { AttemptBadge } from "./payment-attempts";
 import { useMoneyText } from "./common";
 
 type Dialog = { kind: "record" } | { kind: "reverse"; payment: AdminPayment } | { kind: "adjust" } | null;
@@ -40,8 +41,9 @@ export function PaymentPanel({ reservation, onChanged }: { reservation: AdminRes
   const pay = useAdminResource(`res-payments:${id}:${reservation.paymentStatus}`, (signal) => getReservationPayments(id, { signal }));
   const rec = useAdminResource(`res-recon:${id}:${reservation.paymentStatus}`, (signal) => getReconciliation(id, { signal }));
   const ledger = useAdminResource(showLedger ? `res-ledger:${id}:${reservation.paymentStatus}` : null, (signal) => getLedger(id, { signal }));
+  const attempts = useAdminResource(`res-attempts:${id}:${reservation.paymentStatus}`, (signal) => listPaymentAttempts({ reservationId: id, size: 10 }, { signal }));
   const open = reservation.status === "READY_FOR_PICKUP";
-  const done = () => { setDialog(null); pay.reload(); rec.reload(); ledger.reload(); announceAdminChange(); onChanged(); };
+  const done = () => { setDialog(null); pay.reload(); rec.reload(); ledger.reload(); attempts.reload(); announceAdminChange(); onChanged(); };
 
   if (pay.error != null && !pay.data) return <AdminErrorState error={pay.error} onRetry={pay.reload} />;
   if (!pay.data) return <Skeleton className="h-40 w-full" />;
@@ -49,7 +51,7 @@ export function PaymentPanel({ reservation, onChanged }: { reservation: AdminRes
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3"><PaymentStatusBadge status={lower(paymentStatus)} /><span className="text-caption text-ink-soft">{t("paymentMethod.cash_at_pickup")}</span>
+      <div className="flex flex-wrap items-center gap-3"><PaymentStatusBadge status={lower(paymentStatus)} />
         {rec.data && <Badge tone={rec.data.consistent ? "success" : "danger"}>{rec.data.consistent ? t("adminRes.reconciled") : t("adminRes.notReconciled")}</Badge>}</div>
 
       <ul className="divide-y divide-line rounded-control border border-line">
@@ -74,13 +76,29 @@ export function PaymentPanel({ reservation, onChanged }: { reservation: AdminRes
             <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
               <div className="min-w-0 flex-1">
                 <p className={`text-label ${p.reversed ? "font-normal text-ink-muted line-through" : "font-semibold"}`}>{money(p.amount, p.currency)}</p>
-                <p className="text-caption text-ink-soft">{fmt.dateTime(p.receivedAt)}{p.reference ? ` · ${p.reference}` : ""}{p.note ? ` · ${p.note}` : ""}</p>
+                <p className="text-caption text-ink-soft"><Badge tone={p.method === "STRIPE_CHECKOUT" ? "info" : "neutral"} className="mr-1.5">{p.method === "STRIPE_CHECKOUT" ? t("adminPay.methodStripe") : t("adminPay.methodCash")}</Badge>{fmt.dateTime(p.receivedAt)}{p.reference ? ` · ${p.method === "STRIPE_CHECKOUT" ? `${t("adminPay.stripeRef")} ` : ""}${p.reference}` : ""}{p.note ? ` · ${p.note}` : ""}</p>
+                {p.method === "STRIPE_CHECKOUT" && !p.reversed && <p className="text-caption text-ink-muted">{t("adminPay.reverseUnsupported")}</p>}
                 {p.reversed && p.reversal && <p className="text-caption text-danger-fg">{t("adminRes.reversedOn", { date: fmt.dateTime(p.reversal.at), reason: p.reversal.reason })}</p>}
               </div>
-              {p.reversed ? <Badge tone="danger">{t("adminRes.reversed")}</Badge> : open && <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "reverse", payment: p })}><RotateCcw aria-hidden className="size-4" />{t("adminRes.reverse")}</Button>}
+              {p.reversed ? <Badge tone="danger">{t("adminRes.reversed")}</Badge> : open && p.method !== "STRIPE_CHECKOUT" && <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "reverse", payment: p })}><RotateCcw aria-hidden className="size-4" />{t("adminRes.reverse")}</Button>}
             </li>
           ))}
         </ul>
+      )}
+
+      {attempts.data && attempts.data.items.length > 0 && (
+        <section aria-labelledby="att-title" className="space-y-2">
+          <h3 id="att-title" className="text-label font-semibold">{t("adminPay.attemptsTitle")}</h3>
+          {attempts.data.items.some((a) => a.requiresAttention) && <Alert tone="warning">{t("adminPay.attentionNote")}</Alert>}
+          <ul className="divide-y divide-line rounded-control border border-line">
+            {attempts.data.items.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2.5">
+                <div className="min-w-0"><p className="text-label font-semibold tabular-nums">{money(a.amount, a.currency)}</p><p className="text-caption text-ink-soft">{fmt.dateTime(a.createdAt)}</p>{a.providerPaymentIntentId && <p className="text-caption font-mono break-all text-ink-muted">{a.providerPaymentIntentId}</p>}</div>
+                <AttemptBadge attempt={a} />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <div>
@@ -133,6 +151,7 @@ function RecordDialog({ reservation, balances, onClose, onDone }: { reservation:
         <TextField label={t("admin.detail.dialogs.payment.reference")} optional value={ref} onChange={(e) => setRef(e.target.value)} />
         <TextField label={t("adminRes.paymentNote")} optional value={note} onChange={(e) => setNote(e.target.value)} />
         <p className="text-caption text-ink-muted">{t("adminRes.overpaidNote")}</p>
+        <p className="text-caption text-ink-muted">{t("adminPay.manualNote")}</p>
         {action.error != null && <ActionError error={action.error} onReload={onDone} />}
       </div>
     </Drawer>
