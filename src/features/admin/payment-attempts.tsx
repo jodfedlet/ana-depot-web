@@ -64,7 +64,7 @@ export function PaymentAttemptsView() {
                 </li>
               ))}
             </ul>
-            <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block" aria-busy={res.loading}>
+            <div tabIndex={0} className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block" aria-busy={res.loading}>
               <table className="w-full min-w-[52rem] text-left">
                 <caption className="sr-only">{t("adminPay.attemptsTitle")}</caption>
                 <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr>

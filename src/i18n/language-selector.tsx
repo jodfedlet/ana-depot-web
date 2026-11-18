@@ -33,7 +33,7 @@ export function LanguageSelector({ className }: { className?: string }) {
         type="button"
         lang={other}
         onClick={() => choose(other)}
-        aria-label={`${t("common.language")} : ${localeNames[other].native}`}
+        aria-label={`${localeNames[other].short} — ${t("common.language")} : ${localeNames[other].native}`}   /* starts with the visible text (WCAG 2.5.3) */
         title={localeNames[other].native}
         className={cn("text-caption min-h-9 min-w-10 rounded-full border border-line-strong bg-surface px-2.5 font-semibold text-ink-soft hover:bg-sand-100 sm:hidden", className)}
       >
@@ -47,7 +47,7 @@ export function LanguageSelector({ className }: { className?: string }) {
           lang={l}
           onClick={() => choose(l)}
           aria-pressed={l === locale}
-          aria-label={localeNames[l].native}
+          aria-label={`${localeNames[l].short} — ${localeNames[l].native}`}   /* starts with the visible text (WCAG 2.5.3) */
           title={localeNames[l].native}
           className={cn(
             "text-caption min-h-9 min-w-10 rounded-full px-2.5 font-semibold",

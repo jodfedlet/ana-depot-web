@@ -79,7 +79,7 @@ export function ProductList() {
             <div className="rounded-card border border-line bg-surface"><EmptyState icon={<Search aria-hidden />} title={hasFilters ? t("admin.products.noMatchTitle") : t("admin.products.emptyTitle")} description={hasFilters ? t("admin.products.noMatchText") : t("admin.products.emptyText")}>{!hasFilters && <ButtonLink href="/admin/products/new">{t("admin.products.new")}</ButtonLink>}</EmptyState></div>
           ) : (
             <div aria-busy={res.loading}>
-              <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
+              <div tabIndex={0} className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
                 <table className="w-full min-w-[56rem] text-left">
                   <caption className="sr-only">{t("admin.products.title")}</caption>
                   <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr>{(["product", "category", "status", "price", "stock", "actions"] as const).map((c) => <th key={c} scope="col" className={`px-3 py-3 font-medium ${c === "actions" ? "text-right" : ""}`}>{t(`admin.products.columns.${c}`)}</th>)}</tr></thead>

@@ -42,7 +42,7 @@ export function ReservationList() {
           <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
           <input id="rq" type="search" defaultValue={q} key={q} placeholder={t("admin.list.search")} onKeyDown={(e) => { if (e.key === "Enter") url.set({ q: (e.target as HTMLInputElement).value || undefined }); }} onBlur={(e) => { if (e.target.value !== q) url.set({ q: e.target.value || undefined }); }} className={`${field} w-full pl-9`} />
         </div>
-        <div role="group" aria-label={t("admin.list.status")} className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        <div tabIndex={0} role="group" aria-label={t("admin.list.status")} className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
           {[["", t("adminRes.quickAll")], ...QUICK.map((s) => [s, t(`status.${lower(s)}`)])].map(([v, label]) => (
             <button key={v} type="button" aria-pressed={status === v} onClick={() => url.set({ status: v || undefined })} className={`text-label min-h-10 shrink-0 rounded-full border px-3.5 font-semibold ${status === v ? "border-brand-700 bg-brand-50 text-brand-800" : "border-line-strong bg-surface text-ink-soft hover:text-ink"}`}>{label}</button>
           ))}
@@ -67,7 +67,7 @@ export function ReservationList() {
             <div className="rounded-card border border-line bg-surface"><EmptyState icon={<Search aria-hidden />} title={t("admin.list.emptyTitle")} description={t("admin.list.emptyText")}>{hasFilters && <Button onClick={url.clear}>{t("adminCommon.clearFilters")}</Button>}</EmptyState></div>
           ) : (
             <div aria-busy={res.loading}>
-              <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
+              <div tabIndex={0} className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
                 <table className="w-full min-w-[52rem] text-left">
                   <caption className="sr-only">{t("admin.list.title")}</caption>
                   <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr>{(["reference", "customer", "submitted", "items", "total", "payment", "status", "actions"] as const).map((c) => <th key={c} scope="col" className={`px-3 py-3 font-medium ${c === "items" ? "text-right" : ""}`}>{t(`admin.list.columns.${c}`)}</th>)}</tr></thead>

@@ -54,7 +54,7 @@ export function CustomerList() {
           {res.data.items.length === 0 ? (
             <div className="rounded-card border border-line bg-surface"><EmptyState icon={<Search aria-hidden />} title={t("admin.customers.emptyTitle")} description={hasFilters ? t("adminCommon.emptyFiltered") : t("admin.customers.emptyText")} /></div>
           ) : (
-            <div className="overflow-x-auto rounded-card border border-line bg-surface" aria-busy={res.loading}>
+            <div tabIndex={0} className="overflow-x-auto rounded-card border border-line bg-surface" aria-busy={res.loading}>
               <table className="w-full min-w-[44rem] text-left">
                 <caption className="sr-only">{t("admin.customers.title")}</caption>
                 <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr><th scope="col" className="px-3 py-3 font-medium">{t("admin.detail.labels.name")}</th><th scope="col" className="px-3 py-3 font-medium">{t("admin.detail.sections.customer")}</th><th scope="col" className="px-3 py-3 font-medium">{t("adminCust.kind")}</th><th scope="col" className="px-3 py-3 text-right font-medium">{t("admin.list.columns.items")}</th><th scope="col" className="px-3 py-3 font-medium">{t("adminCust.last")}</th></tr></thead>

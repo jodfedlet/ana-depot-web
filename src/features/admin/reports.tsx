@@ -98,7 +98,7 @@ export function ReportsView() {
                   </div>
                   <p className="text-caption px-5 pt-3 text-ink-muted">{t("adminDash.salesNote")}</p>
                   {rows.length === 0 ? <p className="text-label px-5 py-8 text-center font-normal text-ink-soft">{t("adminDash.noSalesDays")}</p> : (
-                    <div className="overflow-x-auto">
+                    <div tabIndex={0} className="overflow-x-auto">
                       <table className="text-label w-full min-w-[20rem] text-left font-normal">
                         <thead className="text-caption text-ink-muted"><tr><th scope="col" className="px-4 py-2 font-medium">{t("adminDash.bucketStart")}</th><th scope="col" className="px-2 py-2 text-right font-medium">{t("adminDash.reservationsCount")}</th><CurrencyHeads label={t("adminDash.value")} /></tr></thead>
                         <tbody className="divide-y divide-line">{rows.map((b) => <tr key={b.start}><th scope="row" className="px-4 py-2.5 font-normal">{fmt.date(b.start, "short")}</th><td className="px-2 py-2.5 text-right tabular-nums">{b.reservations}</td><CurrencyCells values={b.collected} /></tr>)}</tbody>
@@ -114,7 +114,7 @@ export function ReportsView() {
               <>
                 <p className="text-caption px-5 pt-3 text-ink-muted">{t("adminDash.paymentsNote")}</p>
                 {SUPPORTED_CURRENCIES.map((c) => (
-                  <div key={c} className="overflow-x-auto border-t border-line first:border-t-0">
+                  <div tabIndex={0} key={c} className="overflow-x-auto border-t border-line first:border-t-0">
                     <table className="text-label w-full min-w-[24rem] text-left font-normal">
                       <caption className="text-label px-4 pb-1 pt-3 text-left font-semibold">{c}</caption>
                       <thead className="text-caption text-ink-muted"><tr><th scope="col" className="px-5 py-2 font-medium">{t("adminDash.bucketStart")}</th>{(["payReceived", "payReversed", "payAdjustments", "payNet"] as const).map((k) => <th key={k} scope="col" className="px-3 py-2 text-right font-medium">{t(`adminDash.${k}`)}</th>)}</tr></thead>
@@ -129,7 +129,7 @@ export function ReportsView() {
                   <section aria-labelledby="pay-by-method" className="border-t border-line px-5 py-4">
                     <h3 id="pay-by-method" className="text-label font-semibold">{t("adminDash.payByMethod")}</h3>
                     <p className="text-caption mt-1 text-ink-muted">{t("adminDash.payByMethodNote")}</p>
-                    <div className="mt-3 overflow-x-auto">
+                    <div tabIndex={0} className="mt-3 overflow-x-auto">
                       <table className="text-label w-full min-w-[20rem] text-left font-normal">
                         <thead className="text-caption text-ink-muted"><tr><th scope="col" className="py-2 pr-3 font-medium">{t("admin.payments.columns.method")}</th>{SUPPORTED_CURRENCIES.map((c) => <th key={c} scope="col" className="px-2 py-2 text-right font-medium">{c}</th>)}</tr></thead>
                         <tbody className="divide-y divide-line">
@@ -153,7 +153,7 @@ export function ReportsView() {
 
             {result.tab === "products" && (
               result.data.rows.length === 0 ? <p className="text-label px-5 py-10 text-center font-normal text-ink-soft">{t("adminDash.empty")}</p> : (
-                <div className="overflow-x-auto">
+                <div tabIndex={0} className="overflow-x-auto">
                   <table className="text-label w-full min-w-[36rem] text-left font-normal">
                     <thead className="text-caption text-ink-muted"><tr><th scope="col" className="px-5 py-2 font-medium">{t("adminDash.productName")}</th><th scope="col" className="px-3 py-2 font-medium">{t("adminDash.productsCurrency")}</th><th scope="col" className="px-3 py-2 text-right font-medium">{t("adminDash.productQty")}</th><th scope="col" className="px-3 py-2 text-right font-medium">{t("adminDash.productReservations")}</th><th scope="col" className="px-5 py-2 text-right font-medium">{t("adminDash.productRevenue")}</th></tr></thead>
                     <tbody className="divide-y divide-line">{result.data.rows.map((r) => <tr key={`${r.productId}-${r.currency}`}><th scope="row" className="px-5 py-2.5 font-normal">{r.name} <span className="text-caption text-ink-muted">{r.sku}</span></th><td className="px-3 py-2.5">{r.currency}</td><td className="px-3 py-2.5 text-right tabular-nums">{r.quantity}</td><td className="px-3 py-2.5 text-right tabular-nums">{r.reservations}</td><td className="text-price px-5 py-2.5 text-right">{money(r.revenue, r.currency)}</td></tr>)}</tbody>

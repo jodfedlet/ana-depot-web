@@ -104,7 +104,7 @@ export function PaymentPanel({ reservation, onChanged }: { reservation: AdminRes
       <div>
         <Button variant="ghost" size="sm" onClick={() => setShowLedger((v) => !v)} aria-expanded={showLedger}>{showLedger ? t("adminRes.hideLedger") : t("adminRes.showLedger")}</Button>
         {showLedger && (ledger.error != null && !ledger.data ? <AdminErrorState error={ledger.error} onRetry={ledger.reload} /> : !ledger.data ? <Skeleton className="mt-2 h-20 w-full" /> : (
-          <div className="mt-2 overflow-x-auto"><table className="text-caption w-full min-w-[28rem] text-left">
+          <div tabIndex={0} className="mt-2 overflow-x-auto"><table className="text-caption w-full min-w-[28rem] text-left">
             <caption className="sr-only">{t("adminRes.ledger")}</caption>
             <thead className="text-ink-muted"><tr><th scope="col" className="py-1 font-medium">{t("adminRes.ledgerDate")}</th><th scope="col" className="py-1 font-medium">{t("adminRes.ledgerType")}</th><th scope="col" className="py-1 text-right font-medium">{t("adminRes.ledgerAmount")}</th><th scope="col" className="py-1 pl-3 font-medium">{t("adminRes.reason")}</th></tr></thead>
             <tbody className="divide-y divide-line">{ledger.data.map((e) => <tr key={e.id}><td className="py-1.5">{fmt.dateTime(e.at)}</td><td className="py-1.5">{t(`adminRes.ledgerTypes.${e.type}`)}</td><td className="py-1.5 text-right tabular-nums">{e.amount.startsWith("-") ? `−${money(e.amount.slice(1), e.currency)}` : money(e.amount, e.currency)}</td><td className="py-1.5 pl-3 text-ink-soft">{e.reason ?? "—"}</td></tr>)}</tbody>

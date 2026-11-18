@@ -91,7 +91,7 @@ export function InventoryView() {
       ) : (
         <div aria-busy={res.loading}>
           <p role="status" className="text-label mb-2 font-normal text-ink-soft">{t("adminCommon.results", { count: res.data.totalItems })}</p>
-          <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
+          <div tabIndex={0} className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
             <table className="w-full min-w-[52rem] text-left">
               <caption className="sr-only">{t("admin.inventory.title")}</caption>
               <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr>

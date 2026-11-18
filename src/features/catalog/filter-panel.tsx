@@ -223,7 +223,7 @@ export function CatalogToolbar({ data: serverData }: { data: CatalogFilterData }
         </p>
         <div className="ml-auto flex items-center gap-2">
           <label htmlFor="sort" className="text-label hidden text-ink-soft sm:block">{t("catalog.sortBy")}</label>
-          <select id="sort" value={query.sort ?? (query.q ? "relevance" : "newest")} onChange={(e) => go({ sort: e.target.value as SortKey })} className="text-label min-h-11 rounded-control border border-line-strong bg-surface px-3">
+          <select id="sort" aria-label={t("catalog.sortBy")} value={query.sort ?? (query.q ? "relevance" : "newest")} onChange={(e) => go({ sort: e.target.value as SortKey })} className="text-label min-h-11 rounded-control border border-line-strong bg-surface px-3">
             {sortKeys.filter((k) => k !== "relevance" || query.q).map((k) => <option key={k} value={k}>{t(`catalog.sort.${k}`)}</option>)}
           </select>
         </div>

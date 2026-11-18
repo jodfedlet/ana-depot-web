@@ -60,7 +60,7 @@ function CashAndCardPayments() {
           {res.data.items.length === 0 ? (
             <div className="rounded-card border border-line bg-surface"><EmptyState icon={<Search aria-hidden />} title={hasFilters ? t("admin.payments.noMatchTitle") : t("admin.payments.emptyTitle")} description={hasFilters ? t("admin.payments.noMatchText") : t("admin.payments.emptyText")} /></div>
           ) : (
-            <div className="overflow-x-auto rounded-card border border-line bg-surface" aria-busy={res.loading}>
+            <div tabIndex={0} className="overflow-x-auto rounded-card border border-line bg-surface" aria-busy={res.loading}>
               <table className="w-full min-w-[50rem] text-left">
                 <caption className="sr-only">{t("admin.payments.title")}</caption>
                 <thead className="text-caption border-b border-line bg-sand-50 text-ink-muted"><tr><th scope="col" className="px-3 py-3 font-medium">{t("admin.payments.columns.date")}</th><th scope="col" className="px-3 py-3 font-medium">{t("admin.payments.columns.reservation")}</th><th scope="col" className="px-3 py-3 text-right font-medium">{t("admin.payments.columns.amount")}</th><th scope="col" className="px-3 py-3 font-medium">{t("adminPay.filterMethod")}</th><th scope="col" className="px-3 py-3 font-medium">{t("admin.payments.columns.reference")}</th><th scope="col" className="px-3 py-3 font-medium">{t("admin.products.status")}</th></tr></thead>

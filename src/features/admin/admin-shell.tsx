@@ -144,7 +144,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <span className="text-label font-semibold lg:hidden">{t("admin.brand")}</span>
             <div className="ml-auto flex items-center gap-1 sm:gap-2">
               <LanguageSelector />
-              <Popover label={t("admin.topbar.notifications")} trigger={<><Bell aria-hidden className="size-5" />{pendingCount > 0 && <span aria-hidden className="grid min-w-5 place-items-center rounded-full bg-accent-600 px-1.5 text-xs font-bold text-white">{pendingCount}</span>}</>}>
+              <Popover label={pendingCount > 0 ? `${t("admin.topbar.notifications")} (${pendingCount})` : t("admin.topbar.notifications")} trigger={<><Bell aria-hidden className="size-5" />{pendingCount > 0 && <span aria-hidden data-count={pendingCount} className="grid min-w-5 place-items-center rounded-full bg-accent-600 px-1.5 text-xs font-bold text-white after:content-[attr(data-count)]" />}</>}>
                 <p className="text-label px-2 py-1.5 font-semibold">{t("admin.topbar.notifications")}</p>
                 {pendingCount === 0 ? <p className="text-label px-2 py-2 font-normal text-ink-soft">{t("admin.topbar.none")}</p> : (
                   <ul>

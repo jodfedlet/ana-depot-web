@@ -153,7 +153,7 @@ export function Dashboard() {
       <section aria-labelledby="top-title" className="rounded-card border border-line bg-surface">
         <div className="border-b border-line px-5 py-4"><h2 id="top-title" className="text-h3">{t("adminDash.topProducts")}</h2><p className="text-caption mt-1 text-ink-muted">{t("adminDash.topProductsNote")}</p></div>
         {top.rows.length === 0 ? <p className="text-label px-5 py-8 text-center font-normal text-ink-soft">{t("adminDash.topEmpty")}</p> : (
-          <div className="overflow-x-auto">
+          <div tabIndex={0} className="overflow-x-auto">
             <table className="text-label w-full min-w-[32rem] text-left font-normal">
               <thead className="text-caption text-ink-muted"><tr><th scope="col" className="px-5 py-2 font-medium">{t("adminDash.productName")}</th><th scope="col" className="px-3 py-2 font-medium">{t("adminDash.productsCurrency")}</th><th scope="col" className="px-3 py-2 text-right font-medium">{t("adminDash.productQty")}</th><th scope="col" className="px-5 py-2 text-right font-medium">{t("adminDash.productRevenue")}</th></tr></thead>
               <tbody className="divide-y divide-line">
