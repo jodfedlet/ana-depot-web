@@ -7,6 +7,7 @@ export type AdminAccess =
   | { state: "session_invalid" }
   | { state: "backend_unreachable"; email: string }
   | { state: "forbidden"; email: string }
+  | { state: "mfa_required"; me: Me }
   | { state: "allowed"; me: Me };
 
 export interface AccessDeps {
@@ -34,5 +35,6 @@ export async function resolveAdminAccess(deps: AccessDeps): Promise<AdminAccess>
   if (result.kind === "unauthorized") return { state: "session_invalid" };
   if (result.kind === "unreachable") return { state: "backend_unreachable", email: user.email };
   if (result.me.userId !== user.id) return { state: "session_invalid" }; // token and profile must describe the same person
-  return canAccessAdmin(result.me) ? { state: "allowed", me: result.me } : { state: "forbidden", email: user.email };
+  if (canAccessAdmin(result.me)) return { state: "allowed", me: result.me };
+  return result.me.mfaRequired ? { state: "mfa_required", me: result.me } : { state: "forbidden", email: user.email };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ChevronDown, ClipboardList, LayoutDashboard, Menu, Package, Boxes, Settings, Tags, Users, Wallet, BarChart3 } from "lucide-react";
+import { Bell, ChevronDown, ClipboardList, LayoutDashboard, Menu, Package, Boxes, Settings, Tags, UserCog, Users, Wallet, BarChart3 } from "lucide-react";
 import { Suspense, createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Wordmark } from "@/components/layout/wordmark";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,7 @@ const navItems: NavItem[] = [
   { href: "/admin/inventory", key: "admin.nav.inventory", icon: Boxes, badge: "stock" },
   { href: "/admin/customers", key: "admin.nav.customers", icon: Users },
   { href: "/admin/reports", key: "admin.nav.reports", icon: BarChart3 },
+  { href: "/admin/team", key: "adminTeam.nav", icon: UserCog },
   { href: "/admin/settings", key: "admin.nav.storeSettings", icon: Settings, alsoActive: ["/admin/pickup-settings"] },
 ];
 

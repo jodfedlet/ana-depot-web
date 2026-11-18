@@ -8,6 +8,7 @@ import { ShieldAlert, ServerCrash, Settings2 } from "lucide-react";
 import { AdminSignOutButton } from "./admin-actions";
 import { AdminIdentityProvider } from "./admin-identity";
 import { AdminShell } from "./admin-shell";
+import { StaffMfa } from "./staff-mfa";
 import { getAdminAccess } from "@/lib/auth/supabase-server";
 
 const displayName = (email: string) => {
@@ -34,6 +35,17 @@ export async function AdminGate({ locale, children }: { locale: Locale; children
   }
 
   const t = getT(locale);
+  if (access.state === "mfa_required") {
+    // an active team member whose session has not passed the second factor yet: nothing of the administration is rendered, only the verification step
+    return (
+      <div className="grid min-h-dvh place-items-center bg-sand-50 p-4">
+        <main id="main" className="w-full max-w-lg space-y-4 rounded-card border border-line bg-surface p-6">
+          <StaffMfa />
+          <AdminSignOutButton label={t("admin.guard.forbiddenAction")} variant="outline" />
+        </main>
+      </div>
+    );
+  }
   const view =
     access.state === "forbidden"
       ? { icon: <ShieldAlert aria-hidden />, title: t("admin.guard.forbiddenTitle"), text: t("admin.guard.forbiddenText", { email: access.email }), action: <AdminSignOutButton label={t("admin.guard.forbiddenAction")} /> }

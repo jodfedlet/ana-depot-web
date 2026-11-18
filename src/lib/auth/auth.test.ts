@@ -13,7 +13,7 @@ import { safeNextPath } from "./safe-next";
  * access decisions, request shape, state transitions). They do NOT prove that a real Supabase project accepts the
  * calls — that needs a real project (see docs/auth.md) and is not covered here.
  */
-const me = { userId: "u1", email: "a@b.co", emailVerified: true, staff: false, permissions: [] as string[], customerProfileId: null };
+const me = { userId: "u1", email: "a@b.co", emailVerified: true, staff: false, mfaRequired: false, permissions: [] as string[], customerProfileId: null };
 
 const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const jwtWithRole = (role: string) => `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ iss: "supabase", role })}.${"s".repeat(20)}`;
@@ -89,6 +89,11 @@ describe("parseMe / fetchMe (mocked fetch)", () => {
   it("rejects malformed bodies instead of trusting them", () => {
     expect(parseMe(me)).toEqual(me);
     expect(parseMe({ ...me, staff: "true" })).toBeNull();
+    expect(parseMe({ ...me, mfaRequired: "yes" })).toBeNull();                                  // a malformed flag is rejected, not guessed
+    expect(parseMe({ ...me, mfaRequired: true })).toMatchObject({ staff: false, mfaRequired: true });
+    expect(parseMe({ ...me, staff: true, mfaRequired: true })).toMatchObject({ staff: true, mfaRequired: false }); // never both: staff wins
+    const older = Object.fromEntries(Object.entries(me).filter(([k]) => k !== "mfaRequired"));   // an older API that does not send the flag
+    expect(parseMe(older)).toMatchObject({ mfaRequired: false });
     expect(parseMe({ ...me, permissions: [1] })).toBeNull();
     expect(parseMe({ ...me, userId: 5 })).toBeNull();
     expect(parseMe(null)).toBeNull();
@@ -125,6 +130,15 @@ describe("resolveAdminAccess (default deny, mocked dependencies)", () => {
     expect((await resolveAdminAccess({ ...base, fetchMe: async () => ({ kind: "unreachable" as const }) })).state).toBe("backend_unreachable");
     expect((await resolveAdminAccess({ ...base, fetchMe: async () => ({ kind: "ok" as const, me }) })).state).toBe("forbidden"); // a customer
     expect((await resolveAdminAccess({ ...base, fetchMe: async () => ({ kind: "ok" as const, me: { ...me, staff: true, userId: "someone-else" } }) })).state).toBe("session_invalid");
+  });
+  it("an active team member whose session lacks the second factor sees only the verification step, never the administration", async () => {
+    const needsMfa = { ...me, staff: false, mfaRequired: true };
+    const access = await resolveAdminAccess({ ...base, fetchMe: async () => ({ kind: "ok" as const, me: needsMfa }) });
+    expect(access.state).toBe("mfa_required");
+    // a customer is never sent to the verification step: that would reveal that the account is a team member's
+    expect((await resolveAdminAccess({ ...base, fetchMe: async () => ({ kind: "ok" as const, me }) })).state).toBe("forbidden");
+    // staff:true always wins, and an inconsistent answer (staff and mfaRequired together) is treated as plain staff by the API contract
+    expect((await resolveAdminAccess({ ...base, fetchMe: async () => ({ kind: "ok" as const, me: { ...me, staff: true, mfaRequired: false } }) })).state).toBe("allowed");
   });
   it("does not even ask the backend when there is no verified user", async () => {
     const fetchMe_ = vi.fn();
