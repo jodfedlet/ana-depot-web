@@ -38,7 +38,8 @@ async function makeReady(view) {
 const reservationOf = async (id) => (await admin("GET", `/admin/reservations/${id}`)).body;
 const paymentsOf = async (id) => (await admin("GET", `/admin/reservations/${id}/payments`)).body;
 const reconcile = async (id) => (await admin("GET", `/admin/reservations/${id}/reconciliation`)).body;
-const netUsd = async () => { const day = new Date().toISOString().slice(0, 10); const r = (await admin("GET", `/admin/reports/payments?from=${day}&to=${day}`)).body; return Number(r?.totals?.net?.USD ?? r?.totals?.USD?.net ?? 0); };
+// reports are bucketed in the STORE's time zone (America/Port-au-Prince), not UTC: after 19:00 Haiti time the UTC date is already tomorrow
+const netUsd = async () => { const day = new Date().toLocaleDateString("en-CA", { timeZone: "America/Port-au-Prince" }); const r = (await admin("GET", `/admin/reports/payments?from=${day}&to=${day}`)).body; return Number(r?.totals?.net?.USD ?? r?.totals?.USD?.net ?? 0); };
 const usd = (id) => ({ productId: id, quantity: 1, currency: "USD" });
 const htg = (id) => ({ productId: id, quantity: 1, currency: "HTG" });
 
