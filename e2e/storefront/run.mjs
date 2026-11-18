@@ -513,7 +513,8 @@ await run("errors", async () => {
   await page.unroute("**/api/v1/products**");
   await page.route("**/api/v1/store/pickup", () => { /* never answered: the client timeout applies */ });
   await page.goto(`${env.WEB}/fr/info/pickup`);
-  await sleep(12500);
+  // a GET that never answers is retried a bounded number of times with backoff (10 s timeout each): wait for the final message, not a fixed time
+  await page.getByText(/met trop de temps/).first().waitFor({ timeout: 90000 }).catch(() => {});
   t = await bodyText(page);
   check("timeout: translated 'server is slow' message with retry", /met trop de temps/.test(t));
 });

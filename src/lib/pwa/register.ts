@@ -31,6 +31,7 @@ export async function registerServiceWorker(): Promise<void> {
     return; // no worker: the site works exactly as before
   }
   const reg = registration;
+  if (!reg) return; // some environments (a browser with workers blocked) resolve to nothing instead of rejecting
   const flag = () => { if (reg.waiting && navigator.serviceWorker.controller) setPwaState({ updateReady: true }); };
   flag();
   reg.addEventListener("updatefound", () => {
