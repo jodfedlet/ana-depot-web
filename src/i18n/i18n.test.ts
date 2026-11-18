@@ -121,3 +121,58 @@ describe("date formatting", () => {
     expect(formatDate("2026-03-02T12:00:00Z", "ht", "short")).toBe("2 mas 2026");
   });
 });
+
+describe("payment messaging: Stripe card payment is part of the product, but is only mentioned when the backend says it is available", () => {
+  // keys whose text is shown when the card is NOT offered (pay at pickup only, card off, provider unreachable, unknown): they must be true whatever the provider does
+  const PICKUP_ONLY = ["announcement.message", "home.benefits.payTitle", "home.benefits.payText", "home.benefits.reserveText", "cart.noOnlinePayment", "product.payAtStore", "reserve.pickup.payIntro", "reserve.review.t4",
+    "reserve.confirmation.n4", "track.detail.payAtStore", "info.howSteps.s2", "info.howSteps.s5", "info.howSteps.payments", "statusDescription.ready_for_pickup", "onlinePay.atPickupText", "seo.infoHowDescription"];
+  // keys shown only when the card is offered: they must name BOTH ways of paying
+  const BOTH = PICKUP_ONLY.filter((k) => k !== "statusDescription.ready_for_pickup" && k !== "onlinePay.atPickupText" && k !== "seo.infoHowDescription" && k !== "info.howSteps.s2" && k !== "home.benefits.reserveText")
+    .map((k) => (k === "home.benefits.payTitle" ? "home.benefits.payTitleBoth" : k === "home.benefits.payText" ? "home.benefits.payTextBoth" : k === "announcement.message" ? "announcement.messageBoth" : `${k}Both`));
+  const CARD = { fr: /carte|Stripe/i, ht: /\bkat\b|Stripe/i };
+  const STORE = { fr: /magasin/i, ht: /magazen/i };
+
+  for (const [lang, flat] of [["fr", frFlat], ["ht", htFlat]] as const) {
+    it(`${lang}: wording used when no card is offered never advertises one (and never claims cash is the only way)`, () => {
+      for (const k of PICKUP_ONLY) {
+        expect(flat[k], `${lang} ${k} exists`).toBeTruthy();
+        expect(flat[k], `${lang} ${k} must not mention a card`).not.toMatch(CARD[lang]);
+        expect(flat[k], `${lang} ${k} must not say online payment is not requested/impossible`).not.toMatch(lang === "fr" ? /Aucun paiement en ligne n'est demandé|uniquement|seulement|en espèces, au magasin/i : /Yo pa mande w peye sou entènèt|sèlman|an lajan kach nan magazen an/i);
+      }
+    });
+    it(`${lang}: wording used when the card is offered names both the card and paying at the store`, () => {
+      for (const k of BOTH.filter((x) => x !== "home.benefits.payTitleBoth")) {   // the title is dictated and generic; its description names both ways
+        expect(flat[k], `${lang} ${k} exists`).toBeTruthy();
+        expect(flat[k], `${lang} ${k} mentions the card`).toMatch(CARD[lang]);
+        expect(flat[k], `${lang} ${k} still offers the store`).toMatch(STORE[lang]);
+      }
+    });
+    it(`${lang}: a card payment is never described as cash, and a cash payment is never described as a card`, () => {
+      const method = lang === "fr" ? { cash: flat["paymentMethod.cash_at_pickup"], card: flat["paymentMethod.stripe_checkout"] } : { cash: flat["paymentMethod.cash_at_pickup"], card: flat["paymentMethod.stripe_checkout"] };
+      expect(method.card).toMatch(CARD[lang]);
+      expect(method.card).not.toMatch(lang === "fr" ? /espèces/i : /lajan kach/i);
+      expect(method.cash).not.toMatch(CARD[lang]);
+    });
+  }
+
+  it("fr: the exact agreed wording is used where it was dictated", () => {
+    expect(frFlat["announcement.messageBoth"]).toBe("Réservez en ligne, payez par carte ou au magasin lors du retrait, selon les options disponibles.");
+    expect(frFlat["home.benefits.reserveTitle"]).toBe("Réservez en ligne");
+    expect(frFlat["home.benefits.reserveText"]).toBe("Choisissez vos produits et envoyez votre réservation en quelques clics.");
+    expect(frFlat["home.benefits.payTitleBoth"]).toBe("Payez comme vous le souhaitez");
+    expect(frFlat["home.benefits.payTextBoth"]).toBe("Payez en ligne par carte ou au magasin lors du retrait, selon les options proposées.");
+    expect(frFlat["home.benefits.wholesaleTitle"]).toBe("Prix dégressifs");
+    expect(frFlat["home.benefits.wholesaleText"]).toBe("Profitez de prix avantageux selon les quantités pour les produits concernés.");
+    expect(frFlat["home.benefits.trackTitle"]).toBe("Suivez votre réservation");
+    expect(frFlat["home.benefits.trackText"]).toBe("Consultez le statut de votre réservation à tout moment.");
+  });
+
+  it("the three phrases reported as misleading no longer exist anywhere in the customer catalogs (fr and ht)", () => {
+    const all = Object.entries({ ...frFlat, ...htFlat }).filter(([k]) => !k.startsWith("admin.") && !k.startsWith("adminPay.") && !k.startsWith("adminDash."));
+    for (const [k, v] of all) {
+      expect(v, k).not.toMatch(/Aucun paiement en ligne n'est demandé/);
+      expect(v, k).not.toMatch(/Le paiement se fait en espèces, au magasin/);
+      expect(v, k).not.toMatch(/Yo pa mande w peye sou entènèt\./);
+    }
+  });
+});

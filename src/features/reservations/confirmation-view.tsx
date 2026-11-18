@@ -16,6 +16,7 @@ import { useSession } from "@/lib/auth/use-session";
 import { OnlinePayPanel } from "@/features/payments/online-pay-panel";
 import { usePayerAccess } from "@/lib/api/online-payment-hooks";
 import { PickupInfoFor, ReservationStatusBadge, SectionCard, orderLinesOf } from "./shared";
+import { useCardOffered } from "@/lib/api/payment-capabilities";
 
 const subscribeNever = () => () => {};
 
@@ -26,6 +27,7 @@ const subscribeNever = () => () => {};
  */
 export function ConfirmationView({ reference }: { reference: string }) {
   const t = useT();
+  const cardOffered = useCardOffered();
   const { session } = useSession();
   // sessionStorage exists only in the browser: `undefined` while rendering on the server / hydrating, then the stored answer or null
   const raw = useSyncExternalStore(subscribeNever, () => recallSubmittedRaw(reference), () => undefined);
@@ -96,7 +98,7 @@ export function ConfirmationView({ reference }: { reference: string }) {
       <section aria-labelledby="next-title" className="rounded-card border border-line bg-surface p-5">
         <h2 id="next-title" className="text-h3 mb-3">{t("reserve.confirmation.nextTitle")}</h2>
         <ol className="text-label list-decimal space-y-2 pl-5 font-normal text-ink-soft">
-          <li>{t("reserve.confirmation.n1")}</li><li>{t("reserve.confirmation.n2")}</li><li>{t("reserve.confirmation.n3")}</li><li>{t("reserve.confirmation.n4")}</li>
+          <li>{t("reserve.confirmation.n1")}</li><li>{t("reserve.confirmation.n2")}</li><li>{t("reserve.confirmation.n3")}</li><li>{t(cardOffered ? "reserve.confirmation.n4Both" : "reserve.confirmation.n4")}</li>
         </ol>
       </section>
 

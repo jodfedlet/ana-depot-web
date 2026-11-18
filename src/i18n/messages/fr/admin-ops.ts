@@ -82,7 +82,7 @@ export const adminOps = {
     currenciesTitle: "Devises",
     currenciesText: "HTG et USD sont vendus dès le lancement. Chaque produit a son prix dans chaque devise ; il n'y a aucun taux de change.",
     paymentsTitle: "Modes de paiement",
-    paymentsText: "Espèces au retrait. MonCash et NatCash : bientôt disponibles.",
+    paymentsText: "Espèces au retrait, et carte en ligne (Stripe) lorsqu'elle est activée pour la boutique. MonCash et NatCash : bientôt disponibles.",
     notificationsTitle: "Notifications aux clients",
     notificationsText: "Le canal (SMS, e-mail ou WhatsApp) n'est pas décidé.",
     staffTitle: "Rôles et permissions du personnel",

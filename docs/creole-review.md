@@ -20,3 +20,9 @@ NATIVE REVIEW REQUIRED. Wording given by the business owner (used as supplied): 
 expiry sentences, the explanation that each currency is paid separately, the staff notes (no refund, do not mark as paid), and the reworded "you are not asked to pay now" lines that
 replaced the former "no online payment" statements (those would be false once Stripe is switched on).
 Points for the reviewer: "kòmann" (as supplied in the pay-at-pickup label) vs "kòmand" elsewhere; "debite" (to debit), "ranbousman" (refund), "tantativ" (attempt), "sesyon" (session).
+
+## Payment messaging (capability-aware wording; `ht/store.ts`, `ht/customer.ts`, `ht/seo.ts`, `ht/admin-ops.ts`)
+NATIVE REVIEW REQUIRED. Written by the assistant from the agreed French copy (no Creole text was supplied). Two variants exist for each sentence that depends on payment availability: the plain one (pay at the store only) and a `...Both` one (card online or at the store).
+Keys: `announcement.message/messageBoth/messageClosed`, `home.benefits.reserveText/payTitle/payText/payTitleBoth/payTextBoth/wholesaleText/trackText`, `cart.noOnlinePayment(Both)`, `product.payAtStore(Both)`, `info.howSteps.s2/s5(Both)/payments(Both)`,
+`reserve.pickup.payIntro(Both)/cardName/cardDesc/cardWhenReady`, `reserve.review.t4(Both)`, `reserve.confirmation.n4(Both)`, `track.detail.payAtStore(Both)`, `statusDescription.ready_for_pickup`, `onlinePay.atPickupText/temporarilyUnavailable`, `seo.infoHowDescription`, `admin.*.paymentsText`.
+Points for the reviewer: "peye ak kat" vs "peye sou entènèt ak kat" (pay by card / pay online by card); "Peye jan w vle" (Pay as you wish) as the title of the combined option; "disponib" vs "ki disponib yo" ("depending on available options"); whether "magazen an" or "boutik la" is preferred in customer text (the admin text uses "boutik").

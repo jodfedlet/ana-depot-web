@@ -4,8 +4,7 @@
 
 Next.js 16 App Router, React 19, TypeScript strict, Tailwind v4. Single seller, physical goods, **general merchandise** (never position it
 as a furniture/hardware/household specialist — the hero and home must stay category-neutral). Currencies: **HTG and USD** (decided).
-**Retail + wholesale** (per-product quantity price tiers, never wholesale-only). **Commerce model: reservation-first.** Customer reserves online → store reviews → customer visits → pays cash in
-person → collects. There is NO online payment and NO delivery yet. Launch market Haiti; languages `fr` and `ht`.
+**Retail + wholesale** (per-product quantity price tiers, never wholesale-only). **Commerce model: reservation-first.** Customer reserves online → store reviews → store marks it ready → customer pays (cash at pickup, or online with hosted Stripe Checkout once the store's Stripe account is configured; OFF by default) → collects. There is NO delivery. Launch market Haiti; languages `fr` and `ht`.
 The **customer storefront is connected to the real backend** (`../ana-depot-api`, Spring Boot): catalog, search, pickup, cart checks, guest reservations, tracking, customer account (`docs/storefront-integration.md`). The **administration is connected to the real admin APIs** too (`/api/v1/admin/**`, Phase 4; `docs/admin-integration.md`). No demo business data is left.
 Design: `docs/design-system.md` (read before changing UI). Business decisions still open: README.
 
@@ -44,7 +43,8 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
 - **Customer vs staff data:** `lib/reservations/customer-view.ts` is the customer view model (from the API's `CustomerReservationView` via `lib/api/map-reservation.ts`); it cannot express internal notes/staff names. Guests need reference **and** phone (checked by the SERVER; `reservations/access-store.ts` keeps them for the tab only).
 - Pickup disabled/not configured ⇒ the SERVER refuses (422) and the form is blocked too. MonCash/NatCash are "Bientôt disponible", disabled, never stored on a reservation.
 - Images: ticket -> direct PUT to the presigned URL (R2 in production, MinIO locally) -> complete.
-- Browser suite: `npm run e2e:admin` (`e2e/admin/README.md`).
+- Browser suites: `npm run e2e:admin` (`e2e/admin/README.md`), `e2e:a11y` (axe, 390/1280, fr+ht), `e2e:team` (team invitations + staff second factor; needs the API with `ANA_STAFF_REQUIRE_MFA=true`, the other suites need it off).
+- **Team and second factor:** `features/admin/team.tsx` (invite with a one-time code shown once, remove/restore access), `features/account/join-team.tsx` (code in the URL fragment), `features/admin/staff-mfa.tsx` (Supabase TOTP; the gate shows ONLY this step while `/me.mfaRequired`). Roles are still undecided (all members equal): `../ana-depot-api/docs/decisions.md`.
 
 ## Catalog domain
 - Catalog data (storefront and admin) comes from the API; `lib/catalog/model.ts` keeps only `unitIds`/`PriceTier`/`Pricing`. Category `attributes` drive the product form, PDP specs and filters — never hardcode fields per category.
@@ -52,7 +52,7 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
 - Catalog lists paginate (12/page): tests must search (`?q=`) rather than assume a product is on page 1.
 
 ## Currency rules (HTG + USD, decided — do not re-ask)
-- Each product has `pricing.currency`; retail/sale/tiers/variant prices share it. `PricingSnapshot`, cart lines and reservation lines carry it.
+- A product has one price set PER currency (see "Per-currency pricing" below); retail/sale/tiers of one set share its currency. `PricingSnapshot`, cart lines and reservation lines carry the currency.
 - **No exchange rate, no conversion, no cross-currency arithmetic.** `addMoney` throws on mixed currencies; totals use `sumByCurrency` (cart:
   `cartSubtotals`, reservation: `totals: Money[]`). Never reintroduce a single `total`.
 - Payments: `recordPayment` needs `currency` (must be one of the reservation's); `balances(r)` is per currency; status is `paid` only when every

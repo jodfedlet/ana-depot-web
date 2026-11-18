@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, ChevronDown, ShoppingBag } from "lucide-react";
+import { Banknote, ChevronDown, CreditCard, ShoppingBag } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { ApiErrorState } from "@/components/ui/api-error";
@@ -29,6 +29,7 @@ import { type Errors, focusFirstInvalid, isBlank, isValidEmail, isValidPhone } f
 import { usePaymentOptions } from "@/lib/api/online-payment-hooks";
 import { PickupInfo, SectionCard } from "./shared";
 import { Stepper } from "./stepper";
+import { useCardOffered } from "@/lib/api/payment-capabilities";
 
 interface Contact { firstName: string; lastName: string; dialCode: string; phone: string; email: string }
 type ContactErrors = Errors<keyof Contact>;
@@ -37,6 +38,7 @@ const stepIds: StepId[] = ["contact", "pickup", "review"];
 
 export function ReserveFlow() {
   const t = useT();
+  const cardOffered = useCardOffered();
   const locale = useLocale();
   const lt = useLText();
   const router = useLocaleRouter();
@@ -205,8 +207,10 @@ export function ReserveFlow() {
 
               <fieldset className="space-y-3">
                 <legend className="text-h3">{t("reserve.pickup.payTitle")}</legend>
-                <p className="text-label font-normal text-ink-soft">{t("reserve.pickup.payIntro")}</p>
+                <p className="text-label font-normal text-ink-soft">{t(cardOffered ? "reserve.pickup.payIntroBoth" : "reserve.pickup.payIntro")}</p>
                 <PaymentOption id="cash" checked label={t("reserve.payment.cashName")} description={t("reserve.payment.cashDesc")} badge={<Badge tone="success">{t("reserve.payment.available")}</Badge>} icon={<Banknote aria-hidden className="size-5" />} />
+                {/* The card option is shown only when the backend says it is available. It cannot be chosen now: checkout opens when the reservation is ready, and nothing is debited at reservation time. */}
+                {cardOffered && <PaymentOption id="card" disabled label={t("reserve.pickup.cardName")} description={t("reserve.pickup.cardDesc")} badge={<Badge tone="info">{t("reserve.pickup.cardWhenReady")}</Badge>} icon={<CreditCard aria-hidden className="size-5" />} />}
                 {/* Not operational yet: visible, labelled, and impossible to select */}
                 <PaymentOption id="moncash" disabled label={t("reserve.payment.moncash")} description={t("reserve.payment.soonNote")} badge={<Badge>{t("reserve.payment.soon")}</Badge>} />
                 <PaymentOption id="natcash" disabled label={t("reserve.payment.natcash")} description={t("reserve.payment.soonNote")} badge={<Badge>{t("reserve.payment.soon")}</Badge>} />
@@ -243,7 +247,7 @@ export function ReserveFlow() {
               <section aria-labelledby="terms-title" className="rounded-card border border-warning-fg/30 bg-warning-bg p-5">
                 <h3 id="terms-title" className="text-h3 text-warning-fg">{t("reserve.review.termsTitle")}</h3>
                 <ul className="text-label mt-3 list-disc space-y-1.5 pl-5 font-normal text-ink">
-                  <li>{t("reserve.review.t1")}</li><li>{t("reserve.review.t2")}</li><li>{t("reserve.review.t3")}</li><li>{t("reserve.review.t4")}</li><li>{t("reserve.review.t5")}</li>
+                  <li>{t("reserve.review.t1")}</li><li>{t("reserve.review.t2")}</li><li>{t("reserve.review.t3")}</li><li>{t(cardOffered ? "reserve.review.t4Both" : "reserve.review.t4")}</li><li>{t("reserve.review.t5")}</li>
                 </ul>
                 {terms ? (
                   <>
@@ -273,7 +277,7 @@ export function ReserveFlow() {
         <h2 className="text-h3 mb-4">{t("cart.summary")}</h2>
         <OrderLines lines={cart.lines} />
         <MoneyRows label={t("reserve.review.total")} totals={totals} className="text-label mt-5 border-t border-line pt-4" valueClassName="text-h3" />
-        <p className="text-caption mt-2 text-ink-muted">{t("cart.noOnlinePayment")}</p>
+        <p className="text-caption mt-2 text-ink-muted">{t(cardOffered ? "cart.noOnlinePaymentBoth" : "cart.noOnlinePayment")}</p>
       </aside>
     </div>
   );

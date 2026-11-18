@@ -19,6 +19,7 @@ import { availabilityTone, findVariant, hasVariants } from "@/lib/product";
 import { useCart } from "@/lib/stores/cart-store";
 import { OptionPicker } from "./option-picker";
 import { ProductGallery } from "./product-gallery";
+import { useCardOffered } from "@/lib/api/payment-capabilities";
 
 function initialSelection(product: Product): Record<string, string> {
   if (!hasVariants(product)) return {};
@@ -32,6 +33,7 @@ function initialSelection(product: Product): Record<string, string> {
  */
 export function ProductExperience({ product: allOffers, children }: { product: Product; children: ReactNode }) {
   const t = useT();
+  const cardOffered = useCardOffered();
   const unitLabel = useUnitLabel();
   const router = useLocaleRouter();
   const locale = useLocale();
@@ -149,7 +151,7 @@ export function ProductExperience({ product: allOffers, children }: { product: P
             </Button>
             <Button size="lg" variant="outline" className="flex-1" disabled={!canBuy} onClick={reserveNow}>{t("product.reserveNow")}</Button>
           </div>
-          <p className="text-caption text-ink-soft">{t("product.payAtStore")}</p>
+          <p className="text-caption text-ink-soft">{t(cardOffered ? "product.payAtStoreBoth" : "product.payAtStore")}</p>
         </div>
 
         <div className="mt-8">{children}</div>

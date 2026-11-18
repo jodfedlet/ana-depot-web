@@ -25,6 +25,7 @@ import { focusFirstInvalid, isBlank } from "@/lib/validation";
 import { OnlinePayPanel } from "@/features/payments/online-pay-panel";
 import { usePayerAccess } from "@/lib/api/online-payment-hooks";
 import { PaymentBalances, PaymentHistory, PaymentStatusBadge, PickupInfoFor, ReservationStatusBadge, SectionCard, Timeline, orderLinesOf, useCustomerTimeline } from "./shared";
+import { useCardOffered } from "@/lib/api/payment-capabilities";
 
 /** /reservations — guest lookup. The reference alone is never enough: the phone number is verified by the server too. */
 export function LookupForm() {
@@ -114,6 +115,7 @@ function Gate({ reference, verify }: { reference: string; verify: (phone: string
  */
 export function CustomerReservationDetail({ reference }: { reference: string }) {
   const t = useT();
+  const cardOffered = useCardOffered();
   const fmt = useFormat();
   const { session } = useSession();
   const mineId = useSearchParams().get("mine") ?? undefined;
@@ -176,7 +178,7 @@ export function CustomerReservationDetail({ reference }: { reference: string }) 
               <h3 className="text-label mb-2 font-semibold">{t("track.detail.paymentsTitle")}</h3>
               <PaymentHistory payments={view.payments} />
             </div>
-            {view.payment.status !== "paid" && <p className="text-caption mt-3 text-ink-soft">{t("track.detail.payAtStore")}</p>}
+            {view.payment.status !== "paid" && <p className="text-caption mt-3 text-ink-soft">{t(cardOffered ? "track.detail.payAtStoreBoth" : "track.detail.payAtStore")}</p>}
             <div className="mt-3"><OnlinePayPanel view={view} access={payAccess} /></div>
           </SectionCard>
           <SectionCard title={t("pickup.title")}>

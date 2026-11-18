@@ -3,6 +3,7 @@
 import { LanguageSelector } from "@/i18n/language-selector";
 import { Link } from "@/i18n/link";
 import { useT } from "@/i18n/provider";
+import { usePaymentCapabilities } from "@/lib/api/payment-capabilities";
 import { siteConfig } from "@/config/site";
 import { SearchBox } from "@/features/search/search-box";
 import { AccountLink } from "./account-link";
@@ -14,13 +15,14 @@ import { Wordmark } from "./wordmark";
 
 export function Header() {
   const t = useT();
+  const { mode } = usePaymentCapabilities();   // the announcement states only what the backend says can be paid right now
   const nav = useNavItems();
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/95 backdrop-blur supports-[backdrop-filter]:bg-canvas/85">
       {siteConfig.showAnnouncement && (
         <div className="bg-brand-800 text-white">
           <p className="container-page text-caption flex min-h-9 flex-wrap items-center justify-center gap-x-2 py-1.5 text-center">
-            <span>{t("announcement.message")}</span>
+            <span>{t(mode === "both" ? "announcement.messageBoth" : mode === "closed" ? "announcement.messageClosed" : "announcement.message")}</span>
             <Link href={siteConfig.announcementHref} className="font-semibold underline underline-offset-2">
               {t("announcement.link")}
             </Link>

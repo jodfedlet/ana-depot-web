@@ -7,6 +7,7 @@ import { ApiErrorState } from "@/components/ui/api-error";
 import { ProductGrid } from "@/features/catalog/product-card";
 import { Link } from "@/i18n/link";
 import { useT } from "@/i18n/provider";
+import { useCardOffered } from "@/lib/api/payment-capabilities";
 import { type CatalogInitial, useCatalogPage, useCategories } from "@/lib/api/catalog-hooks";
 import { HOME_QUERY } from "@/lib/catalog-query";
 import type { Category } from "@/lib/catalog-types";
@@ -42,10 +43,11 @@ export function Hero() {
 
 export function Benefits() {
   const t = useT();
+  const cardOffered = useCardOffered();
   const items = [
     { icon: ShoppingBag, title: t("home.benefits.reserveTitle"), text: t("home.benefits.reserveText") },
     { icon: Percent, title: t("home.benefits.wholesaleTitle"), text: t("home.benefits.wholesaleText") },
-    { icon: Wallet, title: t("home.benefits.payTitle"), text: t("home.benefits.payText") },
+    { icon: Wallet, title: t(cardOffered ? "home.benefits.payTitleBoth" : "home.benefits.payTitle"), text: t(cardOffered ? "home.benefits.payTextBoth" : "home.benefits.payText") },
     { icon: PackageSearch, title: t("home.benefits.trackTitle"), text: t("home.benefits.trackText") },
   ];
   return (

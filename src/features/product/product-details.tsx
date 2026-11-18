@@ -6,12 +6,14 @@ import { Link } from "@/i18n/link";
 import { useT } from "@/i18n/provider";
 import type { Product } from "@/lib/catalog-types";
 import { usePickupView } from "@/lib/api/pickup-hooks";
+import { useCardOffered } from "@/lib/api/payment-capabilities";
 
 const section = "border-t border-line py-5";
 
 /** Description, specifications (built from the category's attributes) and a short pickup/payment note. */
 export function ProductDetails({ product }: { product: Product }) {
   const t = useT();
+  const cardOffered = useCardOffered();
   const unitLabel = useUnitLabel();
   const { view } = usePickupView();
   const loc = view?.status === "available" ? view.location : null;
@@ -50,7 +52,7 @@ export function ProductDetails({ product }: { product: Product }) {
           </li>
           <li className="flex gap-3">
             <Wallet aria-hidden className="mt-0.5 size-5 shrink-0 text-brand-700" />
-            <p className="text-label font-normal text-ink-soft">{t("product.payAtStore")}</p>
+            <p className="text-label font-normal text-ink-soft">{t(cardOffered ? "product.payAtStoreBoth" : "product.payAtStore")}</p>
           </li>
         </ul>
         <p className="text-caption mt-3 text-ink-muted">{t("product.needsApproval")} <Link href="/info/how-it-works" className="font-semibold text-brand-700 underline underline-offset-2">{t("announcement.link")}</Link></p>

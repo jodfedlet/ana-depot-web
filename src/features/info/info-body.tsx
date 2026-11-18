@@ -6,10 +6,12 @@ import { Skeleton } from "@/components/ui/states";
 import { PickupInfo } from "@/features/reservations/shared";
 import { useLText, useT } from "@/i18n/provider";
 import { usePickupView } from "@/lib/api/pickup-hooks";
+import { useCardOffered } from "@/lib/api/payment-capabilities";
 
 /** Info page content. "how" is real (it describes the implemented model); "pickup" shows live settings; others wait for business text. */
 export function InfoBody({ kind }: { kind: "how" | "pickup" | "placeholder" }) {
   const t = useT();
+  const cardOffered = useCardOffered();
   const lt = useLText();
   const { view, loading, error, reload } = usePickupView();
 
@@ -18,9 +20,9 @@ export function InfoBody({ kind }: { kind: "how" | "pickup" | "placeholder" }) {
       <div className="mt-6">
         <h2 className="text-h2">{t("info.howSteps.title")}</h2>
         <ol className="text-body mt-4 list-decimal space-y-3 pl-6 text-ink-soft">
-          <li>{t("info.howSteps.s1")}</li><li>{t("info.howSteps.s2")}</li><li>{t("info.howSteps.s3")}</li><li>{t("info.howSteps.s4")}</li><li>{t("info.howSteps.s5")}</li>
+          <li>{t("info.howSteps.s1")}</li><li>{t("info.howSteps.s2")}</li><li>{t("info.howSteps.s3")}</li><li>{t("info.howSteps.s4")}</li><li>{t(cardOffered ? "info.howSteps.s5Both" : "info.howSteps.s5")}</li>
         </ol>
-        <Alert tone="info" className="mt-6">{t("info.howSteps.payments")}</Alert>
+        <Alert tone="info" className="mt-6">{t(cardOffered ? "info.howSteps.paymentsBoth" : "info.howSteps.payments")}</Alert>
       </div>
     );
   }

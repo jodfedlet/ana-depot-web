@@ -22,7 +22,7 @@ import type { CustomerReservation } from "@/lib/reservations/customer-view";
 export function OnlinePayPanel({ view, access }: { view: CustomerReservation; access: PayerAccess | null }) {
   const t = useT();
   const locale = useLocale();
-  const { currencies, loading } = usePaymentOptions();
+  const { currencies, loading, online: onlineStatus } = usePaymentOptions();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<{ key: string; uncertain: boolean } | null>(null);
 
@@ -33,8 +33,13 @@ export function OnlinePayPanel({ view, access }: { view: CustomerReservation; ac
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
-  if (loading || currencies.length === 0) return null;
+  if (loading) return null;
   if (view.payment.status === "paid") return null;
+  // switched on but the provider cannot be reached: say so (the reservation and paying at pickup are unaffected) instead of silently offering nothing
+  if (currencies.length === 0 && onlineStatus === "temporarily_unavailable" && acceptsOnlinePayment(view.status)) {
+    return <Alert tone="info" live="polite">{t("onlinePay.temporarilyUnavailable")}</Alert>;
+  }
+  if (currencies.length === 0) return null;
   const { online, atStoreOnly } = splitDue(view.balances, currencies);
   const ready = acceptsOnlinePayment(view.status);
   if (!ready && !announcesOnlinePayment(view.status)) return null;

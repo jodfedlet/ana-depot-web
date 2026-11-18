@@ -18,9 +18,11 @@ import { useCartCheck } from "@/lib/api/cart-check";
 import { formatMoney } from "@/lib/money";
 import { useCart } from "@/lib/stores/cart-store";
 import { useOnline } from "@/lib/pwa/store";
+import { useCardOffered } from "@/lib/api/payment-capabilities";
 
 export function CartView() {
   const t = useT();
+  const cardOffered = useCardOffered();
   const locale = useLocale();
   const unitLabel = useUnitLabel();
   const cart = useCart();
@@ -103,7 +105,7 @@ export function CartView() {
         <p className="text-caption mt-3 text-ink-muted">{t("cart.note")}</p>
         <ButtonLink href="/reserve" size="lg" full className="mt-5" aria-disabled={blocked || !online || undefined} tabIndex={blocked || !online ? -1 : undefined}>{t("cart.reserve")}</ButtonLink>
         {!online && <p className="text-caption mt-2 text-center font-medium text-warning-fg">{t("pwa.reserveOffline")}</p>}
-        <p className="text-caption mt-3 text-center font-medium text-ink">{t("cart.noOnlinePayment")}</p>
+        <p className="text-caption mt-3 text-center font-medium text-ink">{t(cardOffered ? "cart.noOnlinePaymentBoth" : "cart.noOnlinePayment")}</p>
         <p className="text-caption mt-1 text-center text-ink-soft">{t("cart.guest")}</p>
       </aside>
     </div>

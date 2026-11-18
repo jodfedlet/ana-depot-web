@@ -73,7 +73,7 @@ try {
     await page.getByLabel("Prénom").fill(who.first); await page.getByLabel("Nom", { exact: true }).fill(who.last); await page.getByLabel("Téléphone").fill(who.phone);
     await page.getByRole("button", { name: "Continuer vers le retrait" }).click();
     await page.getByRole("button", { name: "Continuer vers la vérification" }).waitFor();
-    check("pickup step: no card fields; pay-at-pickup wording", (await noCard(page)) && /sans payer maintenant, et sans carte/.test(await text(page)));
+    check("pickup step: no card fields; the reservation is made without paying, and the card option is announced for when it is ready (the real capability answer says BOTH)", (await noCard(page)) && /Vous réservez sans payer maintenant\. Quand votre réservation est prête, vous payez par carte en ligne ou au magasin/.test(await text(page)) && /Carte en ligne \(Stripe\)/.test(await text(page)));
     await page.getByRole("button", { name: "Continuer vers la vérification" }).click();
     await page.getByRole("button", { name: /Envoyer la réservation/ }).waitFor();
     const review = await text(page);

@@ -84,7 +84,7 @@ export const adminOps: typeof frAdminOps = {
     currenciesTitle: "Monnen",
     currenciesText: "Yo vann an HTG ak an USD depi lansman an. Chak pwodwi gen pri li nan chak monnen; pa gen okenn to chanj.",
     paymentsTitle: "Mòd peman",
-    paymentsText: "Lajan kach nan retrè a. MonCash ak NatCash: talè konsa.",
+    paymentsText: "Lajan kach nan retrè a, ak kat sou entènèt (Stripe) lè yo aktive l pou boutik la. MonCash ak NatCash: talè konsa.",
     notificationsTitle: "Notifikasyon pou kliyan yo",
     notificationsText: "Yo poko deside ki kanal pou yo itilize (SMS, imèl oswa WhatsApp).",
     staffTitle: "Wòl ak pèmisyon anplwaye yo",

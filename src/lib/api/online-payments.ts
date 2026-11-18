@@ -14,7 +14,13 @@ import type { ReservationStatusDto } from "./dto";
  * sends an amount (the backend charges the current due of ONE currency), never decides success, and never talks to Stripe except by navigating to the
  * hosted page the backend returned.
  */
-export interface PaymentOptionsDto { online: { provider: "STRIPE"; currencies: string[] } | null }
+/** The backend's statement of what can be paid right now (`onlineStatus`, `atPickup`, `summary` are absent on an older API: see lib/payments/capabilities.ts). */
+export interface PaymentOptionsDto {
+  online: { provider: "STRIPE"; currencies: string[] } | null;
+  onlineStatus?: "AVAILABLE" | "DISABLED" | "TEMPORARILY_UNAVAILABLE";
+  atPickup?: { available: boolean };
+  summary?: "BOTH" | "PICKUP_ONLY" | "NONE";
+}
 export interface CheckoutSessionDto { attemptId: string; checkoutUrl: string; currency: string; amount: string; expiresAt: string; reused: boolean }
 export interface PaymentAttemptDto { id: string; currency: string; amount: string; status: AttemptStatus; settledAt?: string | null; createdAt: string }
 export interface PaymentStatusDto {

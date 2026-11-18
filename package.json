@@ -15,6 +15,8 @@
     "e2e:storefront": "node e2e/storefront/run.mjs",
     "e2e:admin": "node e2e/admin/run.mjs",
     "e2e:team": "node e2e/admin/team.mjs",
+    "e2e:a11y": "node e2e/a11y/run.mjs",
+    "e2e:payment-messaging": "node e2e/storefront/payment-messaging.mjs",
     "e2e:stripe": "node e2e/storefront/stripe.mjs",
     "e2e:stripe-real": "node e2e/storefront/stripe-real.mjs",
     "e2e:pwa": "node e2e/pwa/run.mjs"
@@ -32,6 +34,7 @@
     "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "axe-core": "^4.14.1",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "playwright-core": "^1.65.1",

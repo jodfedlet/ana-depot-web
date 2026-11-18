@@ -112,7 +112,11 @@ authorizes every `/api/v1/admin/**` request from the bearer token; the gate deci
 ## Provisioning the first administrator
 There is **no** UI or public endpoint for it, by design, and no hard-coded credentials. The process (details in `../ana-depot-api/docs/auth.md`): the owner
 creates (or invites) the user in Supabase Auth, then a trusted operator inserts that user's Supabase `sub` into the backend's `staff_members` table using the documented
-one-off administrative procedure. Until that row exists the user is just a customer.
+one-off administrative procedure (`ANA_BOOTSTRAP_ADMIN_SUBJECT`). Until that row exists the user is just a customer.
+
+## Team and second factor (after the first administrator)
+- **Further team members join with a one-time code**, not by editing the database: *Administration > Équipe* creates a code (shown once; the API stores only its hash), the colleague signs in with their own account and opens `/{locale}/account/join-team` (the link carries the code in the URL *fragment*, which browsers never send to a server; the page removes it from the address bar when it is used). A wrong, used, revoked or expired code gives one and the same message. Members can be removed and restored; nobody changes their own access; the last active member cannot be removed. All members have the same rights (roles: decision D14).
+- **Second factor.** When the API runs with `ANA_STAFF_REQUIRE_MFA=true`, `/me` answers `staff:false, mfaRequired:true` for a team member whose session has not passed a TOTP code, and the gate (`resolveAdminAccess` state `mfa_required`) renders ONLY `features/admin/staff-mfa.tsx`: enrol (QR + key) or verify, using Supabase Auth MFA with the public key. After success the page reloads and the server asks the API again; the API trusts only the signed `aal2` claim. Verified locally by `npm run e2e:team`; the hosted Supabase project must have TOTP enabled.
 
 ## Customer UX covered (French + Haitian Creole)
 Sign-in, registration, verification pending/success/failure with resend, password recovery and reset (incl. expired link), expired session, invalid credentials,

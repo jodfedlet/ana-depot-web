@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { recallAccess } from "../reservations/access-store";
 import { isTerminalAttempt, pollDelayMs } from "../payments/online";
 import { useSession } from "../auth/use-session";
-import { getPaymentOptions, getPaymentStatus, toPaymentStatusView, type PayerAccess, type PaymentStatusView } from "./online-payments";
+import { usePaymentCapabilities } from "./payment-capabilities";
+import { getPaymentStatus, toPaymentStatusView, type PayerAccess, type PaymentStatusView } from "./online-payments";
 import { ApiError } from "./http";
 import { useApiResource } from "./use-resource";
 
@@ -13,8 +14,8 @@ import { useApiResource } from "./use-resource";
  * "no online option": the reservation and pay-at-pickup never depend on this call.
  */
 export function usePaymentOptions() {
-  const { data, loading } = useApiResource("payment-options", (signal) => getPaymentOptions({ signal }));
-  return { currencies: data?.online?.currencies ?? [], loading };
+  const { currencies, loading, online } = usePaymentCapabilities();
+  return { currencies, loading, online };
 }
 
 /** How this visitor proves the reservation: the phone typed in this tab (guest) or the signed-in owner. Null = neither (ask for the phone). */
