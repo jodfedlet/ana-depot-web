@@ -58,7 +58,7 @@ export function LoginForm({ status }: { status?: "expired" | "signed_out" }) {
       <CardContent>
         {status === "expired" && <Alert tone="info" className="mb-5">{t("auth.sessionExpired")}</Alert>}
         {status === "signed_out" && <Alert tone="success" live="polite" className="mb-5">{t("auth.signedOut")}</Alert>}
-        <form onSubmit={handleLogin} noValidate>
+        <form method="post" onSubmit={handleLogin} noValidate>
           <div className="flex flex-col gap-5">
             <div className="grid gap-2">
               <Label htmlFor="email">{t("auth.email")}</Label>

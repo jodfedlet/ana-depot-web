@@ -160,7 +160,7 @@ export function ReserveFlow() {
 
         <div className="mt-8">
           {step === "contact" && (
-            <form ref={formRef} onSubmit={continueContact} noValidate className="space-y-6">
+            <form method="post" ref={formRef} onSubmit={continueContact} noValidate className="space-y-6">
               <h2 ref={headingRef} tabIndex={-1} className={heading}>{t("reserve.contact.title")}</h2>
               <p className="text-label font-normal text-ink-soft">
                 {t("reserve.contact.intro")}{" "}

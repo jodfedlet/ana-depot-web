@@ -130,7 +130,7 @@ function PhoneGate({ reference, attemptId }: { reference: string; attemptId?: st
     <div className="mx-auto max-w-md">
       <h1 className="text-h1">{t("onlinePay.return.phoneTitle")}</h1>
       <p className="text-body mt-2 text-ink-soft">{t("onlinePay.return.phoneText")}</p>
-      <form onSubmit={submit} noValidate className="mt-6 space-y-5 rounded-card border border-line bg-surface p-5">
+      <form method="post" onSubmit={submit} noValidate className="mt-6 space-y-5 rounded-card border border-line bg-surface p-5">
         <TextField label={t("track.lookup.reference")} value={reference} readOnly />
         <TextField label={t("track.lookup.phone")} type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setError(undefined); }} error={error} />
         <Button type="submit" size="lg" full loading={loading}>{t("onlinePay.return.phoneSubmit")}</Button>

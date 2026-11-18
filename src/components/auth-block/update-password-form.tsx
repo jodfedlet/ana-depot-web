@@ -54,7 +54,7 @@ export function UpdatePasswordForm() {
         <CardDescription>{t("auth.update.description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleUpdate} noValidate>
+        <form method="post" onSubmit={handleUpdate} noValidate>
           <div className="flex flex-col gap-5">
             <div className="grid gap-2">
               <Label htmlFor="password">{t("auth.update.label")}</Label>

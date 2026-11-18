@@ -56,7 +56,7 @@ export function ForgotPasswordForm() {
         <CardDescription>{t("auth.forgot.description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleForgotPassword} noValidate>
+        <form method="post" onSubmit={handleForgotPassword} noValidate>
           <div className="flex flex-col gap-5">
             <div className="grid gap-2">
               <Label htmlFor="email">{t("auth.email")}</Label>

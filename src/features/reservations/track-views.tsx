@@ -69,7 +69,7 @@ export function LookupForm() {
           <Link href="/account/reservations" className="font-semibold underline underline-offset-2">{t("track.lookup.account")}</Link>
         </Alert>
       )}
-      <form ref={formRef} onSubmit={submit} noValidate className="mt-6 space-y-5 rounded-card border border-line bg-surface p-5 sm:p-7">
+      <form method="post" ref={formRef} onSubmit={submit} noValidate className="mt-6 space-y-5 rounded-card border border-line bg-surface p-5 sm:p-7">
         {failure && <Alert tone="danger" live="assertive" title={t("track.lookup.errorTitle")}>{failure}</Alert>}
         <TextField label={t("track.lookup.reference")} hint={t("track.lookup.referenceHint")} autoComplete="off" autoCapitalize="characters" spellCheck={false} value={reference} onChange={(e) => { setReference(e.target.value); setErrors((x) => ({ ...x, reference: undefined })); }} error={errors.reference} />
         <TextField label={t("track.lookup.phone")} type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setErrors((x) => ({ ...x, phone: undefined })); }} error={errors.phone} />
@@ -99,7 +99,7 @@ function Gate({ reference, verify }: { reference: string; verify: (phone: string
     <div className="mx-auto max-w-md">
       <h1 className="text-h1">{t("track.gate.title")}</h1>
       <p className="text-body mt-2 text-ink-soft">{t("track.gate.text")}</p>
-      <form onSubmit={submit} noValidate className="mt-6 space-y-5 rounded-card border border-line bg-surface p-5">
+      <form method="post" onSubmit={submit} noValidate className="mt-6 space-y-5 rounded-card border border-line bg-surface p-5">
         <TextField label={t("track.lookup.reference")} value={reference} readOnly />
         <TextField label={t("track.lookup.phone")} type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setError(undefined); }} error={error} />
         <Button type="submit" size="lg" full loading={loading}>{t("track.gate.submit")}</Button>

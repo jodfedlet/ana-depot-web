@@ -228,7 +228,7 @@ function ProfileForm({ initial }: { initial: { firstName: string | null; lastNam
   };
   const edit = (k: keyof typeof draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setDraft({ ...draft, [k]: e.target.value }); setErrors((x) => ({ ...x, [k]: "" })); };
   return (
-    <form onSubmit={submit} noValidate className="mt-6 grid max-w-xl gap-4 sm:grid-cols-2">
+    <form method="post" onSubmit={submit} noValidate className="mt-6 grid max-w-xl gap-4 sm:grid-cols-2">
       {failure != null && <div className="sm:col-span-2">{isSessionProblem(failure) ? <AccountError error={failure} onRetry={() => setFailure(undefined)} /> : <Alert tone="danger" live="assertive">{t(apiErrorKey(failure))}</Alert>}</div>}
       <TextField label={t("account.profile.firstName")} autoComplete="given-name" value={draft.firstName} onChange={edit("firstName")} error={errors.firstName} />
       <TextField label={t("account.profile.lastName")} autoComplete="family-name" value={draft.lastName} onChange={edit("lastName")} error={errors.lastName} />
