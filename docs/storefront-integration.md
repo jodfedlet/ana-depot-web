@@ -116,3 +116,6 @@ Verification: `npm run e2e:stripe` (e2e/storefront/stripe.mjs) is **MOCKED** (Pl
 **Local verification switch (never in production).** `NEXT_PUBLIC_CHECKOUT_TEST_ORIGIN` (build time, e.g. `http://127.0.0.1:9199` for the API repo's fake Stripe) makes the redirect check also accept
 EXACTLY that origin. Every other host, scheme, port and any credentials stay refused (unit-tested). A production build with it set prints a build warning. `/payment/*` pages are private: `Cache-Control: private, no-store`,
 never cached by the service worker, `noindex`.
+
+## Hosted staging
+Environment template and the readiness audit live in the API repository: `../ana-depot-api/docs/staging/` (`web.staging.env.template`, `dev/staging/check-env.mjs` checks that the web and API terms versions, CORS origin and asset origin agree).
