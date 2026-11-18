@@ -5,7 +5,7 @@ import type { PriceKind } from "../catalog/pricing";
 import type { LText } from "../localized";
 import type { Money } from "../money";
 import type { DayNumber, PickupInstructions, PickupLocation } from "../pickup/types";
-import type { CustomerBalance, CustomerEvent, CustomerLine, CustomerReservation } from "../reservations/customer-view";
+import type { CustomerBalance, CustomerEvent, CustomerLine, CustomerPayment, CustomerReservation } from "../reservations/customer-view";
 import { type EventType, type PaymentStatus, type RejectReason, type ReservationStatus, rejectReasons, reservationStatuses } from "../reservations/types";
 import { decimalToMinor } from "./decimal";
 import type { LTextDto, PickupDto, PickupInstructionsDto, PickupLocationDto, ReservationViewDto } from "./dto";
@@ -101,6 +101,13 @@ export function toCustomerReservation(dto: ReservationViewDto): CustomerReservat
     balances.push({ currency: b.currency, total, paid, due });
   }
 
+  const payments: CustomerPayment[] = [];
+  for (const [i, p] of (dto.payments ?? []).entries()) {
+    const money = amount(p.amount, p.currency);
+    if (!money) return null;
+    payments.push({ id: `${p.method}-${p.receivedAt}-${i}`, money, method: p.method, receivedAt: p.receivedAt, reversed: p.reversed === true });
+  }
+
   const events: CustomerEvent[] = dto.events.flatMap((e, i) => {
     const type = EVENT[e.type];
     if (!type) return []; // an event kind this client does not know is left out rather than mislabelled
@@ -128,6 +135,7 @@ export function toCustomerReservation(dto: ReservationViewDto): CustomerReservat
     totals,
     balances,
     payment: { status: paymentStatus, paid: balances.map((b) => b.paid).filter((p) => p.amount > 0) },
+    payments,
     pickup: location && location.storeName ? { location: toPickupLocation(location), instructions: toPickupInstructions(dto.pickup?.instructions) } : null,
     readyAt: dto.readyAt ?? undefined,
     expiresAt: dto.expiresAt ?? undefined,

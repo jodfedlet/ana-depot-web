@@ -24,7 +24,7 @@ export const customer: typeof frCustomer = {
     expired: "Rezèvasyon sa a ekspire paske pesonn pa t vin pran l nan delè ki te prevwa a.",
   },
   paymentStatus: { unpaid: "Pa peye", partial: "Peye yon pati", paid: "Peye nèt" },
-  paymentMethod: { cash_at_pickup: "Lajan kach le w vin pran l", stripe_checkout: "Kat sou entènèt (Stripe)" },
+  paymentMethod: { cash_at_pickup: "Lajan kach le w vin pran l", stripe_checkout: "Kat sou entènèt (Stripe)", other: "Lòt fason" },
   rejectReasons: {
     product_unavailable: "Pwodwi a pa disponib",
     incorrect_product_info: "Enfòmasyon sou pwodwi a pa kòrèk",
@@ -191,6 +191,9 @@ export const customer: typeof frCustomer = {
       paymentMethod: "Fason pou peye",
       paymentStatus: "Eta peman an",
       amountPaid: "Montan resevwa",
+      paymentsTitle: "Peman ki resevwa",
+      paymentsNone: "Poko gen peman ki resevwa.",
+      paymentReversed: "magazen an anile l",
       payAtStore: "Ou peye nan magazen an le w vin pran pwodwi yo.",
       expiresOn: "Pou pran anvan {date}",
       contact: "Enfòmasyon kontak ou",

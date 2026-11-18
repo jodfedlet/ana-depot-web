@@ -95,6 +95,8 @@ export const adminLive: typeof frAdminLive = {
     payReversed: "Anile",
     payAdjustments: "Ajisteman",
     payNet: "Nèt",
+    payByMethod: "Resevwa dapre fason yo peye",
+    payByMethodNote: "Lajan kach nan magazen an ak peman sou entènèt yo konte separe, pa monnen.",
     paymentsNote: "Dapre jounal peman yo (resevwa, anilasyon, ajisteman), pa monnen epi pa dat ekriti a.",
     productsCurrency: "Monnen",
     allCurrencies: "Tout monnen",

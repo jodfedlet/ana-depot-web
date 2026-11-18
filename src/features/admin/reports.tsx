@@ -125,6 +125,28 @@ export function ReportsView() {
                     </table>
                   </div>
                 ))}
+                {result.data.receivedByMethod && Object.keys(result.data.receivedByMethod).length > 0 && (
+                  <section aria-labelledby="pay-by-method" className="border-t border-line px-5 py-4">
+                    <h3 id="pay-by-method" className="text-label font-semibold">{t("adminDash.payByMethod")}</h3>
+                    <p className="text-caption mt-1 text-ink-muted">{t("adminDash.payByMethodNote")}</p>
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="text-label w-full min-w-[20rem] text-left font-normal">
+                        <thead className="text-caption text-ink-muted"><tr><th scope="col" className="py-2 pr-3 font-medium">{t("admin.payments.columns.method")}</th>{SUPPORTED_CURRENCIES.map((c) => <th key={c} scope="col" className="px-2 py-2 text-right font-medium">{c}</th>)}</tr></thead>
+                        <tbody className="divide-y divide-line">
+                          {Object.entries(result.data.receivedByMethod).map(([method, amounts]) => {
+                            const key = method.toLowerCase();
+                            return (
+                              <tr key={method}>
+                                <th scope="row" className="py-2.5 pr-3 font-normal">{key === "cash_at_pickup" || key === "stripe_checkout" ? t(`paymentMethod.${key}` as const) : t("paymentMethod.other")}</th>
+                                {SUPPORTED_CURRENCIES.map((c) => <td key={c} className="text-price px-2 py-2.5 text-right">{amounts[c] !== undefined ? money(amounts[c], c) : "—"}</td>)}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )}
                 <div className="border-t border-line px-5 py-3"><Button variant="ghost" size="sm" onClick={() => setShowEmpty((v) => !v)}>{showEmpty ? t("adminDash.hideEmpty") : t("adminDash.showEmpty")}</Button></div>
               </>
             )}

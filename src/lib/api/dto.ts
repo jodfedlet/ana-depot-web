@@ -119,7 +119,10 @@ export interface ReservationViewDto {
   pickup: { location: PickupLocationDto | null; instructions: PickupInstructionsDto | null; capturedAt: string; origin: string } | null;
   canCancel: boolean;
   events: { type: ReservationEventTypeDto; at: string; note: string | null; rejectReason: string | null; cancelledBy: "CUSTOMER" | "STORE" | null }[];
+  /** The payments received so far (absent on a freshly created reservation and on list pages). */
+  payments?: { currency: string; amount: string; method: string; receivedAt: string; reversed: boolean }[];
 }
 
-export interface MeDto { userId: string; email: string | null; emailVerified: boolean; staff: boolean; permissions: string[]; customerProfileId: string | null }
+/** `staff` is true only for a session that may use the administration; `mfaRequired`: an active team member whose session still needs a second factor. */
+export interface MeDto { userId: string; email: string | null; emailVerified: boolean; staff: boolean; mfaRequired?: boolean; permissions: string[]; customerProfileId: string | null }
 export interface ProfileDto { id: string | null; firstName: string | null; lastName: string | null; dialCode: string | null; phone: string | null; email: string | null }

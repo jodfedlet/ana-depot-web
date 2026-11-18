@@ -37,6 +37,9 @@ export interface CustomerLine {
 
 export interface CustomerBalance { currency: string; total: Money; paid: Money; due: Money }
 
+/** One payment the customer made, in its own currency. `method` is the backend's code ("CASH_AT_PICKUP", "STRIPE_CHECKOUT"); `reversed`: the store took it back as a correction. */
+export interface CustomerPayment { id: string; money: Money; method: string; receivedAt: string; reversed: boolean }
+
 export interface CustomerReservation {
   id: string;
   reference: string;
@@ -50,6 +53,8 @@ export interface CustomerReservation {
   /** One entry per currency present: total, paid and still due. */
   balances: CustomerBalance[];
   payment: { status: PaymentStatus; paid: Money[] };
+  /** Every payment received so far, oldest first; empty when none (or when the view comes from a list). */
+  payments: CustomerPayment[];
   /** The pickup information as promised when the reservation was made; null when the snapshot holds no readable location. */
   pickup: { location: PickupLocation; instructions: PickupInstructions } | null;
   readyAt?: string;

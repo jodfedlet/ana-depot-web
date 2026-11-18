@@ -94,6 +94,8 @@ export const adminLive = {
     payReversed: "Annulé",
     payAdjustments: "Ajustements",
     payNet: "Net",
+    payByMethod: "Reçu selon le mode de paiement",
+    payByMethodNote: "Espèces au retrait et paiements en ligne sont comptés séparément, par devise.",
     paymentsNote: "D'après le journal des paiements (reçus, annulations, ajustements), par devise et par date d'écriture.",
     productsCurrency: "Devise",
     allCurrencies: "Toutes les devises",

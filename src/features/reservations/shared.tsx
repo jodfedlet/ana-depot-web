@@ -206,6 +206,31 @@ export function PickupInfoFor({ view }: { view: CustomerReservation }) {
   return <PickupInfo location={view.pickup.location} instructions={view.pickup.instructions} status={view.status} />;
 }
 
+/** Every payment received, newest last, each in its own currency. Nothing is ever added across currencies. */
+export function PaymentHistory({ payments }: { payments: CustomerReservation["payments"] }) {
+  const t = useT();
+  const locale = useLocale();
+  const fmt = useFormat();
+  if (payments.length === 0) return <p className="text-caption text-ink-soft">{t("track.detail.paymentsNone")}</p>;
+  return (
+    <ul className="text-label divide-y divide-line font-normal" aria-label={t("track.detail.paymentsTitle")}>
+      {payments.map((p) => {
+        const key = p.method.toLowerCase();
+        const method = key === "cash_at_pickup" || key === "stripe_checkout" ? t(`paymentMethod.${key}` as const) : t("paymentMethod.other");
+        return (
+          <li key={p.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+            <div>
+              <p className={p.reversed ? "text-ink-soft line-through" : "font-semibold"}>{method}</p>
+              <p className="text-caption text-ink-soft">{fmt.date(p.receivedAt, "short")}{p.reversed ? ` · ${t("track.detail.paymentReversed")}` : ""}</p>
+            </div>
+            <p className={`tabular-nums ${p.reversed ? "text-ink-soft line-through" : "font-semibold"}`}>{formatMoney(p.money, locale)}</p>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** Per-currency position: total, paid so far, still due. HTG and USD are separate lines and never summed. */
 export function PaymentBalances({ balances }: { balances: CustomerReservation["balances"] }) {
   const t = useT();

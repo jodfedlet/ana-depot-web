@@ -102,10 +102,18 @@ export interface StockCounts { ok: number; low: number; out: number; untracked: 
 export interface OverviewReport { period: ReportPeriod; reservationsCreated: Record<string, number>; openNow: Record<string, number>; collected: CurrencyMap; paymentsNet: CurrencyMap; stock: StockCounts; activeProducts: number; newCustomers: number }
 export interface SalesReport { period: ReportPeriod; groupBy: string; buckets: { start: string; collected: CurrencyMap; reservations: number }[]; totals: CurrencyMap; reservations: number }
 export interface PaymentBucket { start?: string; received: CurrencyMap; reversed: CurrencyMap; adjustments: CurrencyMap; net: CurrencyMap }
-export interface PaymentsReport { period: ReportPeriod; groupBy: string; buckets: PaymentBucket[]; totals: PaymentBucket }
+/** `receivedByMethod`: money received in the period by how it was paid ("CASH_AT_PICKUP", "STRIPE_CHECKOUT"), per currency. */
+export interface PaymentsReport { period: ReportPeriod; groupBy: string; buckets: PaymentBucket[]; totals: PaymentBucket; receivedByMethod?: Record<string, Record<string, string>> }
 export interface ProductsReport { period: ReportPeriod; rows: { productId: string; name: string; sku: string; currency: string; quantity: number; revenue: string; reservations: number }[] }
 export interface ReservationsReport { period: ReportPeriod; byStatus: Record<string, number>; total: number; rejectionReasons: Record<string, number> }
 export interface StockReport { stock: StockCounts; activeProducts: number }
+
+// ---- team ----
+export interface StaffMemberDto { userId: string; active: boolean; you: boolean; initial?: boolean; displayName: string | null; email: string | null; note: string | null; joinedAt: string; updatedAt: string | null }
+export type InvitationStatusDto = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+export interface StaffInvitationDto { id: string; note: string; status: InvitationStatusDto; createdAt: string; expiresAt: string }
+/** The one answer that carries the invitation code. It is never returned again. */
+export interface IssuedInvitationDto { id: string; note: string; expiresAt: string; code: string }
 
 // ---- settings ----
 export interface PickupScheduleDay { day: number; open: boolean; from: string; to: string }

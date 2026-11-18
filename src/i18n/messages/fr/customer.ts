@@ -21,7 +21,7 @@ export const customer = {
     expired: "Cette réservation a expiré faute de retrait dans le délai prévu.",
   },
   paymentStatus: { unpaid: "Non payée", partial: "Partiellement payée", paid: "Payée" },
-  paymentMethod: { cash_at_pickup: "Espèces au retrait", stripe_checkout: "Carte en ligne (Stripe)" },
+  paymentMethod: { cash_at_pickup: "Espèces au retrait", stripe_checkout: "Carte en ligne (Stripe)", other: "Autre mode" },
   rejectReasons: {
     product_unavailable: "Produit indisponible",
     incorrect_product_info: "Information produit incorrecte",
@@ -188,6 +188,9 @@ export const customer = {
       paymentMethod: "Mode de paiement",
       paymentStatus: "Statut du paiement",
       amountPaid: "Montant reçu",
+      paymentsTitle: "Paiements reçus",
+      paymentsNone: "Aucun paiement reçu pour le moment.",
+      paymentReversed: "annulé par le magasin",
       payAtStore: "Le paiement se fait au magasin lors du retrait.",
       expiresOn: "À retirer avant le {date}",
       contact: "Vos coordonnées",

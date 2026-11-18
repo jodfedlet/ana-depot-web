@@ -24,7 +24,7 @@ import { normalizeReference, rememberAccess } from "@/lib/reservations/access-st
 import { focusFirstInvalid, isBlank } from "@/lib/validation";
 import { OnlinePayPanel } from "@/features/payments/online-pay-panel";
 import { usePayerAccess } from "@/lib/api/online-payment-hooks";
-import { PaymentBalances, PaymentStatusBadge, PickupInfoFor, ReservationStatusBadge, SectionCard, Timeline, orderLinesOf, useCustomerTimeline } from "./shared";
+import { PaymentBalances, PaymentHistory, PaymentStatusBadge, PickupInfoFor, ReservationStatusBadge, SectionCard, Timeline, orderLinesOf, useCustomerTimeline } from "./shared";
 
 /** /reservations — guest lookup. The reference alone is never enough: the phone number is verified by the server too. */
 export function LookupForm() {
@@ -169,10 +169,13 @@ export function CustomerReservationDetail({ reference }: { reference: string }) 
         <div className="space-y-6">
           <SectionCard title={t("track.detail.payment")}>
             <dl className="text-label space-y-2 font-normal">
-              <div className="flex justify-between gap-3"><dt className="text-ink-soft">{t("track.detail.paymentMethod")}</dt><dd>{t("paymentMethod.cash_at_pickup")}</dd></div>
               <div className="flex items-center justify-between gap-3"><dt className="text-ink-soft">{t("track.detail.paymentStatus")}</dt><dd><PaymentStatusBadge status={view.payment.status} /></dd></div>
             </dl>
             <div className="mt-3 border-t border-line pt-3"><PaymentBalances balances={view.balances} /></div>
+            <div className="mt-3 border-t border-line pt-3">
+              <h3 className="text-label mb-2 font-semibold">{t("track.detail.paymentsTitle")}</h3>
+              <PaymentHistory payments={view.payments} />
+            </div>
             {view.payment.status !== "paid" && <p className="text-caption mt-3 text-ink-soft">{t("track.detail.payAtStore")}</p>}
             <div className="mt-3"><OnlinePayPanel view={view} access={payAccess} /></div>
           </SectionCard>
