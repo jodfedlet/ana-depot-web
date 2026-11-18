@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/states";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/seo/json-ld";
 import { ProductPageView } from "@/features/product/product-page-view";
@@ -37,7 +39,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/products
   return pageMetadata({ locale, path: `/products/${product.slug}`, title: product.name, description, image });
 }
 
-export default async function ProductPage({ params }: PageProps<"/[locale]/products/[slug]">) {
+async function Content({ params }: Pick<PageProps<"/[locale]/products/[slug]">, "params">) {
   const { locale, slug: raw } = await params;
   if (!isLocale(locale)) notFound();
   const slug = decodeURIComponent(raw);
@@ -73,4 +75,9 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
       <ProductPageView key={slug} slug={slug} initial={initial} />
     </>
   );
+}
+
+/** `params` is read inside the boundary (Next 16: URL data outside <Suspense> blocks instant navigation). The status code of unknown products is decided by the proxy, not here. */
+export default function ProductPage(props: PageProps<"/[locale]/products/[slug]">) {
+  return <Suspense fallback={<div className="container-page py-8"><Skeleton className="h-96 w-full" /></div>}><Content params={props.params} /></Suspense>;
 }

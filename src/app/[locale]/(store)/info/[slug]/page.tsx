@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { InfoBody } from "@/features/info/info-body";
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/info/[sl
   return pageMetadata({ locale, path: `/info/${slug}`, title: t(page.key), description, noindex: page.kind === "placeholder" });
 }
 
-export default async function InfoPage({ params }: PageProps<"/[locale]/info/[slug]">) {
+async function Content({ params }: Pick<PageProps<"/[locale]/info/[slug]">, "params">) {
   const { locale, slug } = await params;
   if (!isLocale(locale)) notFound();
   const page = infoPages[slug as InfoPageSlug];
@@ -34,4 +35,8 @@ export default async function InfoPage({ params }: PageProps<"/[locale]/info/[sl
       <InfoBody kind={page.kind} />
     </div>
   );
+}
+
+export default function InfoPage(props: PageProps<"/[locale]/info/[slug]">) {
+  return <Suspense><Content params={props.params} /></Suspense>;
 }

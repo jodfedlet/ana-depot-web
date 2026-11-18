@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/states";
 import { JsonLd } from "@/components/seo/json-ld";
 import { Benefits, HomeCatalogSections, Hero } from "@/features/home/sections";
 import { isLocale } from "@/i18n/config";
@@ -29,7 +31,8 @@ async function homeInitial(): Promise<CatalogInitial | undefined> {
   }
 }
 
-export default async function HomePage({ params }: PageProps<"/[locale]">) {
+/** The data part of the home page. `params` is read inside a <Suspense> boundary (Next 16), while the hero, which needs no URL data, is in the static shell. */
+async function HomeData({ params }: Pick<PageProps<"/[locale]">, "params">) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const origin = siteOrigin();
@@ -37,9 +40,17 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
     <>
       <JsonLd data={organizationJsonLd(origin)} />
       <JsonLd data={websiteJsonLd(locale, origin)} />
+      <HomeCatalogSections initial={await homeInitial()} />
+    </>
+  );
+}
+
+export default function HomePage(props: PageProps<"/[locale]">) {
+  return (
+    <>
       <Hero />
       <Benefits />
-      <HomeCatalogSections initial={await homeInitial()} />
+      <Suspense fallback={<div className="container-page mt-14"><Skeleton className="h-8 w-56" /></div>}><HomeData params={props.params} /></Suspense>
     </>
   );
 }

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/states";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/seo/json-ld";
 import { CatalogView } from "@/features/catalog/catalog-view";
@@ -32,7 +34,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/categori
   return pageMetadata({ locale, path: `/categories/${loaded.data.slug}`, title: category.name, description, image });
 }
 
-export default async function CategoryPage({ params }: PageProps<"/[locale]/categories/[slug]">) {
+async function Content({ params }: Pick<PageProps<"/[locale]/categories/[slug]">, "params">) {
   const { locale, slug: raw } = await params;
   if (!isLocale(locale)) notFound();
   const slug = decodeURIComponent(raw);
@@ -50,4 +52,8 @@ export default async function CategoryPage({ params }: PageProps<"/[locale]/cate
       <CatalogView key={slug} query={{ category: slug, page: 1 }} mode="browse" basePath="/products" initial={initial} />
     </>
   );
+}
+
+export default function CategoryPage(props: PageProps<"/[locale]/categories/[slug]">) {
+  return <Suspense fallback={<div className="container-page py-8"><Skeleton className="h-96 w-full" /></div>}><Content params={props.params} /></Suspense>;
 }
