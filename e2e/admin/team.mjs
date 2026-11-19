@@ -214,6 +214,63 @@ await run("team", async () => {
   void colleagueId;
 });
 
+await run("recovery", async () => {
+  section("C2. Recovery codes (D15): make a set, lose the authenticator, get in with one code, once");
+  const owner = await newPage(browser);
+  await signIn(owner.page, env.STAFF_EMAIL, env.STAFF_PASSWORD, "/admin");
+  await owner.page.getByLabel("Code à 6 chiffres").fill(totp(staffSecret));
+  await owner.page.getByRole("button", { name: "Vérifier", exact: true }).click();
+  await owner.page.waitForFunction(() => /Tableau de bord/.test(document.body.innerText), null, { timeout: 20000 });
+  await owner.page.goto(`${env.WEB}/fr/admin/security`); await settle(owner.page, 1200);
+  check("with no codes yet the page says so", /aucun code de récupération/.test(await bodyText(owner.page)));
+  await owner.page.getByRole("button", { name: "Créer de nouveaux codes" }).click();
+  await owner.page.getByRole("dialog").getByRole("button", { name: "Créer les codes" }).click();
+  const list = owner.page.getByTestId("recovery-codes");
+  await list.waitFor({ timeout: 15000 });
+  const codes = (await list.locator("li").allInnerTexts()).map((c) => c.trim());
+  check("ten codes in readable groups are shown, with the warning that they will not be shown again", codes.length === 10 && codes.every((c) => /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/.test(c)) && /plus jamais affichés/.test(await bodyText(owner.page)));
+  await shot(owner.page, "recovery-codes-d");
+  await owner.page.getByRole("button", { name: "J'ai noté mes codes" }).click(); await settle(owner.page, 600);
+  const after = await bodyText(owner.page);
+  check("afterwards only the count is visible, never a code", /10 codes de récupération restants/.test(after) && !codes.some((c) => after.includes(c)));
+  await owner.page.goto(`${env.WEB}/fr/admin/team`); await settle(owner.page, 1200);
+  check("the Team page shows how many recovery codes each member has (never the codes)", /Codes de récupération : 10/.test(await bodyText(owner.page)));
+  await owner.ctx.close();
+
+  // the authenticator is lost: a brand-new sign-in has only the password
+  const lost = await newPage(browser);
+  await signIn(lost.page, env.STAFF_EMAIL, env.STAFF_PASSWORD, "/admin");
+  await lost.page.getByRole("button", { name: "J'ai perdu mon application d'authentification" }).click();
+  check("the verification screen offers a recovery code", /Code de récupération/.test(await bodyText(lost.page)) && !/Tableau de bord/.test(await bodyText(lost.page)));
+  await lost.page.getByLabel("Code de récupération").fill("AAAA-BBBB-CCCC-DDDD");
+  await lost.page.getByRole("button", { name: "Utiliser ce code" }).click();
+  await lost.page.getByText(/n'est pas valide/).waitFor({ timeout: 10000 });
+  check("a wrong code is refused and nothing opens", !/Tableau de bord/.test(await bodyText(lost.page)));
+  await lost.page.getByLabel("Code de récupération").fill(codes[0].toLowerCase());
+  await lost.page.getByRole("button", { name: "Utiliser ce code" }).click();
+  await lost.page.waitForFunction(() => /Tableau de bord/.test(document.body.innerText), null, { timeout: 20000 });
+  await settle(lost.page, 800);
+  check("a recovery code opens the administration and says the access is limited", /connecté avec un code de récupération/.test(await bodyText(lost.page)));
+  await shot(lost.page, "recovery-session-banner-d");
+  await lost.page.goto(`${env.WEB}/fr/admin/security`); await settle(lost.page, 1200);
+  check("the used code is gone (9 left) and a new set can be made from the recovered session", /9 codes de récupération restants/.test(await bodyText(lost.page)) && (await lost.page.getByRole("button", { name: "Créer de nouveaux codes" }).count()) === 1);
+  check("no horizontal overflow on the security page", (await overflow(lost.page)) <= 0, String(await overflow(lost.page)));
+  await lost.ctx.close();
+
+  // the same code in yet another sign-in: refused, and that sign-in stays outside
+  const again = await newPage(browser);
+  await signIn(again.page, env.STAFF_EMAIL, env.STAFF_PASSWORD, "/admin");
+  await again.page.getByRole("button", { name: "J'ai perdu mon application d'authentification" }).click();
+  await again.page.getByLabel("Code de récupération").fill(codes[0]);
+  await again.page.getByRole("button", { name: "Utiliser ce code" }).click();
+  await again.page.getByText(/n'est pas valide/).waitFor({ timeout: 10000 });
+  check("a used code cannot open another sign-in", !/Tableau de bord/.test(await bodyText(again.page)));
+  const weakToken = await tokenOf(env.STAFF_EMAIL);
+  const probe = await api("GET", "/admin/reservations", weakToken);
+  check("and the API still answers 403 mfa_required to a password-only session", probe.status === 403 && probe.body?.code === "mfa_required", `${probe.status} ${probe.body?.code}`);
+  await again.ctx.close();
+});
+
 await run("layout", async () => {
   section("D. Mobile and Haitian Creole");
   const m = await newPage(browser, { width: 390, height: 844 });
