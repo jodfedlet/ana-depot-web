@@ -589,16 +589,17 @@ await run("reservations", async () => {
   const rec = (await admin("GET", `/admin/reservations/${id}/reconciliation`)).body;
   check("the ledger reconciles with the cached paid amounts", rec.consistent === true);
 
-  // 11. over-payment (policy undecided): the server accepts, the UI says so
+  // 11. over-payment (D3, approved: refused; the counter gives change)
   const over = await apiReserve([{ productId: state.prodId, variantId: await variantId(skuS), quantity: 1, currency: "HTG" }]);
   await toReady(over.id);
   await page.goto(`${env.WEB}/fr/admin/reservations/${over.reference}`); await settle(page, 1200);
   const total = (await resDetail(over.id)).balances[0].total;
   await page.getByRole("button", { name: "Enregistrer le paiement" }).first().click();
+  check("the payment dialog states the maximum (the amount due) and pre-fills it", /ne peut pas dépasser le solde dû/.test(await dialog(page).innerText()) && (await dialog(page).getByLabel("Montant reçu (HTG)").inputValue()) === total);
   await dialog(page).getByLabel("Montant reçu (HTG)").fill((Number(total) + 100).toFixed(2));
   await dialog(page).getByRole("button", { name: "Enregistrer le paiement" }).click(); await sleep(1500);
   const ot = await bodyText(page);
-  check("an over-payment is accepted by the SERVER and shown as 'Trop-perçu' with the undecided-policy note; due never negative", /Trop-perçu/.test(ot) && /politique de trop-perçu n'est pas encore décidée/.test(ot) && (await resDetail(over.id)).balances[0].due === "0.00");
+  check("an over-payment is REFUSED by the server with a translated message; nothing was recorded", /dépasse le solde restant/.test(ot) && (await resDetail(over.id)).balances[0].due === total && (await resDetail(over.id)).balances[0].paid === "0.00");
   await shot(page, "admin-10-overpayment-1280");
 
   // 12. reject: OTHER needs an explanation

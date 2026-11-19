@@ -150,7 +150,7 @@ function RecordDialog({ reservation, balances, onClose, onDone }: { reservation:
         <TextField label={t("admin.detail.dialogs.payment.amount", { currency })} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
         <TextField label={t("admin.detail.dialogs.payment.reference")} optional value={ref} onChange={(e) => setRef(e.target.value)} />
         <TextField label={t("adminRes.paymentNote")} optional value={note} onChange={(e) => setNote(e.target.value)} />
-        <p className="text-caption text-ink-muted">{t("adminRes.overpaidNote")}</p>
+        <p className="text-caption text-ink-muted">{bal ? t("adminRes.payMax", { amount: money(bal.due, bal.currency) }) : null}</p>
         <p className="text-caption text-ink-muted">{t("adminPay.manualNote")}</p>
         {action.error != null && <ActionError error={action.error} onReload={onDone} />}
       </div>

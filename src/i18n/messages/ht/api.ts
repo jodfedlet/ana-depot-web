@@ -56,6 +56,7 @@ export const api: typeof frApi = {
     invalid_status: "Aksyon sa a pa posib nan eta aktyèl la. Nou mete paj la ajou.",
     payment_required: "Dwe anrejistre peman konplè nan chak monnen anvan nou bay pwodwi yo.",
     already_paid: "Monnen sa a deja peye nèt.",
+    overpayment_not_allowed: "Montan an depase sa ki rete pou peye nan monnen sa a : anrejistre sa ki rete a sèlman epi remèt kliyan an monnen.",
     already_reversed: "Peman sa a deja anile.",
     inventory_exists: "Pwodwi sa a deja gen yon stòk anrejistre.",
     stock_negative: "Operasyon sa a ta fè stòk la vin negatif.",

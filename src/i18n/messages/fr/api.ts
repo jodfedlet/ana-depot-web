@@ -54,6 +54,7 @@ export const api = {
     invalid_status: "Cette action n'est pas possible dans l'état actuel. La page a été actualisée.",
     payment_required: "Le paiement complet doit être enregistré dans chaque devise avant la remise des produits.",
     already_paid: "Cette devise est déjà réglée en totalité.",
+    overpayment_not_allowed: "Le montant dépasse le solde restant de cette devise : enregistrez au plus le solde dû et rendez la monnaie.",
     already_reversed: "Ce paiement a déjà été annulé.",
     inventory_exists: "Ce produit a déjà un stock enregistré.",
     stock_negative: "Cette opération rendrait le stock négatif.",
