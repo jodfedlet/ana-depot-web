@@ -66,6 +66,12 @@ export function PaymentPanel({ reservation, onChanged }: { reservation: AdminRes
           </li>
         ))}
       </ul>
+      {reservation.refundDue.length > 0 && (
+        <Alert tone="danger">
+          <p className="font-semibold">{t("adminRes.refundDueTitle")}</p>
+          <p className="mt-1">{t("adminRes.refundDueText", { amounts: reservation.refundDue.map((a) => money(a.amount, a.currency)).join(" · ") })}</p>
+        </Alert>
+      )}
       {balances.some(isOverpaid) && <Alert tone="warning">{t("adminRes.overpaidNote")}</Alert>}
 
       {open ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setDialog({ kind: "record" })}>{t("admin.detail.actions.recordPayment")}</Button><Button variant="ghost" onClick={() => setDialog({ kind: "adjust" })}>{t("adminRes.adjust")}</Button></div> : <p className="text-caption text-ink-muted">{t("adminRes.paymentsOnlyReady")}</p>}

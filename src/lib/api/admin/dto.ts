@@ -70,6 +70,8 @@ export interface AdminReservation {
   id: string; reference: string; status: ReservationStatus; paymentStatus: PaymentStatus; locale: string; createdAt: string; readyAt: string | null; expiresAt: string | null; customerId: string | null;
   contact: AdminContact; lines: AdminLine[]; balances: AdminBalance[]; pickup: Record<string, unknown> | null; terms: { version: string | null; acceptedAt: string } | null;
   history: AdminChange[]; notes: AdminNote[]; allowedActions: AllowedAction[];
+  /** Card money to give back (rejected / cancelled / expired reservation), per currency; the refund is done in the Stripe dashboard (D1). */
+  refundDue: { currency: string; amount: string }[];
 }
 
 // ---- payments ----

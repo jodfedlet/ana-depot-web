@@ -272,6 +272,23 @@ try {
     check("the backend refuses to reverse a Stripe payment (online_payment_reversal_unsupported)", rev.status === 409 && rev.body?.code === "online_payment_reversal_unsupported", `${rev.status} ${rev.body?.code}`);
     const manual = await admin("POST", `/admin/reservations/${mixed.id}/payments`, { amount: "1.00", currency: "USD", method: "STRIPE_CHECKOUT" }, key());
     check("staff cannot record a Stripe payment by hand (refused)", manual.status >= 400, `${manual.status} ${manual.body?.code}`);
+
+    // D1: the reservation ends without collection -> the card money is flagged "refund due" (the refund is done in the Stripe dashboard)
+    const ended = await admin("POST", `/admin/reservations/${mixed.id}/cancel`, { reason: "e2e: customer asked" }, key());
+    check("cancelling the card-paid reservation answers its refund-due figure (USD only, never cash)", ended.status === 200 && ended.body?.refundDue?.length === 1 && ended.body.refundDue[0].currency === "USD", JSON.stringify(ended.body?.refundDue));
+    for (const width of [1280, 390]) {
+      const { ctx, page } = await newPage(browser, { width });
+      await page.goto(`${env.WEB}/fr/auth/login?next=%2Fadmin`); await settle(page);
+      await page.getByLabel("E-mail").fill(env.STAFF_EMAIL); await page.getByLabel("Mot de passe", { exact: true }).fill(env.STAFF_PASSWORD);
+      await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+      await page.waitForURL(/\/fr\/admin/, { timeout: 20000 }); await settle(page);
+      await page.goto(`${env.WEB}/fr/admin/reservations/${mixed.reference}`); await settle(page, 1200);
+      const t = await text(page);
+      check(`${width}px: the screen says a card refund is due, the amount, and that it is done in the Stripe dashboard`, /Remboursement à faire/.test(t) && /tableau de bord Stripe/.test(t) && new RegExp(String(ended.body.refundDue[0].amount).replace(".", "[.,]")).test(t));
+      check(`${width}px: no horizontal page overflow`, (await overflow(page)) <= 0, await overflow(page));
+      await shot(page, `stripe-real-11-refund-due-${width}`);
+      await ctx.close();
+    }
   }
 } catch (e) {
   console.log(`FATAL ${e.stack ?? e}`);
