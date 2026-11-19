@@ -15,6 +15,10 @@ import { type AdminSignals, useAdminSignals } from "@/lib/api/admin/signals";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/auth/use-session";
 import { useAdminSession } from "./admin-identity";
+import { canOpenAdminPage } from "@/lib/admin/access";
+import { EmptyState } from "@/components/ui/states";
+import { ShieldAlert } from "lucide-react";
+import { ButtonLink } from "@/components/ui/button";
 
 // ---------- unsaved changes guard ----------
 interface GuardValue { setDirty: (dirty: boolean) => void; go: (href: string) => void }
@@ -79,11 +83,12 @@ function NavList({ onNavigate, signals }: { onNavigate?: () => void; signals: Ad
   const t = useT();
   const pathname = useLocalePathname();
   const { go } = useContext(GuardContext);
+  const { permissions } = useAdminSession();
   const badges = { pending: signals.pending ?? 0, stock: signals.stockAttention ?? 0 }; // unknown (loading/failed) shows no badge, never an invented number
   return (
     <nav aria-label={t("admin.nav.label")}>
       <ul className="space-y-1">
-        {navItems.map(({ href, key, icon: Icon, exact, badge, alsoActive }) => {
+        {navItems.filter((item) => canOpenAdminPage(permissions, item.href)).map(({ href, key, icon: Icon, exact, badge, alsoActive }) => {
           const active = exact ? pathname === href : pathname.startsWith(href) || (alsoActive ?? []).some((p) => pathname.startsWith(p));
           return (
             <li key={href}>
@@ -105,12 +110,25 @@ function NavList({ onNavigate, signals }: { onNavigate?: () => void; signals: Ad
   );
 }
 
+/** A page the role may not open shows an explanation instead of screens whose API calls the server would refuse. The server is the real gate (D14). */
+function PageAccess({ children }: { children: ReactNode }) {
+  const t = useT();
+  const pathname = useLocalePathname();
+  const { permissions, role } = useAdminSession();
+  if (canOpenAdminPage(permissions, pathname)) return <>{children}</>;
+  return (
+    <EmptyState icon={<ShieldAlert aria-hidden />} title={t("adminRole.noAccessTitle")} description={t("adminRole.noAccessText", { role: role ? t(`adminRole.role.${role as "OWNER" | "MANAGER" | "STAFF"}`) : "—" })}>
+      <ButtonLink href="/admin" variant="outline">{t("adminRole.backToDashboard")}</ButtonLink>
+    </EmptyState>
+  );
+}
+
 export function AdminShell({ children }: { children: ReactNode }) {
   const t = useT();
   const router = useLocaleRouter();
   const { session, signOut } = useAdminSession();
   const auth = useSession();
-  const signals = useAdminSignals();
+  const signals = useAdminSignals(session?.permissions ?? []);
   const pending = signals.recent;
   const pendingCount = signals.pending ?? 0;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -163,7 +181,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               </Popover>
             </div>
           </header>
-          <main id="main" className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+          <main id="main" className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8"><Suspense fallback={<AdminLoading />}><PageAccess>{children}</PageAccess></Suspense></main>
         </div>
       </div>
 

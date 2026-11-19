@@ -123,11 +123,11 @@ export interface NotificationDto {
 export interface NotificationSummaryDto { counts: Record<string, number>; mode: "SMTP" | "LOG" | "DISABLED"; oldestWaitingAt: string | null }
 
 // ---- team ----
-export interface StaffMemberDto { userId: string; active: boolean; you: boolean; initial?: boolean; displayName: string | null; email: string | null; note: string | null; joinedAt: string; updatedAt: string | null }
+export interface StaffMemberDto { userId: string; active: boolean; role: "OWNER" | "MANAGER" | "STAFF"; you: boolean; initial?: boolean; displayName: string | null; email: string | null; note: string | null; joinedAt: string; updatedAt: string | null }
 export type InvitationStatusDto = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
-export interface StaffInvitationDto { id: string; note: string; status: InvitationStatusDto; createdAt: string; expiresAt: string }
+export interface StaffInvitationDto { id: string; note: string; role: "OWNER" | "MANAGER" | "STAFF"; status: InvitationStatusDto; createdAt: string; expiresAt: string }
 /** The one answer that carries the invitation code. It is never returned again. */
-export interface IssuedInvitationDto { id: string; note: string; expiresAt: string; code: string }
+export interface IssuedInvitationDto { id: string; note: string; role: "OWNER" | "MANAGER" | "STAFF"; expiresAt: string; code: string }
 
 // ---- settings ----
 export interface PickupScheduleDay { day: number; open: boolean; from: string; to: string }

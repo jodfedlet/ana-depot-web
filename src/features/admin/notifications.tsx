@@ -14,6 +14,7 @@ import { Link } from "@/i18n/link";
 import { useT } from "@/i18n/provider";
 import { apiErrorKey } from "@/lib/api/errors";
 import type { NotificationDto, NotificationStatusDto, NotificationTypeDto } from "@/lib/api/admin/dto";
+import { useAdminSession } from "./admin-identity";
 import { listNotifications, notificationSummary, retryNotification } from "@/lib/api/admin/endpoints";
 import { useAction, useAdminResource } from "@/lib/api/admin/hooks";
 import { RefreshButton, useUrlState } from "./common";
@@ -49,6 +50,7 @@ export function NotificationsView() {
   const summary = useAdminResource("notif:summary", (signal) => notificationSummary({ signal }));
   const list = useAdminResource(`notif:${status}:${type}:${page}`, (signal) => listNotifications({ status: status || undefined, type: type || undefined, page, size: 20 }, { signal }));
   const action = useAction();
+  const { can } = useAdminSession();
   const [confirm, setConfirm] = useState<NotificationDto | null>(null);
   const reload = () => { summary.reload(); list.reload(); };
 
@@ -112,7 +114,7 @@ export function NotificationsView() {
                 <div className="flex items-center gap-3">
                   <span className="text-caption text-ink-muted">{t("adminNotif.columns.attempts")} : {n.attempts}</span>
                   <NotificationBadge status={n.status} />
-                  {n.status === "DEAD" && <Button variant="outline" size="sm" onClick={() => setConfirm(n)}>{t("adminNotif.retry")}</Button>}
+                  {n.status === "DEAD" && can("NOTIFICATIONS_RESEND") && <Button variant="outline" size="sm" onClick={() => setConfirm(n)}>{t("adminNotif.retry")}</Button>}
                 </div>
               </li>
             ))}

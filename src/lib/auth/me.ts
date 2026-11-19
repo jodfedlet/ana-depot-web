@@ -1,8 +1,8 @@
 /**
  * The backend's answer to "who is this token?": `GET {API base URL}/api/v1/me` (see lib/api/base-url.ts).
  * Authentication (Supabase Auth) says WHO someone is; this says what Ana Dépôt lets them do. `staff` is true only for
- * members provisioned in the backend (never derived from user-editable metadata). `permissions` is opaque on purpose:
- * the role model is an open business decision, so the frontend only ever asks the questions in `authorization.ts`.
+ * members provisioned in the backend (never derived from user-editable metadata). `role` and `permissions` come from the backend's staff table (D14: Owner,
+ * Manager, Staff); the frontend only ever asks the questions in `authorization.ts`, and only to decide what to SHOW (every endpoint authorizes again).
  */
 export interface Me {
   userId: string;
@@ -11,6 +11,8 @@ export interface Me {
   staff: boolean;
   /** An active team member whose session still lacks the second factor: not staff yet, they must enroll or verify. */
   mfaRequired: boolean;
+  /** OWNER | MANAGER | STAFF for an active team member, otherwise null. */
+  role: string | null;
   permissions: string[];
   customerProfileId: string | null;
 }
@@ -22,10 +24,11 @@ export function parseMe(body: unknown): Me | null {
   if (typeof b.userId !== "string" || typeof b.email !== "string") return null;
   if (typeof b.staff !== "boolean" || typeof b.emailVerified !== "boolean") return null;
   if (!Array.isArray(b.permissions) || !b.permissions.every((p) => typeof p === "string")) return null;
+  if (b.role !== undefined && b.role !== null && typeof b.role !== "string") return null;
   if (b.mfaRequired !== undefined && typeof b.mfaRequired !== "boolean") return null;
   const profile = b.customerProfileId;
   if (profile !== null && profile !== undefined && typeof profile !== "string") return null;
-  return { userId: b.userId, email: b.email, emailVerified: b.emailVerified, staff: b.staff, mfaRequired: b.mfaRequired === true && b.staff === false, permissions: b.permissions as string[], customerProfileId: (profile as string | null | undefined) ?? null };
+  return { userId: b.userId, email: b.email, emailVerified: b.emailVerified, staff: b.staff, mfaRequired: b.mfaRequired === true && b.staff === false, role: typeof b.role === "string" ? b.role : null, permissions: b.permissions as string[], customerProfileId: (profile as string | null | undefined) ?? null };
 }
 
 export type MeResult = { kind: "ok"; me: Me } | { kind: "unauthorized" } | { kind: "unreachable" };

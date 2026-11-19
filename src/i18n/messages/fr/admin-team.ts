@@ -1,10 +1,31 @@
 /** Administration : équipe (invitations, accès), vérification en deux étapes, rejoindre l'équipe. */
 export const adminTeam = {
+  adminRole: {
+    noAccessTitle: "Cette page n'est pas disponible avec votre rôle",
+    noAccessText: "Votre rôle ({role}) ne donne pas accès à cette page. Si vous en avez besoin, demandez au propriétaire de modifier votre rôle.",
+    backToDashboard: "Retour au tableau de bord",
+    role: { OWNER: "Propriétaire", MANAGER: "Responsable", STAFF: "Équipe comptoir" },
+    roleHelp: {
+      OWNER: "Tout, y compris l'équipe et les réglages du magasin.",
+      MANAGER: "Réservations, paiements (avec annulation et correction), stock, catalogue, clients, rapports. Pas l'équipe ni les réglages du magasin.",
+      STAFF: "Réservations, encaissement en espèces, consultation du stock et des clients. Pas de prix, pas de rapports, pas d'équipe.",
+    },
+    readOnlyCustomer: "Votre rôle permet de consulter ce client, pas de le modifier.",
+    yourRole: "Votre rôle : {role}",
+    counterTitle: "À traiter au comptoir",
+    counterNote: "Votre rôle ne comprend pas les rapports financiers : voici les réservations et le stock à suivre.",
+  },
   adminTeam: {
     nav: "Équipe",
     title: "Équipe",
     subtitle: "Les personnes qui peuvent utiliser l'administration du magasin.",
-    rolesNote: "Tous les membres ont les mêmes droits pour le moment : la gestion des rôles n'est pas encore décidée.",
+    rolesNote: "Chaque personne a un rôle fixe : Propriétaire (tout), Responsable (tout sauf l'équipe et les réglages du magasin) ou Équipe comptoir (réservations, espèces, consultation). Seul un propriétaire gère l'équipe.",
+    roleLabel: "Rôle",
+    changeRole: "Changer le rôle",
+    changeRoleTitle: "Changer le rôle de {name}",
+    changeRoleText: "Les nouveaux droits s'appliquent dès la prochaine action de cette personne.",
+    confirmRole: "Enregistrer le rôle",
+    roleChanged: "Rôle modifié.",
     membersTitle: "Membres",
     you: "Vous",
     active: "Actif",

@@ -19,6 +19,7 @@ import { announceAdminChange } from "@/lib/api/admin/signals";
 import { isTransientError } from "@/lib/api/errors";
 import { attemptKey, endAttempt } from "@/lib/api/idempotency";
 import { isOverpaid } from "@/lib/admin/money";
+import { useAdminSession } from "./admin-identity";
 import { PaymentStatusBadge } from "@/features/reservations/shared";
 import { AttemptBadge } from "./payment-attempts";
 import { useMoneyText } from "./common";
@@ -32,6 +33,7 @@ const lower = <T extends string>(s: T) => s.toLowerCase() as Lowercase<T>;
  * request is retried after a lost answer (never a fresh key). The over-payment policy is undecided: the server's behaviour is shown, not a rule invented here.
  */
 export function PaymentPanel({ reservation, onChanged }: { reservation: AdminReservation; onChanged: () => void }) {
+  const { can } = useAdminSession();   // reversing and adjusting are for Owner and Manager (D14); the server refuses them for counter staff anyway
   const t = useT();
   const fmt = useFormat();
   const money = useMoneyText();
@@ -74,7 +76,7 @@ export function PaymentPanel({ reservation, onChanged }: { reservation: AdminRes
       )}
       {balances.some(isOverpaid) && <Alert tone="warning">{t("adminRes.overpaidNote")}</Alert>}
 
-      {open ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setDialog({ kind: "record" })}>{t("admin.detail.actions.recordPayment")}</Button><Button variant="ghost" onClick={() => setDialog({ kind: "adjust" })}>{t("adminRes.adjust")}</Button></div> : <p className="text-caption text-ink-muted">{t("adminRes.paymentsOnlyReady")}</p>}
+      {open ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setDialog({ kind: "record" })}>{t("admin.detail.actions.recordPayment")}</Button>{can("PAYMENTS_CORRECT") && <Button variant="ghost" onClick={() => setDialog({ kind: "adjust" })}>{t("adminRes.adjust")}</Button>}</div> : <p className="text-caption text-ink-muted">{t("adminRes.paymentsOnlyReady")}</p>}
 
       {payments.length > 0 && (
         <ul className="divide-y divide-line rounded-control border border-line">
@@ -86,7 +88,7 @@ export function PaymentPanel({ reservation, onChanged }: { reservation: AdminRes
                 {p.method === "STRIPE_CHECKOUT" && !p.reversed && <p className="text-caption text-ink-muted">{t("adminPay.reverseUnsupported")}</p>}
                 {p.reversed && p.reversal && <p className="text-caption text-danger-fg">{t("adminRes.reversedOn", { date: fmt.dateTime(p.reversal.at), reason: p.reversal.reason })}</p>}
               </div>
-              {p.reversed ? <Badge tone="danger">{t("adminRes.reversed")}</Badge> : open && p.method !== "STRIPE_CHECKOUT" && <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "reverse", payment: p })}><RotateCcw aria-hidden className="size-4" />{t("adminRes.reverse")}</Button>}
+              {p.reversed ? <Badge tone="danger">{t("adminRes.reversed")}</Badge> : open && p.method !== "STRIPE_CHECKOUT" && can("PAYMENTS_CORRECT") && <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "reverse", payment: p })}><RotateCcw aria-hidden className="size-4" />{t("adminRes.reverse")}</Button>}
             </li>
           ))}
         </ul>

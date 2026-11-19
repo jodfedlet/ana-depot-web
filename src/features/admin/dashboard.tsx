@@ -12,6 +12,7 @@ import { Link } from "@/i18n/link";
 import { useLText, useT } from "@/i18n/provider";
 import { useAdminResource } from "@/lib/api/admin/hooks";
 import { NotificationsAlert } from "./notifications";
+import { useAdminSession } from "./admin-identity";
 import { getPickupSettings, listInventory, listReservations, reportOverview, reportProducts } from "@/lib/api/admin/endpoints";
 import { cn } from "@/lib/cn";
 import { reservationStatuses, type ReservationStatus as UiStatus } from "@/lib/reservations/types";
@@ -25,7 +26,7 @@ const OPEN = ["PENDING_REVIEW", "CONFIRMED", "READY_FOR_PICKUP"] as const;
  * The administration home. Every figure is a server-side aggregate from the reporting API (or a short list from the list endpoints): nothing is computed from a
  * downloaded dataset, nothing is invented, and HTG and USD are always shown apart. Where the API has no figure (a total of balances due) the screen says so.
  */
-export function Dashboard() {
+function FullDashboard({ canSettings }: { canSettings: boolean }) {
   const t = useT();
   const lt = useLText();
   const fmt = useFormat();
@@ -34,7 +35,7 @@ export function Dashboard() {
   const from = url.get("from"), to = url.get("to");
   const range = { from: from || undefined, to: to || undefined };
 
-  const res = useAdminResource(`dashboard:${from}:${to}`, async (signal) => {
+  const res = useAdminResource(`dashboard:${from}:${to}:${canSettings}`, async (signal) => {
     const [overview, top, pending, ready, recent, low, out, pickup] = await Promise.all([
       reportOverview(range, { signal }),
       reportProducts({ ...range, limit: 5 }, { signal }),
@@ -43,7 +44,7 @@ export function Dashboard() {
       listReservations({ size: 5 }, { signal }),
       listInventory({ state: "LOW", size: 5 }, { signal }),
       listInventory({ state: "OUT", size: 5 }, { signal }),
-      getPickupSettings({ signal }),
+      canSettings ? getPickupSettings({ signal }) : Promise.resolve(null),   // the pickup/store settings are the owner's (D14)
     ]);
     return { overview, top, pending, ready, recent, low, out, pickup, loadedAt: new Date() };
   });
@@ -52,7 +53,7 @@ export function Dashboard() {
   if (!res.data) return <div role="status" aria-label={t("adminCommon.loading")}><Skeleton className="h-24 w-full" /><Skeleton className="mt-4 h-64 w-full" /></div>;
   const { overview, top, pending, ready, recent, low, out, pickup, loadedAt } = res.data;
   const awaiting = ready.items.filter((r) => r.paymentStatus !== "PAID").slice(0, 5);
-  const pickupState = !pickup.enabled ? "off" : pickup.location?.storeName && pickup.location.addressLine && pickup.location.city && pickup.location.phone ? "on" : "none";
+  const pickupState = !pickup ? "none" : !pickup.enabled ? "off" : pickup.location?.storeName && pickup.location.addressLine && pickup.location.city && pickup.location.phone ? "on" : "none";
 
   return (
     <div className="space-y-6" aria-busy={res.loading}>
@@ -190,6 +191,7 @@ export function Dashboard() {
         </section>
 
         <div className="space-y-6">
+          {pickup && (
           <section aria-labelledby="pk-title" className="rounded-card border border-line bg-surface p-5">
             <h2 id="pk-title" className="text-h3 flex items-center gap-2"><MapPin aria-hidden className="size-4" />{t("adminDash.pickup")}</h2>
             <div className="mt-3"><Alert tone={pickupState === "on" ? "success" : "warning"} live="polite">{t(pickupState === "on" ? "adminDash.pickupOn" : pickupState === "off" ? "adminDash.pickupOff" : "adminDash.pickupNone")}</Alert></div>
@@ -197,6 +199,7 @@ export function Dashboard() {
             <p className="text-caption mt-2 text-ink-muted">{pickup.holdPeriodDays ? t("adminDash.holdDays", { count: pickup.holdPeriodDays }) : t("adminDash.holdNone")}</p>
             <ButtonLink href="/admin/settings" variant="outline" size="sm" className="mt-4">{t("adminDash.managePickup")}</ButtonLink>
           </section>
+          )}
 
           <section aria-labelledby="rc-title" className="rounded-card border border-line bg-surface">
             <h2 id="rc-title" className="text-h3 border-b border-line px-5 py-4">{t("adminDash.recent")}</h2>
@@ -212,6 +215,91 @@ export function Dashboard() {
             </ul>
           </section>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** The administration home, by role (D14): Owner and Manager see the full dashboard; counter staff, who have no financial reports, see the work queue and the stock alerts. */
+export function Dashboard() {
+  const { can } = useAdminSession();
+  return can("REPORTS_VIEW") ? <FullDashboard canSettings={can("SETTINGS_MANAGE")} /> : <CounterDashboard />;
+}
+
+function CounterDashboard() {
+  const t = useT();
+  const fmt = useFormat();
+  const money = useMoneyText();
+  const { role } = useAdminSession();
+  const res = useAdminResource("dashboard:counter", async (signal) => {
+    const [pending, ready, recent, low, out] = await Promise.all([
+      listReservations({ status: "PENDING_REVIEW", sort: "OLDEST", size: 10 }, { signal }),
+      listReservations({ status: "READY_FOR_PICKUP", sort: "OLDEST", size: 20 }, { signal }),
+      listReservations({ size: 5 }, { signal }),
+      listInventory({ state: "LOW", size: 5 }, { signal }),
+      listInventory({ state: "OUT", size: 5 }, { signal }),
+    ]);
+    return { pending, ready, recent, low, out };
+  });
+  if (res.error != null && !res.data) return <AdminErrorState error={res.error} onRetry={res.reload} />;
+  if (!res.data) return <div role="status" aria-label={t("adminCommon.loading")}><Skeleton className="h-24 w-full" /><Skeleton className="mt-4 h-64 w-full" /></div>;
+  const { pending, ready, recent, low, out } = res.data;
+  const awaiting = ready.items.filter((r) => r.paymentStatus !== "PAID");
+  const row = (r: (typeof pending.items)[number], extra: string) => (
+    <li key={r.id}>
+      <Link href={`/admin/reservations/${r.reference}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-sand-50">
+        <div className="min-w-0 flex-1"><p className="text-label font-semibold" translate="no">{r.reference}</p><p className="text-caption text-ink-soft">{r.contact.firstName} {r.contact.lastName} · {fmt.dateTime(r.createdAt)}</p></div>
+        <p className="text-caption text-right text-ink">{extra}</p>
+      </Link>
+    </li>
+  );
+  return (
+    <div className="space-y-6" aria-busy={res.loading}>
+      {res.error != null && <AdminErrorState error={res.error} onRetry={res.reload} />}
+      <NotificationsAlert />
+      <div>
+        <h2 className="text-h3">{t("adminRole.counterTitle")}</h2>
+        <p className="text-caption mt-1 text-ink-soft">{t("adminRole.counterNote")}{role ? ` ${t("adminRole.yourRole", { role: t(`adminRole.role.${role as "OWNER" | "MANAGER" | "STAFF"}`) })}` : ""}</p>
+        <div className="mt-3"><RefreshButton onClick={res.reload} loading={res.loading} /></div>
+      </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <section aria-labelledby="c-pending" className="rounded-card border border-line bg-surface">
+          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+            <h2 id="c-pending" className="text-h3">{t("adminDash.needsAttention")} <Badge tone="warning" className="ml-1">{pending.totalItems}</Badge></h2>
+            <Link href="/admin/reservations?status=PENDING_REVIEW" className="text-label font-semibold text-brand-700 hover:underline">{t("adminDash.viewAll")}</Link>
+          </div>
+          {pending.items.length === 0 ? <p className="text-label px-5 py-8 text-center font-normal text-ink-soft">{t("adminDash.needsAttentionEmpty")}</p> : <ul className="divide-y divide-line">{pending.items.map((r) => row(r, r.balances.map((b) => money(b.total, b.currency)).join(" · ")))}</ul>}
+        </section>
+        <section aria-labelledby="c-await" className="rounded-card border border-line bg-surface">
+          <div className="border-b border-line px-5 py-4"><h2 id="c-await" className="text-h3">{t("adminDash.awaitingPayment")}</h2><p className="text-caption mt-1 text-ink-muted">{t("adminDash.awaitingPaymentNote")}</p></div>
+          {awaiting.length === 0 ? <p className="text-label px-5 py-8 text-center font-normal text-ink-soft">{t("adminDash.awaitingEmpty")}</p> : <ul className="divide-y divide-line">{awaiting.slice(0, 8).map((r) => row(r, r.balances.filter((b) => b.due !== "0.00").map((b) => money(b.due, b.currency)).join(" · ") || "—"))}</ul>}
+        </section>
+      </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <section aria-labelledby="c-stock" className="rounded-card border border-line bg-surface p-5">
+          <div className="flex items-center justify-between"><h2 id="c-stock" className="text-h3">{t("adminDash.stock")}</h2><Link href="/admin/inventory" className="text-label font-semibold text-brand-700 hover:underline">{t("adminDash.viewAll")}</Link></div>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            {([["out", out, "danger", t("adminDash.stockOut")], ["low", low, "warning", t("adminDash.stockLow")]] as const).map(([k, list, tone, title]) => (
+              <div key={k}>
+                <p className="text-label flex items-center gap-2 font-semibold">{title} <Badge tone={tone}>{list.totalItems}</Badge></p>
+                {list.items.length === 0 ? <p className="text-caption mt-2 text-ink-soft">—</p> : <ul className="mt-2 space-y-1.5">{list.items.map((p) => <li key={p.id}><Link href={`/admin/inventory?q=${encodeURIComponent(p.productSku)}`} className="text-label font-normal hover:underline" translate="no">{p.productSku}</Link></li>)}</ul>}
+              </div>
+            ))}
+          </div>
+        </section>
+        <section aria-labelledby="c-recent" className="rounded-card border border-line bg-surface">
+          <h2 id="c-recent" className="text-h3 border-b border-line px-5 py-4">{t("adminDash.recent")}</h2>
+          <ul className="divide-y divide-line">
+            {recent.items.map((r) => (
+              <li key={r.id}>
+                <Link href={`/admin/reservations/${r.reference}`} className="flex min-h-14 items-center gap-3 px-5 py-2.5 hover:bg-sand-50">
+                  <div className="min-w-0 flex-1"><p className="text-label whitespace-nowrap font-semibold" translate="no">{r.reference}</p><p className="text-caption truncate text-ink-soft">{r.contact.firstName} {r.contact.lastName}</p></div>
+                  <ReservationStatusBadge status={lower(r.status)} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </div>
   );

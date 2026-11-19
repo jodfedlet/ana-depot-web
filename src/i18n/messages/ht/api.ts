@@ -34,7 +34,7 @@ export const api: typeof frApi = {
     notification_not_retryable: "Mesaj sa a pa ka voye ankò : li deja nan liy voye a oswa li deja voye.",
     invitation_invalid: "Kòd envitasyon sa a pa valab. Li ka ekspire oswa yo ka deja sèvi ak li: mande yon lòt.",
     already_staff: "Kont sa a deja fè pati ekip la.",
-    last_active_staff: "Yo pa ka retire dènye manm aktif ekip la.",
+    last_active_owner: "Yo pa ka retire ni bese dènye pwopriyetè aktif la : nonmen yon lòt pwopriyetè anvan.",
     cannot_change_own_access: "Ou pa ka chanje aksè pa w. Mande yon kolèg.",
     invitation_not_pending: "Envitasyon sa a pa ap tann ankò.",
     mfa_required: "Yo mande yon verifikasyon de etap avan w itilize administrasyon an.",

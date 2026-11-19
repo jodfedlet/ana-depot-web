@@ -1,10 +1,31 @@
 /** Administrasyon: ekip la (envitasyon, aksè), verifikasyon de etap, antre nan ekip la. NATIVE REVIEW REQUIRED (docs/creole-review.md). */
 export const adminTeam: typeof import("../fr/admin-team").adminTeam = {
+  adminRole: {
+    noAccessTitle: "Paj sa a pa disponib ak wòl ou",
+    noAccessText: "Wòl ou ({role}) pa bay aksè nan paj sa a. Si w bezwen l, mande pwopriyetè a chanje wòl ou.",
+    backToDashboard: "Tounen nan tablo bò a",
+    role: { OWNER: "Pwopriyetè", MANAGER: "Responsab", STAFF: "Ekip kontwa" },
+    roleHelp: {
+      OWNER: "Tout bagay, ansanm ak ekip la ak paramèt magazen an.",
+      MANAGER: "Rezèvasyon, peman (ak anilasyon ak koreksyon), stòk, katalòg, kliyan, rapò. Pa gen ekip la ni paramèt magazen an.",
+      STAFF: "Rezèvasyon, ankesman an lajan kach, gade stòk ak kliyan. Pa gen pri, pa gen rapò, pa gen ekip.",
+    },
+    readOnlyCustomer: "Wòl ou pèmèt ou gade kliyan sa a, men se pa pou modifye l.",
+    yourRole: "Wòl ou : {role}",
+    counterTitle: "Pou trete nan kontwa a",
+    counterNote: "Wòl ou pa gen rapò finansye : men rezèvasyon ak stòk pou swiv.",
+  },
   adminTeam: {
     nav: "Ekip la",
     title: "Ekip la",
     subtitle: "Moun ki gen dwa itilize administrasyon magazen an.",
-    rolesNote: "Tout manm yo gen menm dwa pou kounye a: pa gen desizyon sou wòl yo ankò.",
+    rolesNote: "Chak moun gen yon wòl fiks : Pwopriyetè (tout bagay), Responsab (tout sof ekip la ak paramèt magazen an) oswa Ekip kontwa (rezèvasyon, lajan kach, gade). Se sèlman yon pwopriyetè ki jere ekip la.",
+    roleLabel: "Wòl",
+    changeRole: "Chanje wòl la",
+    changeRoleTitle: "Chanje wòl {name}",
+    changeRoleText: "Nouvo dwa yo aplike depi pwochen aksyon moun sa a.",
+    confirmRole: "Anrejistre wòl la",
+    roleChanged: "Wòl la chanje.",
     membersTitle: "Manm yo",
     you: "Ou menm",
     active: "Aktif",

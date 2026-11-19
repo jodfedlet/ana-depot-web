@@ -13,7 +13,7 @@ import { safeNextPath } from "./safe-next";
  * access decisions, request shape, state transitions). They do NOT prove that a real Supabase project accepts the
  * calls — that needs a real project (see docs/auth.md) and is not covered here.
  */
-const me = { userId: "u1", email: "a@b.co", emailVerified: true, staff: false, mfaRequired: false, permissions: [] as string[], customerProfileId: null };
+const me = { userId: "u1", email: "a@b.co", emailVerified: true, staff: false, mfaRequired: false, role: null as string | null, permissions: [] as string[], customerProfileId: null };
 
 const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const jwtWithRole = (role: string) => `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ iss: "supabase", role })}.${"s".repeat(20)}`;

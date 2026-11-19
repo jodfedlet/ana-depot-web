@@ -28,7 +28,7 @@ export async function AdminGate({ locale, children }: { locale: Locale; children
   if (access.state === "session_invalid") redirect(`/${locale}/auth/login?status=expired&next=${encodeURIComponent("/admin")}`);
   if (access.state === "allowed") {
     return (
-      <AdminIdentityProvider identity={{ email: access.me.email, name: displayName(access.me.email) }}>
+      <AdminIdentityProvider identity={{ email: access.me.email, name: displayName(access.me.email), role: access.me.role, permissions: access.me.permissions }}>
         <AdminShell>{children}</AdminShell>
       </AdminIdentityProvider>
     );

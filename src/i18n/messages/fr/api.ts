@@ -32,7 +32,7 @@ export const api = {
     notification_not_retryable: "Ce message ne peut plus être renvoyé : il a déjà été remis en file d'envoi ou envoyé.",
     invitation_invalid: "Ce code d'invitation n'est pas valide. Il a peut-être expiré ou déjà été utilisé : demandez-en un nouveau.",
     already_staff: "Ce compte fait déjà partie de l'équipe.",
-    last_active_staff: "Le dernier membre actif de l'équipe ne peut pas être retiré.",
+    last_active_owner: "Le dernier propriétaire actif ne peut être ni retiré ni rétrogradé : nommez d'abord un autre propriétaire.",
     cannot_change_own_access: "Vous ne pouvez pas modifier votre propre accès. Demandez à un collègue.",
     invitation_not_pending: "Cette invitation n'est plus en attente.",
     mfa_required: "Une vérification en deux étapes est requise avant d'utiliser l'administration.",

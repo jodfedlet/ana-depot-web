@@ -14,6 +14,7 @@ import { useFormat } from "@/i18n/format";
 import { Link } from "@/i18n/link";
 import { useLText, useT } from "@/i18n/provider";
 import type { AdminPosition, AdminProduct, AdminProductSummary } from "@/lib/api/admin/dto";
+import { useAdminSession } from "./admin-identity";
 import { adjustInventory, getProduct, listInventory, listMovements, listProducts, registerInventory, setInventoryThreshold } from "@/lib/api/admin/endpoints";
 import { useAction, useAdminResource } from "@/lib/api/admin/hooks";
 import { announceAdminChange } from "@/lib/api/admin/signals";
@@ -40,7 +41,10 @@ export function InventoryView() {
   const state = url.get("state"), q = url.get("q"), productId = url.get("productId"), sort = url.get("sort");
   const page = Math.max(0, Number(url.get("page")) || 0);
   const res = useAdminResource(`inventory:${state}:${q}:${productId}:${sort}:${page}`, (signal) => listInventory({ state: state || undefined, q: q || undefined, productId: productId || undefined, sort: sort || undefined, page, size: PAGE }, { signal }));
-  const missing = useAdminResource("inventory:missing", (signal) => listProducts({ stock: "NO_STOCK_RECORD", size: 10, sort: "UPDATED" }, { signal }));
+  const { can } = useAdminSession();
+  const canAdjust = can("INVENTORY_ADJUST");
+  // the catalog list is the manager's (D14): counter staff see the stock but not the "no stock record yet" shortcuts
+  const missing = useAdminResource(`inventory:missing:${canAdjust && can("CATALOG_MANAGE")}`, (signal) => (canAdjust && can("CATALOG_MANAGE") ? listProducts({ stock: "NO_STOCK_RECORD", size: 10, sort: "UPDATED" }, { signal }) : Promise.resolve({ items: [] as AdminProductSummary[] })));
   const [adjust, setAdjust] = useState<AdminPosition | null>(null);
   const [history, setHistory] = useState<AdminPosition | null>(null);
   const [threshold, setThreshold] = useState<AdminPosition | null>(null);
@@ -50,8 +54,8 @@ export function InventoryView() {
   const name = (p: AdminPosition) => `${base(p)}${p.variantSku ? ` · ${p.variantSku}` : ""}`;
   const actions = (p: AdminPosition) => (
     <div className="flex flex-wrap gap-1.5">
-      {p.tracked && <Button size="sm" variant="outline" onClick={() => setAdjust(p)}>{t("admin.inventory.adjust")}</Button>}
-      {p.tracked && <Button size="sm" variant="ghost" onClick={() => setThreshold(p)}>{t("adminInv.threshold")}</Button>}
+      {canAdjust && p.tracked && <Button size="sm" variant="outline" onClick={() => setAdjust(p)}>{t("admin.inventory.adjust")}</Button>}
+      {canAdjust && p.tracked && <Button size="sm" variant="ghost" onClick={() => setThreshold(p)}>{t("adminInv.threshold")}</Button>}
       <Button size="sm" variant="ghost" onClick={() => setHistory(p)}>{t("admin.inventory.history")}</Button>
     </div>
   );
@@ -80,7 +84,7 @@ export function InventoryView() {
           <h2 id="miss-t" className="text-label font-semibold text-warning-fg">{t("adminInv.missingTitle")}</h2>
           <p className="text-caption mt-1 text-ink-soft">{t("adminInv.missingText")}</p>
           <ul className="mt-3 flex flex-wrap gap-2">
-            {productId && <li><Button size="sm" variant="outline" onClick={() => setRegister(productId)}><Plus aria-hidden className="size-4" />{t("adminInv.registerThis")}</Button></li>}
+            {productId && canAdjust && <li><Button size="sm" variant="outline" onClick={() => setRegister(productId)}><Plus aria-hidden className="size-4" />{t("adminInv.registerThis")}</Button></li>}
             {(missing.data?.items ?? []).map((p: AdminProductSummary) => <li key={p.id}><Button size="sm" variant="outline" onClick={() => setRegister(p.id)}><Plus aria-hidden className="size-4" />{lt({ fr: p.name.fr ?? "", ht: p.name.ht ?? "" })}{p.sku ? ` · ${p.sku}` : ""}</Button></li>)}
           </ul>
         </section>

@@ -28,7 +28,8 @@ export const retryNotification = (id: string, o?: W) => api.post<NotificationDto
 export const listStaff = (o?: Opts) => api.get<StaffMemberDto[]>("/staff", undefined, o);
 export const setStaffActive = (userId: string, active: boolean, o?: W) => api.put<StaffMemberDto>(`/staff/${userId}`, { active }, o);
 export const listInvitations = (o?: Opts) => api.get<StaffInvitationDto[]>("/staff/invitations", undefined, o);
-export const createInvitation = (note: string, o?: W) => api.post<IssuedInvitationDto>("/staff/invitations", { note }, o);
+export const createInvitation = (note: string, role: "OWNER" | "MANAGER" | "STAFF", o?: W) => api.post<IssuedInvitationDto>("/staff/invitations", { note, role }, o);
+export const setStaffRole = (userId: string, role: "OWNER" | "MANAGER" | "STAFF", o?: W) => api.put<StaffMemberDto>(`/staff/${userId}/role`, { role }, o);
 export const revokeInvitation = (id: string, o?: W) => api.delete(`/staff/invitations/${id}`, o);
 
 // ---- categories ----

@@ -124,5 +124,5 @@ export interface ReservationViewDto {
 }
 
 /** `staff` is true only for a session that may use the administration; `mfaRequired`: an active team member whose session still needs a second factor. */
-export interface MeDto { userId: string; email: string | null; emailVerified: boolean; staff: boolean; mfaRequired?: boolean; permissions: string[]; customerProfileId: string | null }
+export interface MeDto { userId: string; email: string | null; emailVerified: boolean; staff: boolean; mfaRequired?: boolean; role?: string | null; permissions: string[]; customerProfileId: string | null }
 export interface ProfileDto { id: string | null; firstName: string | null; lastName: string | null; dialCode: string | null; phone: string | null; email: string | null }

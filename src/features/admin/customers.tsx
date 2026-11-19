@@ -20,6 +20,7 @@ import { problemOf } from "@/lib/api/errors";
 import { attemptKey, endAttempt } from "@/lib/api/idempotency";
 import { isTransientError } from "@/lib/api/errors";
 import { fieldErrorKey, fieldProblems } from "@/lib/api/errors";
+import { useAdminSession } from "./admin-identity";
 import { CurrencyFigures, RefreshButton, useMoneyText, useUrlState } from "./common";
 
 const field = "text-label min-h-11 rounded-control border border-line-strong bg-surface px-3";
@@ -104,6 +105,7 @@ function CustomerView({ c, reload }: { c: AdminCustomer; reload: () => void }) {
   const money = useMoneyText();
   const toast = useToast();
   const save = useAction();
+  const canEdit = useAdminSession().can("CUSTOMERS_EDIT");
   const [first, setFirst] = useState(c.firstName);
   const [last, setLast] = useState(c.lastName);
   const [email, setEmail] = useState(c.email ?? "");
@@ -135,7 +137,7 @@ function CustomerView({ c, reload }: { c: AdminCustomer; reload: () => void }) {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <SectionCard title={t("admin.customers.contact")}>
           <dl className="text-label mb-4 font-normal"><div className="flex justify-between gap-4 py-1"><dt className="text-ink-soft">{t("admin.detail.labels.phone")}</dt><dd>{c.dialCode} {c.phone}</dd></div></dl>
-          {guest ? (
+          {guest && canEdit ? (
             <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4" noValidate>
               <p className="text-caption text-ink-soft">{t("adminCust.guestEdit")}</p>
               <div className="grid gap-4 sm:grid-cols-2"><TextField label={t("account.profile.firstName")} value={first} onChange={(e) => setFirst(e.target.value)} error={fe("firstName")} /><TextField label={t("account.profile.lastName")} value={last} onChange={(e) => setLast(e.target.value)} error={fe("lastName")} /></div>
@@ -144,7 +146,7 @@ function CustomerView({ c, reload }: { c: AdminCustomer; reload: () => void }) {
               <Button type="submit" loading={save.pending} disabled={!dirty}>{t("common.save")}</Button>
             </form>
           ) : (
-            <><p className="text-label font-normal">{c.email ?? "—"}</p><Alert tone="info" className="mt-3">{t("adminCust.registeredReadOnly")}</Alert></>
+            <><p className="text-label font-normal">{c.email ?? "—"}</p><Alert tone="info" className="mt-3">{t(guest ? "adminRole.readOnlyCustomer" : "adminCust.registeredReadOnly")}</Alert></>
           )}
         </SectionCard>
 
