@@ -162,7 +162,8 @@ await run("outage", async () => {
   const row = page.locator("li", { hasText: /o\*\*\*@example\.test/ }).filter({ has: page.getByRole("button", { name: "Renvoyer" }) }).first();   // "outage-…@example.test" is masked as o***@example.test
   await row.getByRole("button", { name: "Renvoyer" }).click();
   const dialog = page.getByRole("dialog");
-  check("resending asks for confirmation and promises a single, still-true message", /une seule fois/.test(await dialog.innerText()));
+  const dtxt = norm(await dialog.innerText());
+  check("resending asks for confirmation and promises a single, still-true message", /qu.une fois/.test(dtxt) && /encore d.actualité/.test(dtxt), dtxt.slice(0, 200));
   await dialog.getByRole("button", { name: "Renvoyer" }).click();
   await page.getByText("Message remis en file d'envoi.").first().waitFor({ timeout: 10000 });
   const delivered = await waitForMail(email, reference, 40000);
