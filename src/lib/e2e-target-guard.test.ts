@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error plain ESM script shared by the seed and every browser suite
 import { SEED_STORE_NAME, TargetRefused, assertDedicatedTestTarget, assertLocalUrls, assertLocalWeb, configProblems, pickupProblems } from "../../scripts/e2e-target-guard.mjs";
 
 const good = { API_URL: "http://127.0.0.1:8086", E2E_TARGET_CONFIRM: "http://127.0.0.1:8086", SUPABASE_URL: "http://127.0.0.1:54321", WEB_URL: "http://127.0.0.1:3106" };

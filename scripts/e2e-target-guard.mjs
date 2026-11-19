@@ -20,7 +20,12 @@ const HOSTED = /(^|\.)supabase\.co$|(^|\.)supabase\.in$|(^|\.)anadepot\.|(^|\.)w
 
 const clean = (v) => (v ?? "").trim().replace(/\/+$/, "");
 
-/** Pure: the configuration problems, or an empty list. */
+/**
+ * Pure: the configuration problems, or an empty list.
+ * @param {Record<string, string | undefined>} env
+ * @param {{ needWeb?: boolean, needApi?: boolean }} [opts]
+ * @returns {string[]}
+ */
 export function configProblems(env, { needWeb = true, needApi = true } = {}) {
   const problems = [];
   const urls = {};
@@ -44,7 +49,11 @@ export function configProblems(env, { needWeb = true, needApi = true } = {}) {
   return problems;
 }
 
-/** Pure: is this PUBLIC pickup answer from a dedicated test store? */
+/**
+ * Pure: is this PUBLIC pickup answer from a dedicated test store?
+ * @param {any} body
+ * @returns {string[]}
+ */
 export function pickupProblems(body) {
   if (!body || typeof body !== "object") return ["the API's pickup answer is not readable: cannot identify the target"];
   if (body.status === "not_configured") return [];                                  // a fresh, never-configured database
@@ -57,6 +66,10 @@ export class TargetRefused extends Error {
   constructor(problems) { super(`Refusing to write test data:\n - ${problems.join("\n - ")}`); this.problems = problems; }
 }
 
+/**
+ * @param {{ env?: Record<string, string | undefined>, fetchImpl?: typeof fetch, needWeb?: boolean, timeoutMs?: number }} [options]
+ * @returns {Promise<true>}
+ */
 export async function assertDedicatedTestTarget({ env = process.env, fetchImpl = fetch, needWeb = false, timeoutMs = 5000 } = {}) {
   const config = configProblems(env, { needWeb });
   if (config.length) throw new TargetRefused(config);
@@ -71,6 +84,7 @@ export async function assertDedicatedTestTarget({ env = process.env, fetchImpl =
 }
 
 /** Suites that only drive a web build (no API writes): the web URL must still be named explicitly and be local. */
+/** @param {Record<string, string | undefined>} [env] */
 export function assertLocalWeb(env = process.env) {
   const problems = configProblems(env, { needWeb: true, needApi: false });
   if (problems.length) throw new TargetRefused(problems);
@@ -78,6 +92,7 @@ export function assertLocalWeb(env = process.env) {
 }
 
 /** Any other service a suite talks to (local Supabase, mail catcher...): explicit, local, never hosted. */
+/** @param {Record<string, string | undefined>} env @param {string[]} names */
 export function assertLocalUrls(env, names) {
   const problems = [];
   for (const name of names) {
