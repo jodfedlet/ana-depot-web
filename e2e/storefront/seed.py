@@ -1,7 +1,17 @@
 """Seeds a LOCAL verification stack through the real STAFF API (verification data only: never run it against production).
-Required environment: SUPABASE_PUBLIC_KEY, STAFF_EMAIL, STAFF_PASSWORD (a user already bootstrapped as staff). Optional: API_URL, SUPABASE_URL."""
-import json, os, struct, sys, urllib.request, zlib, uuid
-API=os.environ.get("API_URL","http://127.0.0.1:8080")+"/api/v1"; SB=os.environ.get("SUPABASE_URL","http://127.0.0.1:54321")+"/auth/v1"; PK=os.environ["SUPABASE_PUBLIC_KEY"]
+Required environment (NO defaults: an unset variable refuses to run): API_URL, SUPABASE_URL, E2E_TARGET_CONFIRM (must equal API_URL), SUPABASE_PUBLIC_KEY, STAFF_EMAIL, STAFF_PASSWORD
+(a user already bootstrapped as staff). Before it writes anything, scripts/e2e-target-guard.mjs must accept the target: explicit, confirmed, loopback, and identified as a dedicated test store
+(never configured, or already carrying this seed's own store name). See e2e/storefront/README.md."""
+import json, os, struct, subprocess, sys, urllib.request, zlib, uuid
+
+# 1. Refuse to run against anything that is not positively identified as a dedicated local test target (single source of truth: the Node guard, also used by every browser suite).
+_guard = subprocess.run(["node", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "scripts", "e2e-target-guard.mjs")], env=os.environ, capture_output=True, text=True)
+if _guard.returncode != 0:
+    sys.exit((_guard.stderr or _guard.stdout).strip() + "\nseed aborted: nothing was written.")
+for _name in ("SUPABASE_PUBLIC_KEY", "STAFF_EMAIL", "STAFF_PASSWORD"):
+    if not os.environ.get(_name):
+        sys.exit(f"{_name} is not set; seed aborted: nothing was written.")
+API=os.environ["API_URL"].rstrip("/")+"/api/v1"; SB=os.environ["SUPABASE_URL"].rstrip("/")+"/auth/v1"; PK=os.environ["SUPABASE_PUBLIC_KEY"]
 def http(method, url, body=None, headers=None, raw=False):
     h={"Accept":"application/json"}; h.update(headers or {})
     data=None

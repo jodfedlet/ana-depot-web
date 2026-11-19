@@ -11,7 +11,9 @@ import fs from "node:fs";
 import os from "node:os";
 import { chromium } from "playwright-core";
 
-const WEB = process.env.WEB_URL ?? "http://127.0.0.1:3105";
+import { assertLocalWeb } from "../../scripts/e2e-target-guard.mjs";
+assertLocalWeb();   // the web URL must be named explicitly and be local: there is no default port
+const WEB = process.env.WEB_URL;
 const SHOTS = process.env.SHOTS_DIR ?? "e2e/storefront/screenshots";
 fs.mkdirSync(SHOTS, { recursive: true });
 const REF = "ANA-K7M2QX", PHONE = "34567890";

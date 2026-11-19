@@ -4,6 +4,13 @@ Drives the **built** storefront in a real Chromium against the **real Spring Boo
 S3-compatible store (**MinIO** standing in for Cloudflare R2). It is **not** a test of a hosted Supabase project and **not** of real R2.
 It never runs in CI by default and must never be pointed at production (it creates users, reservations, payments and stock adjustments).
 
+## Safety: these scripts write data, so they only run against a dedicated local test target
+The seed and every browser suite that creates data call `scripts/e2e-target-guard.mjs` first and **refuse to run** unless ALL hold: `API_URL`, `SUPABASE_URL` and `WEB_URL` are set explicitly (there are no default ports any more);
+`E2E_TARGET_CONFIRM` equals `API_URL` exactly (you name the service you mean); every host is loopback (a dedicated remote test box needs `E2E_ALLOW_NON_LOOPBACK=1`, and a hosted-looking name is refused regardless);
+and the API's public pickup answer identifies a test store: never configured (a fresh dedicated database) or carrying the seed's own name ("Magasin de vérification (données de test)").
+A developer's database, a real shop or a service that does not answer is refused before anything is written. Example:
+`export API_URL=http://127.0.0.1:8086 E2E_TARGET_CONFIRM=http://127.0.0.1:8086 SUPABASE_URL=http://127.0.0.1:54321 WEB_URL=http://127.0.0.1:3106`. Unit tests: `src/lib/e2e-target-guard.test.ts`.
+
 ## Prerequisites
 1. Local Supabase stack up (`../ana-depot-api/docs/local-supabase.md`), a confirmed **staff** user bootstrapped in the API (`ANA_BOOTSTRAP_ADMIN_SUBJECT`).
 2. API running with:

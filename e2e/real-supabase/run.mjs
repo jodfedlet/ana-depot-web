@@ -5,10 +5,10 @@
  * It proves our screens work with real Supabase behavior. It is NOT a test of a hosted Supabase project.
  *
  * Required environment (all local):
- *   WEB_URL            default http://127.0.0.1:3100
- *   SUPABASE_URL       default http://127.0.0.1:54321
+ *   WEB_URL            (explicit, local)
+ *   SUPABASE_URL       (explicit, local)
  *   SUPABASE_PUBLIC_KEY  the local publishable/anon key (public)
- *   MAIL_URL           default http://127.0.0.1:54324 (Mailpit)
+ *   MAIL_URL           (explicit, local: Mailpit)
  *   STAFF_EMAIL / STAFF_PASSWORD   a REAL Supabase user that was provisioned as staff in the backend (bootstrap)
  *   CHROMIUM_PATH      optional path to a Chromium executable
  * Usage: node e2e/real-supabase/run.mjs   (or: npm run e2e:real)
@@ -17,10 +17,13 @@ import fs from "node:fs";
 import os from "node:os";
 import { chromium } from "playwright-core";
 
-const WEB = process.env.WEB_URL ?? "http://127.0.0.1:3100";
-const SB = process.env.SUPABASE_URL ?? "http://127.0.0.1:54321";
+import { assertLocalUrls, assertLocalWeb } from "../../scripts/e2e-target-guard.mjs";
+assertLocalWeb();
+assertLocalUrls(process.env, ["SUPABASE_URL", "MAIL_URL"]);   // the web URL must be named explicitly and be local: there is no default port
+const WEB = process.env.WEB_URL;
+const SB = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_PUBLIC_KEY;
-const MAIL = process.env.MAIL_URL ?? "http://127.0.0.1:54324";
+const MAIL = process.env.MAIL_URL;
 if (!KEY || !process.env.STAFF_EMAIL || !process.env.STAFF_PASSWORD) {
   console.error("Set SUPABASE_PUBLIC_KEY, STAFF_EMAIL and STAFF_PASSWORD (see the header of this file).");
   process.exit(2);

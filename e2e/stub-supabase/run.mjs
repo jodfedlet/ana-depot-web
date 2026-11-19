@@ -11,7 +11,9 @@ import fs from "node:fs";
 import os from "node:os";
 import { chromium } from "playwright-core";
 
-const WEB = process.env.WEB_URL ?? "http://127.0.0.1:3100";
+import { assertLocalWeb } from "../../scripts/e2e-target-guard.mjs";
+assertLocalWeb();   // the web URL must be named explicitly and be local: there is no default port
+const WEB = process.env.WEB_URL;
 const STUB = process.env.STUB_URL ?? "http://127.0.0.1:54399";
 const results = [];
 const check = (name, ok, extra = "") => { results.push(ok); console.log(`${ok ? "PASS" : "FAIL"}  STUB: ${name}${extra ? `  [${String(extra).slice(0, 150)}]` : ""}`); };

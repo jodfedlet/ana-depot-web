@@ -8,7 +8,9 @@ import fs from "node:fs";
 import os from "node:os";
 import { chromium } from "playwright-core";
 
-const WEB = process.env.WEB_URL ?? "http://127.0.0.1:3100";
+import { assertLocalWeb } from "../../scripts/e2e-target-guard.mjs";
+assertLocalWeb();   // the web URL must be named explicitly and be local: there is no default port
+const WEB = process.env.WEB_URL;
 const base = `${os.homedir()}/.cache/ms-playwright`;
 const exe = process.env.CHROMIUM_PATH ?? `${base}/${fs.readdirSync(base).find((d) => d.startsWith("chromium-"))}/chrome-linux64/chrome`;
 const browser = await chromium.launch({ executablePath: exe, args: ["--no-sandbox"] });

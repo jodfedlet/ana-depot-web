@@ -6,10 +6,18 @@ import fs from "node:fs";
 import os from "node:os";
 import { chromium } from "playwright-core";
 
+import { TargetRefused, assertDedicatedTestTarget } from "../../scripts/e2e-target-guard.mjs";
+
+// These suites CREATE users, reservations, payments and stock movements. They run only against a target the guard can positively identify as a dedicated local test target:
+// every URL explicit (no default ports), the target confirmed (E2E_TARGET_CONFIRM = API_URL), loopback, and a store that is fresh or carries the seed's own name.
+try { await assertDedicatedTestTarget({ needWeb: true }); } catch (e) {
+  console.error(e instanceof TargetRefused ? `${e.message}\n(see scripts/e2e-target-guard.mjs and e2e/storefront/README.md)` : String(e));
+  process.exit(2);
+}
 export const env = {
-  WEB: process.env.WEB_URL ?? "http://127.0.0.1:3100",
-  API: process.env.API_URL ?? "http://127.0.0.1:8080",
-  SB: process.env.SUPABASE_URL ?? "http://127.0.0.1:54321",
+  WEB: process.env.WEB_URL,
+  API: process.env.API_URL,
+  SB: process.env.SUPABASE_URL,
   KEY: process.env.SUPABASE_PUBLIC_KEY,
   MAIL: process.env.MAIL_URL ?? "http://127.0.0.1:54324",
   STAFF_EMAIL: process.env.STAFF_EMAIL,
