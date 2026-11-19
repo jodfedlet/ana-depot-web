@@ -159,7 +159,7 @@ await run("outage", async () => {
   const t = norm(await bodyText(page));
   check("the Messages screen shows the failure in plain words with a Resend button", /Échec définitif/.test(t) && /Serveur d'e-mail injoignable|n'a pas répondu à temps/.test(t));
   await shot(page, "notifications-dead-d");
-  const row = page.locator("li", { hasText: /m\*\*\*@example\.test/ }).first();
+  const row = page.locator("li", { hasText: /o\*\*\*@example\.test/ }).filter({ has: page.getByRole("button", { name: "Renvoyer" }) }).first();   // "outage-…@example.test" is masked as o***@example.test
   await row.getByRole("button", { name: "Renvoyer" }).click();
   const dialog = page.getByRole("dialog");
   check("resending asks for confirmation and promises a single, still-true message", /une seule fois/.test(await dialog.innerText()));
