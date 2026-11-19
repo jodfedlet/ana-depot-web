@@ -780,3 +780,4 @@ console.log(`\n(part 3a done) ${results.filter((r) => r.ok).length} passed, ${re
 console.log(`\n(all sections done) ${results.filter((r) => r.ok).length} passed, ${results.filter((r) => !r.ok).length} failed`);
 console.log(pageErrors.length ? `page errors:\n${pageErrors.join("\n")}` : "no unexpected page errors");
 await browser.close();
+process.exit(results.some((r) => !r.ok) ? 1 : 0);   // a failing check must fail the run (CI)
