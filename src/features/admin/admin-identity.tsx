@@ -13,6 +13,8 @@ export interface AdminIdentity {
   /** OWNER | MANAGER | STAFF (D14), from the backend's staff table. */
   role: string | null;
   permissions: string[];
+  /** This session is in through a recovery code (time-limited), not an authenticator. */
+  mfaRecovered: boolean;
 }
 const Ctx = createContext<AdminIdentity | null>(null);
 
@@ -28,6 +30,7 @@ export function useAdminSession() {
   return {
     session: identity,
     role: identity?.role ?? null,
+    mfaRecovered: identity?.mfaRecovered ?? false,
     permissions,
     /** What to SHOW. The backend refuses what a role may not do, whatever the screen offers. */
     can: (permission: Permission) => permissions.includes(permission),

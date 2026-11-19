@@ -11,6 +11,8 @@ export interface Me {
   staff: boolean;
   /** An active team member whose session still lacks the second factor: not staff yet, they must enroll or verify. */
   mfaRequired: boolean;
+  /** This session got in with a recovery code instead of an authenticator (D15): it is time-limited and the member should make new codes. */
+  mfaRecovered: boolean;
   /** OWNER | MANAGER | STAFF for an active team member, otherwise null. */
   role: string | null;
   permissions: string[];
@@ -28,7 +30,7 @@ export function parseMe(body: unknown): Me | null {
   if (b.mfaRequired !== undefined && typeof b.mfaRequired !== "boolean") return null;
   const profile = b.customerProfileId;
   if (profile !== null && profile !== undefined && typeof profile !== "string") return null;
-  return { userId: b.userId, email: b.email, emailVerified: b.emailVerified, staff: b.staff, mfaRequired: b.mfaRequired === true && b.staff === false, role: typeof b.role === "string" ? b.role : null, permissions: b.permissions as string[], customerProfileId: (profile as string | null | undefined) ?? null };
+  return { userId: b.userId, email: b.email, emailVerified: b.emailVerified, staff: b.staff, mfaRequired: b.mfaRequired === true && b.staff === false, mfaRecovered: b.mfaRecovered === true && b.staff === true, role: typeof b.role === "string" ? b.role : null, permissions: b.permissions as string[], customerProfileId: (profile as string | null | undefined) ?? null };
 }
 
 export type MeResult = { kind: "ok"; me: Me } | { kind: "unauthorized" } | { kind: "unreachable" };

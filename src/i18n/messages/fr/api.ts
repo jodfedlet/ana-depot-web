@@ -31,6 +31,8 @@ export const api = {
     concurrent_update: "Ces informations ont changé entre-temps. Rechargez la page.",
     notification_not_retryable: "Ce message ne peut plus être renvoyé : il a déjà été remis en file d'envoi ou envoyé.",
     invitation_invalid: "Ce code d'invitation n'est pas valide. Il a peut-être expiré ou déjà été utilisé : demandez-en un nouveau.",
+    recovery_code_invalid: "Ce code de récupération n'est pas valide : il a peut-être déjà servi ou été remplacé par un nouvel ensemble.",
+    not_a_member: "Seul un membre actif de l'équipe peut créer des codes de récupération.",
     already_staff: "Ce compte fait déjà partie de l'équipe.",
     last_active_owner: "Le dernier propriétaire actif ne peut être ni retiré ni rétrogradé : nommez d'abord un autre propriétaire.",
     cannot_change_own_access: "Vous ne pouvez pas modifier votre propre accès. Demandez à un collègue.",

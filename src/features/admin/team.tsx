@@ -75,6 +75,7 @@ export function TeamView() {
                 <div className="min-w-0">
                   <p className="text-label font-semibold">{nameOf(m)} {m.you && <Badge tone="brand" className="ml-1">{t("adminTeam.you")}</Badge>}</p>
                   <p className="text-caption text-ink-soft">{[m.email, t("adminTeam.joinedOn", { date: fmt.date(m.joinedAt, "short") })].filter(Boolean).join(" · ")}</p>
+                  {m.active && <p className={`text-caption ${m.recoveryCodesRemaining > 0 ? "text-ink-soft" : "text-warning-fg"}`} data-testid="recovery-count">{m.recoveryCodesRemaining > 0 ? t("adminSecurity.teamCodes", { count: m.recoveryCodesRemaining }) : t("adminSecurity.teamNoCodes")}</p>}
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge tone="info" data-testid="member-role">{t(`adminRole.role.${m.role}`)}</Badge>

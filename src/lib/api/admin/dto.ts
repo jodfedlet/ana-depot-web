@@ -123,7 +123,7 @@ export interface NotificationDto {
 export interface NotificationSummaryDto { counts: Record<string, number>; mode: "SMTP" | "LOG" | "DISABLED"; oldestWaitingAt: string | null }
 
 // ---- team ----
-export interface StaffMemberDto { userId: string; active: boolean; role: "OWNER" | "MANAGER" | "STAFF"; you: boolean; initial?: boolean; displayName: string | null; email: string | null; note: string | null; joinedAt: string; updatedAt: string | null }
+export interface StaffMemberDto { userId: string; active: boolean; role: "OWNER" | "MANAGER" | "STAFF"; recoveryCodesRemaining: number; you: boolean; initial?: boolean; displayName: string | null; email: string | null; note: string | null; joinedAt: string; updatedAt: string | null }
 export type InvitationStatusDto = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
 export interface StaffInvitationDto { id: string; note: string; role: "OWNER" | "MANAGER" | "STAFF"; status: InvitationStatusDto; createdAt: string; expiresAt: string }
 /** The one answer that carries the invitation code. It is never returned again. */
@@ -140,3 +140,7 @@ export interface PickupSettingsDto {
 
 // ---- uploads ----
 export interface UploadTicket { uploadId: string; productId: string; contentType: string; maxBytes: number; upload: { url: string; method: string; headers: Record<string, string>; expiresAt: string } }
+
+/** The caller's own recovery codes. `codes` exist only in the answer to a generation: shown once, never stored. */
+export interface RecoveryCodesIssuedDto { codes: string[]; generatedAt: string; remaining: number }
+export interface RecoveryCodesStatusDto { remaining: number; generatedAt: string | null }

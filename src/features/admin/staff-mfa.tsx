@@ -7,6 +7,8 @@ import { TextField } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/states";
 import { useT } from "@/i18n/provider";
 import { useApiResource } from "@/lib/api/use-resource";
+import { apiErrorKey } from "@/lib/api/errors";
+import { redeemRecoveryCode } from "@/lib/api/staff-recovery";
 import { getBrowserClient } from "@/lib/auth/supabase-browser";
 
 type Step =
@@ -33,6 +35,9 @@ export function StaffMfa() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryError, setRecoveryError] = useState<unknown>(null);
   const step: Step | undefined = enrolling ?? factors.data;
 
   const start = async () => {
@@ -59,6 +64,37 @@ export function StaffMfa() {
     window.location.reload();
   };
 
+  // a lost authenticator (D15): one recovery code lets THIS sign-in session in for a few hours; the backend checks it and the code works once
+  const recover = async () => {
+    setBusy(true);
+    setRecoveryError(null);
+    try {
+      await redeemRecoveryCode(recoveryCode.trim());
+      window.location.reload();
+    } catch (e) {
+      setRecoveryError(e);
+      setBusy(false);
+    }
+  };
+
+  if (recovering) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-h2">{t("adminTeam.mfa.title")}</h1>
+        <form className="space-y-4" method="post" onSubmit={(e) => { e.preventDefault(); if (recoveryCode.trim()) void recover(); }}>
+          <p className="text-label font-normal text-ink-soft">{t("adminTeam.mfa.recoveryIntro")}</p>
+          <TextField label={t("adminTeam.mfa.recoveryCode")} value={recoveryCode} onChange={(e) => setRecoveryCode(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={64} className="font-mono" />
+          {recoveryError != null && <Alert tone="danger" live="assertive">{t(apiErrorKey(recoveryError))}</Alert>}
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit" loading={busy} disabled={recoveryCode.trim().length === 0}>{t("adminTeam.mfa.recoverySubmit")}</Button>
+            <Button type="button" variant="ghost" onClick={() => setRecovering(false)}>{t("adminTeam.mfa.recoveryBack")}</Button>
+          </div>
+          <p className="text-caption text-ink-soft">{t("adminTeam.mfa.recoveryHelp")}</p>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <h1 className="text-h2">{t("adminTeam.mfa.title")}</h1>
@@ -77,7 +113,10 @@ export function StaffMfa() {
           ) : <p className="text-label font-normal text-ink-soft">{t("adminTeam.mfa.verifyIntro")}</p>}
           <TextField label={t("adminTeam.mfa.code")} value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={7} pattern="[0-9 ]*" />
           {failed && <Alert tone="danger" live="assertive">{t("adminTeam.mfa.error")}</Alert>}
-          <Button type="submit" loading={busy} disabled={code.replace(/\s/g, "").length !== 6}>{t("adminTeam.mfa.verify")}</Button>
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit" loading={busy} disabled={code.replace(/\s/g, "").length !== 6}>{t("adminTeam.mfa.verify")}</Button>
+            {step.kind === "verify" && <Button type="button" variant="ghost" onClick={() => setRecovering(true)}>{t("adminTeam.mfa.lostDevice")}</Button>}
+          </div>
         </form>
       )}
     </div>

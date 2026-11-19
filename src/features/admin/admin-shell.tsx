@@ -19,6 +19,7 @@ import { canOpenAdminPage } from "@/lib/admin/access";
 import { EmptyState } from "@/components/ui/states";
 import { ShieldAlert } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 // ---------- unsaved changes guard ----------
 interface GuardValue { setDirty: (dirty: boolean) => void; go: (href: string) => void }
@@ -126,7 +127,7 @@ function PageAccess({ children }: { children: ReactNode }) {
 export function AdminShell({ children }: { children: ReactNode }) {
   const t = useT();
   const router = useLocaleRouter();
-  const { session, signOut } = useAdminSession();
+  const { session, signOut, mfaRecovered } = useAdminSession();
   const auth = useSession();
   const signals = useAdminSignals(session?.permissions ?? []);
   const pending = signals.recent;
@@ -177,11 +178,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
               </Popover>
               <Popover label={t("admin.topbar.account")} trigger={<><span className="grid size-8 place-items-center rounded-full bg-brand-700 text-sm font-semibold text-white">{session?.name.charAt(0)}</span><ChevronDown aria-hidden className="size-4" /></>}>
                 <p className="text-label px-2 py-1.5 font-normal text-ink-soft">{t("admin.topbar.signedInAs", { name: session?.name ?? "" })}</p>
+                <Link href="/admin/security" className="text-label flex min-h-11 w-full items-center rounded-control px-2 hover:bg-sand-50">{t("adminSecurity.nav")}</Link>
                 <button type="button" className="text-label flex min-h-11 w-full items-center rounded-control px-2 text-left hover:bg-sand-50" onClick={() => { void signOut(); }}>{t("admin.topbar.signOut")}</button>
               </Popover>
             </div>
           </header>
-          <main id="main" className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8"><Suspense fallback={<AdminLoading />}><PageAccess>{children}</PageAccess></Suspense></main>
+          <main id="main" className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{mfaRecovered && <Alert tone="warning" className="mb-4"><span>{t("adminSecurity.recoveredBanner")} </span><Link href="/admin/security" className="font-semibold underline">{t("adminSecurity.recoveredLink")}</Link></Alert>}<Suspense fallback={<AdminLoading />}><PageAccess>{children}</PageAccess></Suspense></main>
         </div>
       </div>
 

@@ -33,6 +33,8 @@ export const api: typeof frApi = {
     concurrent_update: "Enfòmasyon sa yo chanje pandan tan sa a. Rechaje paj la.",
     notification_not_retryable: "Mesaj sa a pa ka voye ankò : li deja nan liy voye a oswa li deja voye.",
     invitation_invalid: "Kòd envitasyon sa a pa valab. Li ka ekspire oswa yo ka deja sèvi ak li: mande yon lòt.",
+    recovery_code_invalid: "Kòd rekiperasyon sa a pa valab : li ka deja sèvi oswa yon nouvo seri ranplase l.",
+    not_a_member: "Se sèlman yon manm aktif nan ekip la ki ka kreye kòd rekiperasyon.",
     already_staff: "Kont sa a deja fè pati ekip la.",
     last_active_owner: "Yo pa ka retire ni bese dènye pwopriyetè aktif la : nonmen yon lòt pwopriyetè anvan.",
     cannot_change_own_access: "Ou pa ka chanje aksè pa w. Mande yon kolèg.",

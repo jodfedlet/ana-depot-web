@@ -3,7 +3,7 @@ import { refreshesStorefront } from "./storefront-refresh";
 import type {
   AdminCategory, AdminCategorySummary, AdminCustomer, AdminMovement, AdminPayment, AdminPaymentAttempt, AdminPosition, AdminProduct, AdminProductSummary, AdminReservation, AdminReservationSummary,
   CategoryProductLine, CategoryRequest, LedgerEntry, OverviewReport, PageDto, PaymentOutcome, PaymentsReport, PickupSettingsDto, ProductRequest, ProductsReport, Reconciliation,
-  ReservationPayments, ReservationsReport, SalesReport, StockReport, UploadTicket, AdminImage, StaffMemberDto, StaffInvitationDto, IssuedInvitationDto, NotificationDto, NotificationSummaryDto,
+  ReservationPayments, ReservationsReport, SalesReport, StockReport, UploadTicket, AdminImage, StaffMemberDto, StaffInvitationDto, IssuedInvitationDto, RecoveryCodesIssuedDto, RecoveryCodesStatusDto, NotificationDto, NotificationSummaryDto,
 } from "./dto";
 
 /** One function per staff endpoint of `ana-depot-api/docs/api.md` ("Staff admin API"). Nothing here is invented; every call is authorized by the backend. */
@@ -27,6 +27,8 @@ export const retryNotification = (id: string, o?: W) => api.post<NotificationDto
 // ---- team ----
 export const listStaff = (o?: Opts) => api.get<StaffMemberDto[]>("/staff", undefined, o);
 export const setStaffActive = (userId: string, active: boolean, o?: W) => api.put<StaffMemberDto>(`/staff/${userId}`, { active }, o);
+export const recoveryCodesStatus = (o?: Opts) => api.get<RecoveryCodesStatusDto>("/me/recovery-codes", undefined, o);
+export const generateRecoveryCodes = (o?: W) => api.post<RecoveryCodesIssuedDto>("/me/recovery-codes", {}, o);
 export const listInvitations = (o?: Opts) => api.get<StaffInvitationDto[]>("/staff/invitations", undefined, o);
 export const createInvitation = (note: string, role: "OWNER" | "MANAGER" | "STAFF", o?: W) => api.post<IssuedInvitationDto>("/staff/invitations", { note, role }, o);
 export const setStaffRole = (userId: string, role: "OWNER" | "MANAGER" | "STAFF", o?: W) => api.put<StaffMemberDto>(`/staff/${userId}/role`, { role }, o);

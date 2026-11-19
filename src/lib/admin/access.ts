@@ -7,6 +7,7 @@ import type { Permission } from "@/lib/auth/authorization";
  */
 const PAGES: { prefix: string; permission: Permission | null; exact?: boolean }[] = [
   { prefix: "/admin", permission: null, exact: true },
+  { prefix: "/admin/security", permission: null },   // a member's own recovery codes: every team member
   { prefix: "/admin/reservations", permission: "RESERVATIONS" },
   { prefix: "/admin/payments", permission: "REPORTS_VIEW" },
   { prefix: "/admin/products", permission: "CATALOG_MANAGE" },
