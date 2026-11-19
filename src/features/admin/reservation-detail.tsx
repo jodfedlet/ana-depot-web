@@ -6,6 +6,7 @@ import { AdminErrorState } from "@/components/ui/admin-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Skeleton } from "@/components/ui/states";
+import { ReservationMessages } from "./notifications";
 import { PaymentStatusBadge, PickupInfo, ReservationStatusBadge, SectionCard } from "@/features/reservations/shared";
 import { useFormat } from "@/i18n/format";
 import { Link } from "@/i18n/link";
@@ -124,6 +125,10 @@ function Detail({ r, reload, loading }: { r: AdminReservation; reload: () => voi
 
           <SectionCard title={t("admin.detail.sections.payment")}>
             <PaymentPanel reservation={r} onChanged={reload} />
+          </SectionCard>
+
+          <SectionCard title={t("adminNotif.onReservation")}>
+            <ReservationMessages reservationId={r.id} />
           </SectionCard>
 
           <SectionCard title={t("admin.detail.snapshot.title")}>

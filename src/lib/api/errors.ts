@@ -15,7 +15,7 @@ const KNOWN = [
   // online payment (hosted Stripe Checkout)
   "online_payment_unavailable", "currency_not_available_online", "amount_below_minimum", "payment_provider_error", "online_payment_reversal_unsupported", "method_not_allowed",
   // team management and staff second factor
-  "invitation_invalid", "already_staff", "last_active_staff", "cannot_change_own_access", "invitation_not_pending", "mfa_required",
+  "notification_not_retryable", "invitation_invalid", "already_staff", "last_active_staff", "cannot_change_own_access", "invitation_not_pending", "mfa_required",
 ] as const satisfies readonly ApiErrorCode[];
 const known = new Set<string>(KNOWN);
 

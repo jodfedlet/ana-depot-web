@@ -5,9 +5,10 @@ import { admin } from "./ht/admin";
 import { adminCatalog } from "./ht/admin-catalog";
 import { adminOps } from "./ht/admin-ops";
 import { adminTeam } from "./ht/admin-team";
+import { adminNotif } from "./ht/admin-notif";
 import { customer } from "./ht/customer";
 import { pwa } from "./ht/pwa";
 import { store } from "./ht/store";
 
 /** Haitian Creole. Typed against the French shape, so a missing key will not compile. */
-export const ht: typeof fr = { ...store, ...customer, ...api, ...pwa, ...adminLive, ...adminTeam, admin: { ...admin, ...adminCatalog, ...adminOps } };
+export const ht: typeof fr = { ...store, ...customer, ...api, ...pwa, ...adminLive, ...adminTeam, ...adminNotif, admin: { ...admin, ...adminCatalog, ...adminOps } };

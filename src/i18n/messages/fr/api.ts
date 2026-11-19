@@ -29,6 +29,7 @@ export const api = {
     page_out_of_range: "Cette page de résultats n'existe pas.",
     filter_invalid: "Un des filtres choisis n'est pas valide.",
     concurrent_update: "Ces informations ont changé entre-temps. Rechargez la page.",
+    notification_not_retryable: "Ce message ne peut plus être renvoyé : il a déjà été remis en file d'envoi ou envoyé.",
     invitation_invalid: "Ce code d'invitation n'est pas valide. Il a peut-être expiré ou déjà été utilisé : demandez-en un nouveau.",
     already_staff: "Ce compte fait déjà partie de l'équipe.",
     last_active_staff: "Le dernier membre actif de l'équipe ne peut pas être retiré.",

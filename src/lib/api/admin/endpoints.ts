@@ -3,7 +3,7 @@ import { refreshesStorefront } from "./storefront-refresh";
 import type {
   AdminCategory, AdminCategorySummary, AdminCustomer, AdminMovement, AdminPayment, AdminPaymentAttempt, AdminPosition, AdminProduct, AdminProductSummary, AdminReservation, AdminReservationSummary,
   CategoryProductLine, CategoryRequest, LedgerEntry, OverviewReport, PageDto, PaymentOutcome, PaymentsReport, PickupSettingsDto, ProductRequest, ProductsReport, Reconciliation,
-  ReservationPayments, ReservationsReport, SalesReport, StockReport, UploadTicket, AdminImage, StaffMemberDto, StaffInvitationDto, IssuedInvitationDto,
+  ReservationPayments, ReservationsReport, SalesReport, StockReport, UploadTicket, AdminImage, StaffMemberDto, StaffInvitationDto, IssuedInvitationDto, NotificationDto, NotificationSummaryDto,
 } from "./dto";
 
 /** One function per staff endpoint of `ana-depot-api/docs/api.md` ("Staff admin API"). Nothing here is invented; every call is authorized by the backend. */
@@ -18,6 +18,11 @@ export const reportPayments = (q: Q, o?: Opts) => api.get<PaymentsReport>("/repo
 export const reportProducts = (q: Q, o?: Opts) => api.get<ProductsReport>("/reports/products", q, o);
 export const reportReservations = (q: Q, o?: Opts) => api.get<ReservationsReport>("/reports/reservations", q, o);
 export const reportStock = (o?: Opts) => api.get<StockReport>("/reports/stock", undefined, o);
+
+// ---- customer e-mail notifications ----
+export const listNotifications = (q: Q, o?: Opts) => api.get<PageDto<NotificationDto>>("/notifications", q, o);
+export const notificationSummary = (o?: Opts) => api.get<NotificationSummaryDto>("/notifications/summary", undefined, o);
+export const retryNotification = (id: string, o?: W) => api.post<NotificationDto>(`/notifications/${id}/retry`, undefined, o);
 
 // ---- team ----
 export const listStaff = (o?: Opts) => api.get<StaffMemberDto[]>("/staff", undefined, o);

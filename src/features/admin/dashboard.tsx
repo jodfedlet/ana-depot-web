@@ -11,6 +11,7 @@ import { useFormat } from "@/i18n/format";
 import { Link } from "@/i18n/link";
 import { useLText, useT } from "@/i18n/provider";
 import { useAdminResource } from "@/lib/api/admin/hooks";
+import { NotificationsAlert } from "./notifications";
 import { getPickupSettings, listInventory, listReservations, reportOverview, reportProducts } from "@/lib/api/admin/endpoints";
 import { cn } from "@/lib/cn";
 import { reservationStatuses, type ReservationStatus as UiStatus } from "@/lib/reservations/types";
@@ -56,6 +57,7 @@ export function Dashboard() {
   return (
     <div className="space-y-6" aria-busy={res.loading}>
       {res.error != null && <AdminErrorState error={res.error} onRetry={res.reload} />}
+      <NotificationsAlert />
       <PeriodFilter from={from} to={to} onChange={(p) => url.set({ from: p.from || undefined, to: p.to || undefined })}>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <RefreshButton onClick={res.reload} loading={res.loading} />

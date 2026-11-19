@@ -35,10 +35,12 @@ business record in the browser. Backend rules are never re-implemented: the UI r
 | Payments | Per currency, only while READY_FOR_PICKUP, ledger, reversal, adjustment; overpayment is accepted by the server (policy undecided, shown as such); no refund |
 | Customers | Guests corrected in place, never merged; registered customers read-only |
 | Pickup settings | Snapshots of existing reservations never change |
+| Messages (`/admin/notifications`) | Customer e-mails: summary tiles, filters, plain-language failures, confirmed "Resend" for a message that gave up, a block on each reservation, a dashboard warning when messages fail or sending is off; recipients are masked by the API |
 | Team (`/admin/team`) | Invite with a one-time code (shown once), remove / restore access with confirmation, pending invitations first and history on demand; all members equal (roles undecided) |
 | Payments report | Received money split by method (cash / online) and currency; reservation value (sales) is a separate tab |
 
 ## Verification
+`npm run e2e:notifications` covers customer e-mail end to end against a real SMTP catcher (API in `ANA_MAIL_MODE=smtp`, short retry timings; it stops and starts the catcher container for the outage test).
 `npm run e2e:team` covers the team and staff second factor (needs the API with `ANA_STAFF_REQUIRE_MFA=true`); `npm run e2e:a11y` runs axe on every main screen (390/1280 px, fr+ht).
 `npm run e2e:admin` (see `e2e/admin/README.md`) drives the production build in Chromium against the real API, a LOCAL Supabase stack and MinIO. It is **not** a test of hosted Supabase or Cloudflare R2.
 Unit tests (`npm test`) cover the pure form logic, idempotency, upload and error mapping.

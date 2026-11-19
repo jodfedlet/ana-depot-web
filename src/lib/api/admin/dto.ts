@@ -108,6 +108,18 @@ export interface ProductsReport { period: ReportPeriod; rows: { productId: strin
 export interface ReservationsReport { period: ReportPeriod; byStatus: Record<string, number>; total: number; rejectionReasons: Record<string, number> }
 export interface StockReport { stock: StockCounts; activeProducts: number }
 
+// ---- customer e-mail notifications ----
+export type NotificationStatusDto = "PENDING" | "PROCESSING" | "RETRY" | "SENT" | "DEAD" | "CAPTURED" | "SKIPPED_NO_RECIPIENT" | "SKIPPED_INVALID_RECIPIENT" | "SKIPPED_THROTTLED";
+export type NotificationTypeDto = "RESERVATION_SUBMITTED" | "RESERVATION_CONFIRMED" | "RESERVATION_REJECTED" | "RESERVATION_READY_FOR_PICKUP" | "RESERVATION_COLLECTED" | "RESERVATION_CANCELLED"
+  | "RESERVATION_EXPIRED" | "PAYMENT_RECEIVED" | "PAYMENT_FAILED" | "CHECKOUT_EXPIRED";
+/** `recipient` is MASKED by the API ("m***@example.com"); `lastError` is a short code, never provider text. */
+export interface NotificationDto {
+  id: string; type: NotificationTypeDto; reservationId: string; reservationReference: string | null; recipient: string | null; status: NotificationStatusDto; attempts: number;
+  lastError: string | null; nextAttemptAt: string | null; createdAt: string; sentAt: string | null;
+}
+/** `mode`: SMTP (sent), LOG (development: nothing is sent), DISABLED (messages wait, nothing is sent). */
+export interface NotificationSummaryDto { counts: Record<string, number>; mode: "SMTP" | "LOG" | "DISABLED"; oldestWaitingAt: string | null }
+
 // ---- team ----
 export interface StaffMemberDto { userId: string; active: boolean; you: boolean; initial?: boolean; displayName: string | null; email: string | null; note: string | null; joinedAt: string; updatedAt: string | null }
 export type InvitationStatusDto = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";

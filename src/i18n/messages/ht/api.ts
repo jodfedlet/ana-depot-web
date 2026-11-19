@@ -31,6 +31,7 @@ export const api: typeof frApi = {
     page_out_of_range: "Paj rezilta sa a pa egziste.",
     filter_invalid: "Youn nan filtè ou chwazi yo pa valab.",
     concurrent_update: "Enfòmasyon sa yo chanje pandan tan sa a. Rechaje paj la.",
+    notification_not_retryable: "Mesaj sa a pa ka voye ankò : li deja nan liy voye a oswa li deja voye.",
     invitation_invalid: "Kòd envitasyon sa a pa valab. Li ka ekspire oswa yo ka deja sèvi ak li: mande yon lòt.",
     already_staff: "Kont sa a deja fè pati ekip la.",
     last_active_staff: "Yo pa ka retire dènye manm aktif ekip la.",
