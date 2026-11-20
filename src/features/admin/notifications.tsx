@@ -20,11 +20,11 @@ import { useAction, useAdminResource } from "@/lib/api/admin/hooks";
 import { RefreshButton, useUrlState } from "./common";
 
 const field = "text-label min-h-11 rounded-control border border-line-strong bg-surface px-3";
-export const STATUSES: NotificationStatusDto[] = ["PENDING", "RETRY", "SENT", "DEAD", "CAPTURED", "SKIPPED_NO_RECIPIENT", "SKIPPED_INVALID_RECIPIENT", "SKIPPED_THROTTLED"];
+export const STATUSES: NotificationStatusDto[] = ["PENDING", "RETRY", "SENT", "DEAD", "CAPTURED", "SKIPPED_NO_RECIPIENT", "SKIPPED_INVALID_RECIPIENT", "SKIPPED_THROTTLED", "SUPERSEDED", "EXPIRED"];
 export const TYPES: NotificationTypeDto[] = ["RESERVATION_SUBMITTED", "RESERVATION_CONFIRMED", "RESERVATION_REJECTED", "RESERVATION_READY_FOR_PICKUP", "RESERVATION_COLLECTED", "RESERVATION_CANCELLED",
   "RESERVATION_EXPIRED", "PAYMENT_RECEIVED", "PAYMENT_FAILED", "CHECKOUT_EXPIRED"];
 const tone: Record<NotificationStatusDto, Tone> = { PENDING: "warning", PROCESSING: "info", RETRY: "warning", SENT: "success", DEAD: "danger", CAPTURED: "neutral", SKIPPED_NO_RECIPIENT: "neutral",
-  SKIPPED_INVALID_RECIPIENT: "neutral", SKIPPED_THROTTLED: "neutral" };
+  SKIPPED_INVALID_RECIPIENT: "neutral", SKIPPED_THROTTLED: "neutral", SUPERSEDED: "neutral", EXPIRED: "warning" };
 
 export function NotificationBadge({ status }: { status: NotificationStatusDto }) {
   const t = useT();
@@ -64,10 +64,11 @@ export function NotificationsView() {
 
   const counts = summary.data?.counts ?? {};
   const sum = (...k: string[]) => k.reduce((a, c) => a + (counts[c] ?? 0), 0);
-  const tiles: { key: "waiting" | "sent" | "failed" | "skipped" | "captured"; value: number; filter: string }[] = [
+  const tiles: { key: "waiting" | "sent" | "failed" | "expired" | "skipped" | "captured"; value: number; filter: string }[] = [
     { key: "waiting", value: sum("PENDING", "RETRY", "PROCESSING"), filter: "PENDING" },
     { key: "sent", value: sum("SENT"), filter: "SENT" },
     { key: "failed", value: sum("DEAD"), filter: "DEAD" },
+    ...(sum("EXPIRED") > 0 ? [{ key: "expired" as const, value: sum("EXPIRED"), filter: "EXPIRED" }] : []),
     { key: "skipped", value: sum("SKIPPED_NO_RECIPIENT", "SKIPPED_INVALID_RECIPIENT", "SKIPPED_THROTTLED"), filter: "SKIPPED_NO_RECIPIENT" },
     ...(sum("CAPTURED") > 0 ? [{ key: "captured" as const, value: sum("CAPTURED"), filter: "CAPTURED" }] : []),
   ];
@@ -114,7 +115,7 @@ export function NotificationsView() {
                 <div className="flex items-center gap-3">
                   <span className="text-caption text-ink-muted">{t("adminNotif.columns.attempts")} : {n.attempts}</span>
                   <NotificationBadge status={n.status} />
-                  {n.status === "DEAD" && can("NOTIFICATIONS_RESEND") && <Button variant="outline" size="sm" onClick={() => setConfirm(n)}>{t("adminNotif.retry")}</Button>}
+                  {(n.status === "DEAD" || n.status === "EXPIRED") && can("NOTIFICATIONS_RESEND") && <Button variant="outline" size="sm" onClick={() => setConfirm(n)}>{t("adminNotif.retry")}</Button>}
                 </div>
               </li>
             ))}
@@ -168,8 +169,8 @@ export function NotificationsAlert() {
   const t = useT();
   const res = useAdminResource("notif:alert", (signal) => notificationSummary({ signal }));
   if (!res.data) return null;
-  const dead = res.data.counts.DEAD ?? 0;
+  const dead = res.data.attention;   // gave up, or an important message that expired unsent (superseded and informational-expired messages are not failures)
   if (res.data.mode === "DISABLED") return <Alert tone="warning" live="polite">{t("adminNotif.alertDisabled")} <Link href="/admin/notifications" className="font-semibold underline">{t("adminNotif.open")}</Link></Alert>;
-  if (dead > 0) return <Alert tone="danger" live="polite">{t("adminNotif.alertFailed", { count: dead })} <Link href="/admin/notifications?status=DEAD" className="font-semibold underline">{t("adminNotif.open")}</Link></Alert>;
+  if (dead > 0) return <Alert tone="danger" live="polite">{t("adminNotif.alertFailed", { count: dead })} <Link href={`/admin/notifications?status=${(res.data.counts.DEAD ?? 0) > 0 ? "DEAD" : "EXPIRED"}`} className="font-semibold underline">{t("adminNotif.open")}</Link></Alert>;
   return null;
 }

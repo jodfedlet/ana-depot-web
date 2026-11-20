@@ -111,7 +111,7 @@ export interface ReservationsReport { period: ReportPeriod; byStatus: Record<str
 export interface StockReport { stock: StockCounts; activeProducts: number }
 
 // ---- customer e-mail notifications ----
-export type NotificationStatusDto = "PENDING" | "PROCESSING" | "RETRY" | "SENT" | "DEAD" | "CAPTURED" | "SKIPPED_NO_RECIPIENT" | "SKIPPED_INVALID_RECIPIENT" | "SKIPPED_THROTTLED";
+export type NotificationStatusDto = "PENDING" | "PROCESSING" | "RETRY" | "SENT" | "DEAD" | "CAPTURED" | "SKIPPED_NO_RECIPIENT" | "SKIPPED_INVALID_RECIPIENT" | "SKIPPED_THROTTLED" | "SUPERSEDED" | "EXPIRED";
 export type NotificationTypeDto = "RESERVATION_SUBMITTED" | "RESERVATION_CONFIRMED" | "RESERVATION_REJECTED" | "RESERVATION_READY_FOR_PICKUP" | "RESERVATION_COLLECTED" | "RESERVATION_CANCELLED"
   | "RESERVATION_EXPIRED" | "PAYMENT_RECEIVED" | "PAYMENT_FAILED" | "CHECKOUT_EXPIRED";
 /** `recipient` is MASKED by the API ("m***@example.com"); `lastError` is a short code, never provider text. */
@@ -120,7 +120,7 @@ export interface NotificationDto {
   lastError: string | null; nextAttemptAt: string | null; createdAt: string; sentAt: string | null;
 }
 /** `mode`: SMTP (sent), LOG (development: nothing is sent), DISABLED (messages wait, nothing is sent). */
-export interface NotificationSummaryDto { counts: Record<string, number>; mode: "SMTP" | "LOG" | "DISABLED"; oldestWaitingAt: string | null }
+export interface NotificationSummaryDto { counts: Record<string, number>; /** Messages staff should look at: gave up, or an important message that expired unsent. */ attention: number; mode: "SMTP" | "LOG" | "DISABLED"; oldestWaitingAt: string | null }
 
 // ---- team ----
 export interface StaffMemberDto { userId: string; active: boolean; role: "OWNER" | "MANAGER" | "STAFF"; recoveryCodesRemaining: number; you: boolean; initial?: boolean; displayName: string | null; email: string | null; note: string | null; joinedAt: string; updatedAt: string | null }
