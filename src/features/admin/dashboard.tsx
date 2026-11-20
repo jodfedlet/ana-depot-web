@@ -196,7 +196,7 @@ function FullDashboard({ canSettings }: { canSettings: boolean }) {
             <h2 id="pk-title" className="text-h3 flex items-center gap-2"><MapPin aria-hidden className="size-4" />{t("adminDash.pickup")}</h2>
             <div className="mt-3"><Alert tone={pickupState === "on" ? "success" : "warning"} live="polite">{t(pickupState === "on" ? "adminDash.pickupOn" : pickupState === "off" ? "adminDash.pickupOff" : "adminDash.pickupNone")}</Alert></div>
             {pickupState === "on" && <p className="text-label mt-3 font-normal text-ink-soft">{pickup.location?.storeName} — {pickup.location?.addressLine}, {pickup.location?.city}</p>}
-            <p className="text-caption mt-2 text-ink-muted">{pickup.holdPeriodDays ? t("adminDash.holdDays", { count: pickup.holdPeriodDays }) : t("adminDash.holdNone")}</p>
+            <p className="text-caption mt-2 text-ink-muted">{t("adminDash.holdDays", { count: pickup.effectiveHoldPeriodDays ?? pickup.holdPeriodDays ?? 0 })}</p>
             <ButtonLink href="/admin/settings" variant="outline" size="sm" className="mt-4">{t("adminDash.managePickup")}</ButtonLink>
           </section>
           )}

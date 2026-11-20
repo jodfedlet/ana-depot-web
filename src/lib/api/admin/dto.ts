@@ -135,7 +135,7 @@ export interface PickupSettingsDto {
   enabled: boolean; unavailableMessage: LTextDto | null;
   location: { storeName?: string; addressLine?: string; city?: string; region?: string; country?: string; postalCode?: string | null; phone?: string; email?: string | null; additionalLocationInfo?: LTextDto; schedule?: PickupScheduleDay[]; closureInfo?: LTextDto } | null;
   instructions: { general?: LTextDto; contact?: LTextDto; accepted?: LTextDto; ready?: LTextDto; policy?: LTextDto } | null;
-  holdPeriodDays: number | null; version: number | null; updatedAt: string | null; updatedBy: string | null;
+  holdPeriodDays: number | null; /** What is applied to a newly ready reservation (the store's number, else the approved default). Read-only. */ effectiveHoldPeriodDays?: number; version: number | null; updatedAt: string | null; updatedBy: string | null;
 }
 
 // ---- uploads ----

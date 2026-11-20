@@ -93,6 +93,13 @@ export async function submitReservation(body: ReservationRequest, idempotencyKey
 export const lookupReservation = (reference: string, phone: string, o: Opts = {}) =>
   publicCall((c) => c.post<ReservationViewDto>("/api/v1/reservations/lookup", { reference, phone }, o));
 
+/**
+ * `POST /reservations/cancel` (D7): the customer cancels their own reservation until the store prepares it. Same ownership proof as the lookup (reference + phone in the BODY, an
+ * identical 404 on any miss). The reason is required. The server answers with the updated reservation; nothing is shown as cancelled before that.
+ */
+export const cancelReservation = (reference: string, phone: string, reason: string, o: Opts = {}) =>
+  publicCall((c) => c.post<ReservationViewDto>("/api/v1/reservations/cancel", { reference, phone, reason }, o));
+
 // ---- customer account (token required) --------------------------------------------------------------------------------------------------------
 
 export const getMe = async (o: Opts = {}) => (await customerClient()).get<MeDto>("/api/v1/me", undefined, o);

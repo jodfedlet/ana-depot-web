@@ -296,7 +296,7 @@ export const admin: typeof frAdmin = {
     hold: {
       title: "Ekspirasyon rezèvasyon yo",
       label: "Konbyen jou yo kenbe rezèvasyon an apre « pare pou pran » (jou)",
-      hint: "Kite l vid si w pa vle defini okenn règleman ekspirasyon. Pa gen valè pa defo ki enpoze.",
+      hint: "Kite l vid pou itilize dire pa defo a. Yon rezèvasyon ki pare ekspire otomatikman a lafen dire sa a ; yo fikse delè a le rezèvasyon an vin pare.",
     },
     preview: { title: "Apèsi kliyan an ap wè", language: "Lang apèsi a" },
     history: {

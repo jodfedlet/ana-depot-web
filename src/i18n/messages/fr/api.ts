@@ -57,6 +57,7 @@ export const api = {
     payment_required: "Le paiement complet doit être enregistré dans chaque devise avant la remise des produits.",
     already_paid: "Cette devise est déjà réglée en totalité.",
     overpayment_not_allowed: "Le montant dépasse le solde restant de cette devise : enregistrez au plus le solde dû et rendez la monnaie.",
+    cancellation_not_allowed: "Cette réservation ne peut plus être annulée en ligne : le magasin a commencé à la préparer. Contactez le magasin.",
     already_reversed: "Ce paiement a déjà été annulé.",
     inventory_exists: "Ce produit a déjà un stock enregistré.",
     stock_negative: "Cette opération rendrait le stock négatif.",

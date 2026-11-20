@@ -150,7 +150,9 @@ await run("team", async () => {
   await page.getByRole("dialog").getByLabel("Rôle").selectOption("STAFF");
   await page.getByRole("dialog").getByRole("button", { name: "Enregistrer le rôle" }).click();
   await page.getByText("Rôle modifié.").first().waitFor({ timeout: 10000 });
-  check("and loses it again as soon as the role is lowered", (await api("GET", "/admin/reports/overview", people.STAFF.token)).status === 403);
+  let lowered = 0;
+  for (let i = 0; i < 20 && lowered !== 403; i++) { lowered = (await api("GET", "/admin/reports/overview", people.STAFF.token)).status; if (lowered !== 403) await new Promise((r) => setTimeout(r, 250)); }   // the earlier toast may still be showing: wait for the server's answer, not the toast
+  check("and loses it again as soon as the role is lowered", lowered === 403, String(lowered));
   // the last owner cannot be demoted by anyone
   const me = await api("GET", "/me", ownerToken);
   const demote = await api("PUT", `/admin/staff/${me.body.userId}/role`, ownerToken, { role: "STAFF" });

@@ -41,14 +41,15 @@ export function StoreSettings() {
   if (!res.data) return <Skeleton className="h-72 w-full" />;
   const pickupOk = isConfigured(res.data);
   const hold = res.data.holdPeriodDays;
+  const effective = res.data.effectiveHoldPeriodDays;
   return (
     <ul className="grid gap-4 lg:grid-cols-2">
       <Card title={t("admin.settings.identityTitle")} state="fixed">{t("admin.settings.identityText", { name: siteConfig.name })}</Card>
       <Card title={t("admin.settings.pickupTitle")} state={pickupOk ? "configured" : "notConfigured"} action={<ButtonLink href="/admin/pickup-settings" variant="outline">{t("admin.settings.manage")}</ButtonLink>}>
         {pickupOk ? t("admin.settings.pickupTextOk") : t("admin.settings.pickupTextMissing")}
       </Card>
-      <Card title={t("admin.settings.holdTitle")} state={hold ? "configured" : "decisionPending"} action={<ButtonLink href="/admin/pickup-settings" variant="outline">{t("admin.settings.manage")}</ButtonLink>}>
-        {hold ? t("admin.settings.holdValue", { days: hold }) : t("admin.settings.holdNone")}
+      <Card title={t("admin.settings.holdTitle")} state="configured" action={<ButtonLink href="/admin/pickup-settings" variant="outline">{t("admin.settings.manage")}</ButtonLink>}>
+        {hold ? t("admin.settings.holdValue", { days: hold }) : t("admin.settings.holdDefault", { days: effective ?? 0 })}
       </Card>
       <Card title={t("admin.settings.currenciesTitle")} state="fixed">{t("admin.settings.currenciesText")}</Card>
       <Card title={t("admin.settings.paymentsTitle")} state="fixed">{t("admin.settings.paymentsText")}</Card>

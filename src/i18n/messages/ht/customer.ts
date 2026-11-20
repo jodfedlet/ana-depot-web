@@ -183,6 +183,16 @@ export const customer: typeof frCustomer = {
       text: "Antre nimewo telefòn ou te itilize pou rezèvasyon sa a pou w ka wè l.",
       submit: "Montre",
     },
+    cancel: {
+      button: "Anile rezèvasyon mwen",
+      title: "Anile rezèvasyon mwen",
+      note: "Posib toutotan magazen an poko kòmanse prepare kòmand ou.",
+      text: "Y ap anile rezèvasyon w lan touswit epi pwodwi yo ap remèt nan vant. Ou pa ka defèt aksyon sa a ; ou ka toujou fè yon lòt rezèvasyon.",
+      reason: "Poukisa w ap anile ?",
+      reasonHint: "Obligatwa, 300 karaktè o maksimòm. Magazen an ap li l.",
+      keep: "Kenbe rezèvasyon mwen",
+      confirm: "Anile rezèvasyon an",
+    },
     detail: {
       balanceTotal: "Total",
       balanceDue: "Rès pou peye",

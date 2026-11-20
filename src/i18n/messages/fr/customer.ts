@@ -180,6 +180,16 @@ export const customer = {
       text: "Saisissez le numéro de téléphone utilisé pour cette réservation afin de l'afficher.",
       submit: "Afficher",
     },
+    cancel: {
+      button: "Annuler ma réservation",
+      title: "Annuler ma réservation",
+      note: "Possible tant que le magasin n'a pas commencé à préparer votre commande.",
+      text: "Votre réservation sera annulée tout de suite et les produits seront remis à la vente. Cette action ne peut pas être défaite ; vous pourrez toujours refaire une réservation.",
+      reason: "Pourquoi annulez-vous ?",
+      reasonHint: "Obligatoire, 300 caractères au plus. Le magasin le lira.",
+      keep: "Garder ma réservation",
+      confirm: "Annuler la réservation",
+    },
     detail: {
       balanceTotal: "Total",
       balanceDue: "Reste à payer",

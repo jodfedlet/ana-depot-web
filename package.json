@@ -16,6 +16,7 @@
     "e2e:admin": "node e2e/admin/run.mjs",
     "e2e:team": "node e2e/admin/team.mjs",
     "e2e:roles": "node e2e/admin/roles.mjs",
+    "e2e:cancel": "node e2e/storefront/cancel.mjs",
     "e2e:notifications": "node e2e/admin/notifications.mjs",
     "e2e:a11y": "node e2e/a11y/run.mjs",
     "e2e:payment-messaging": "node e2e/storefront/payment-messaging.mjs",

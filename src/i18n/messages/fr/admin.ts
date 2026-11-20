@@ -293,7 +293,7 @@ export const admin = {
     hold: {
       title: "Expiration des réservations",
       label: "Durée de conservation après « prête à retirer » (jours)",
-      hint: "Laissez vide pour ne définir aucune politique d'expiration. Aucune valeur par défaut n'est imposée.",
+      hint: "Laissez vide pour utiliser la durée par défaut. Une réservation prête expire automatiquement à la fin de cette durée ; le délai est fixé au moment où elle devient prête.",
     },
     preview: { title: "Aperçu côté client", language: "Langue de l'aperçu" },
     history: {

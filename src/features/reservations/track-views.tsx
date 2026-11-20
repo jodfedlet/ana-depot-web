@@ -22,6 +22,7 @@ import { useSession } from "@/lib/auth/use-session";
 import { useOnline } from "@/lib/pwa/store";
 import { normalizeReference, rememberAccess } from "@/lib/reservations/access-store";
 import { focusFirstInvalid, isBlank } from "@/lib/validation";
+import { CancelReservation } from "./cancel-reservation";
 import { OnlinePayPanel } from "@/features/payments/online-pay-panel";
 import { usePayerAccess } from "@/lib/api/online-payment-hooks";
 import { PaymentBalances, PaymentHistory, PaymentStatusBadge, PickupInfoFor, ReservationStatusBadge, SectionCard, Timeline, orderLinesOf, useCustomerTimeline } from "./shared";
@@ -150,6 +151,13 @@ export function CustomerReservationDetail({ reference }: { reference: string }) 
         {t(`statusDescription.${view.status}`)}
         {view.expiresAt && view.status === "ready_for_pickup" && <span className="mt-1 block font-semibold">{t("track.detail.expiresOn", { date: fmt.date(view.expiresAt) })}</span>}
       </Alert>
+
+      {view.canCancel && (
+        <section aria-labelledby="cancel-title" className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface p-4">
+          <div className="min-w-0"><h2 id="cancel-title" className="text-label font-semibold">{t("track.cancel.title")}</h2><p className="text-caption text-ink-soft">{t("track.cancel.note")}</p></div>
+          <CancelReservation reference={view.reference} phone={view.customer.phone} onDone={reload} />
+        </section>
+      )}
 
       {latestMessage?.note && (
         <section aria-labelledby="msg-title" className="rounded-card border-l-4 border-brand-600 bg-brand-50 p-4">
