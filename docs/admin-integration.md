@@ -32,11 +32,11 @@ business record in the browser. Backend rules are never re-implemented: the UI r
 | Products | Per-currency prices, wholesale tiers, variants (combinations of the category's variant axes), lifecycle (draft/active/inactive), images |
 | Inventory | On hand / reserved / available, register, adjust (reason + idempotency), thresholds (seller-set only), movement history |
 | Reservations | Accept / reject / ready / collect / cancel, internal vs customer-visible notes, actions from `allowedActions` |
-| Payments | Per currency, only while READY_FOR_PICKUP, ledger, reversal, adjustment; overpayment is accepted by the server (policy undecided, shown as such); no refund |
+| Payments | Per currency, only while READY_FOR_PICKUP, ledger, reversal, adjustment; a cash payment above the balance is refused by the server (D3) and the dialog shows the maximum; reversal/adjustment for Owner and Manager only; refunds are made in the Stripe dashboard: card money on a rejected/cancelled/expired reservation shows "refund due" and what Stripe reported as already refunded (D1) |
 | Customers | Guests corrected in place, never merged; registered customers read-only |
 | Pickup settings | Snapshots of existing reservations never change |
 | Messages (`/admin/notifications`) | Customer e-mails: summary tiles, filters, plain-language failures, confirmed "Resend" for a message that gave up, a block on each reservation, a dashboard warning when messages fail or sending is off; recipients are masked by the API |
-| Team (`/admin/team`) | Invite with a one-time code (shown once), remove / restore access with confirmation, pending invitations first and history on demand; all members equal (roles undecided) |
+| Team (`/admin/team`) | Invite with a one-time code (shown once), remove / restore access with confirmation, pending invitations first and history on demand; a role (Owner / Manager / Staff) chosen at invitation and changed by an owner; recovery codes per member (count shown, never the codes) |
 | Payments report | Received money split by method (cash / online) and currency; reservation value (sales) is a separate tab |
 
 ## Verification
@@ -48,3 +48,8 @@ Unit tests (`npm test`) cover the pure form logic, idempotency, upload and error
 ## Open decisions (not invented)
 Overpayment and partial-payment policy and who may record payments · hold period/expiry · customer cancellation and refunds · staff roles/permissions · low-stock policy · notification channel ·
 terms text/version (`NEXT_PUBLIC_TERMS_VERSION` must equal the API's `ANA_TERMS_VERSION`) · R2 public image domain · native Haitian Creole review of every new string.
+
+## Roles in the administration (D14, approved) and the second factor (D15)
+* `lib/admin/access.ts` maps each page to the permission the server requires (`/me.permissions`): the menu hides what the role may not open, a page opened by URL says it is not available with the role (no data, no error screen), controls the role lacks are not rendered (reverse/adjust payment, stock adjustment, customer edit, resend a message, products/reports/settings/team). The SERVER refuses the same requests (`AdminAccessMatrixIntegrationTest`).
+* Counter staff (STAFF) get a dashboard without money figures (work queue + stock alerts); Owner and Manager get the full one; only the Owner sees pickup/store settings and the team.
+* Second factor: the verification screen offers "I lost my authenticator" (recovery code); a session in through a code shows a banner; `/admin/security` makes a new set of codes (shown once). Verified by `e2e:roles` (48 checks) and `e2e:team` (41 checks, real GoTrue TOTP).
