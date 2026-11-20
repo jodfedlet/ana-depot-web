@@ -12,7 +12,8 @@ interface I18nValue {
 const I18nContext = createContext<I18nValue | null>(null);
 
 /** Receives ONE language's dictionary from the server layout, so only that language ships to the browser. */
-export type ClientMessages = Omit<Messages, "admin"> & { admin?: Messages["admin"] };
+/** The storefront receives a reduced dictionary (no administration wording: see `getStorefrontMessages`); inside /admin it receives everything. */
+export type ClientMessages = Omit<Partial<Messages>, "adminTeam"> & { adminTeam?: Partial<Messages["adminTeam"]> };
 
 export function I18nProvider({ locale, messages, children }: { locale: Locale; messages: ClientMessages; children: ReactNode }) {
   // The admin namespace is only sent to the browser inside /admin.
