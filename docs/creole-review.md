@@ -30,3 +30,13 @@ Points for the reviewer: "peye ak kat" vs "peye sou entènèt ak kat" (pay by ca
 ## Customer e-mails (`ana-depot-api/src/main/resources/email/messages_ht.properties`)
 NATIVE REVIEW REQUIRED. Written by the assistant from the agreed French wording: subjects, titles, introductions and labels of the ten customer e-mails (reservation received, accepted, refused, ready, collected, cancelled, expired; payment received, failed; checkout expired), the section labels (items, totals per currency, balances, pickup, payments), unit names, rejection reasons and the footer.
 Points for the reviewer: formal vs familiar address ("ou" throughout), "rezèvasyon" vs "kòmand", the three payment method names ("kat sou entènèt", "lajan kach nan magazen an"), the phrase for "balance still to pay" ("sa ki rete pou peye"), "pare pou pran" for "ready for pickup", and whether the greeting "Bonjou {name}," suits a formal transactional message.
+
+## Review pack for the native reviewer (generated, complete)
+`docs/creole-review-pack.csv` lists **every** Creole string of the application and of the customer e-mails (2,117 strings: store, customer, admin, API messages, PWA, SEO, and the
+e-mail bundles) next to its French source, with empty columns `creole_correction`, `status` (OK / CHANGE / QUESTION) and `reviewer_note`. It is generated, not hand-written:
+`npx tsx scripts/creole-review-pack.ts > docs/creole-review-pack.csv` (re-run after any wording change). No string is missing a Creole text.
+
+How an approved correction is applied (no correction has been approved yet, so none has been applied): a developer edits the string in `src/i18n/messages/ht/*.ts` or
+`ana-depot-api/src/main/resources/email/messages_ht.properties`, keeps every `{placeholder}` identical (the unit test `i18n` fails otherwise), runs `npm test` and the browser suites,
+and re-exports the pack so the reviewer sees the current text. Unresolved spelling choices the reviewer must settle once for the whole product are the "Points for the reviewer"
+above (for example `kòmann` / `kòmand`, `rezèvasyon` / `rezève`).
