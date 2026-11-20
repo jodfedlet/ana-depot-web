@@ -7,12 +7,12 @@ afterEach(() => vi.unstubAllEnvs());
 describe("authCookieOptions (server side)", () => {
   it("is not Secure on plain-http deployments", () => {
     vi.stubEnv("SECURITY_HTTPS_ONLY", "");
-    expect(authCookieOptions()).toEqual({ secure: false });
+    expect(authCookieOptions()).toEqual({ secure: false, sameSite: "lax", path: "/" });
   });
   it("is Secure when the deployment is HTTPS-only", () => {
     for (const v of ["true", "TRUE", "1", "yes"]) {
       vi.stubEnv("SECURITY_HTTPS_ONLY", v);
-      expect(authCookieOptions()).toEqual({ secure: true });
+      expect(authCookieOptions()).toEqual({ secure: true, sameSite: "lax", path: "/" });
     }
   });
 });
