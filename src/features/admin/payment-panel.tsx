@@ -74,6 +74,9 @@ export function PaymentPanel({ reservation, onChanged }: { reservation: AdminRes
           <p className="mt-1">{t("adminRes.refundDueText", { amounts: reservation.refundDue.map((a) => money(a.amount, a.currency)).join(" · ") })}</p>
         </Alert>
       )}
+      {reservation.refundedInProvider.length > 0 && (
+        <Alert tone="info">{t("adminRes.refundedInProvider", { amounts: reservation.refundedInProvider.map((a) => money(a.amount, a.currency)).join(" · ") })}</Alert>
+      )}
       {balances.some(isOverpaid) && <Alert tone="warning">{t("adminRes.overpaidNote")}</Alert>}
 
       {open ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setDialog({ kind: "record" })}>{t("admin.detail.actions.recordPayment")}</Button>{can("PAYMENTS_CORRECT") && <Button variant="ghost" onClick={() => setDialog({ kind: "adjust" })}>{t("adminRes.adjust")}</Button>}</div> : <p className="text-caption text-ink-muted">{t("adminRes.paymentsOnlyReady")}</p>}

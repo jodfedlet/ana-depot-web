@@ -72,6 +72,8 @@ export interface AdminReservation {
   history: AdminChange[]; notes: AdminNote[]; allowedActions: AllowedAction[];
   /** Card money to give back (rejected / cancelled / expired reservation), per currency; the refund is done in the Stripe dashboard (D1). */
   refundDue: { currency: string; amount: string }[];
+  /** Already refunded in the Stripe dashboard, as Stripe reported it (observed only; the ledger is untouched). */
+  refundedInProvider: { currency: string; amount: string }[];
 }
 
 // ---- payments ----

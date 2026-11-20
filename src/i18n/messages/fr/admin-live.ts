@@ -246,6 +246,7 @@ export const adminLive = {
     reconciled: "Cohérent avec le journal",
     notReconciled: "Écart avec le journal",
     overpaid: "Trop-perçu",
+    refundedInProvider: "Déjà remboursé dans Stripe : {amounts}. Ce montant vient de Stripe ; le journal des paiements ne change pas.",
     refundDueTitle: "Remboursement à faire",
     refundDueText: "Cette réservation s'est terminée sans retrait, mais le client a payé par carte : {amounts}. Remboursez-le dans le tableau de bord Stripe, puis laissez une note sur la réservation. L'application ne rembourse pas elle-même.",
     overpaidNote: "Cette devise a reçu plus que son solde (paiement antérieur à la règle actuelle). Les nouveaux paiements supérieurs au solde sont refusés : rendez la monnaie.",

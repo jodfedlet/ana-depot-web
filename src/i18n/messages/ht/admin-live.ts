@@ -247,6 +247,7 @@ export const adminLive: typeof frAdminLive = {
     reconciled: "Koresponn ak jounal la",
     notReconciled: "Gen yon dekalaj ak jounal la",
     overpaid: "Twòp resevwa",
+    refundedInProvider: "Deja rembouse nan Stripe : {amounts}. Montan sa a soti nan Stripe ; jounal peman yo pa chanje.",
     refundDueTitle: "Rembousman pou fè",
     refundDueText: "Rezèvasyon sa a fini san yo pa pran pwodwi yo, men kliyan an te peye ak kat : {amounts}. Rembouse l nan tablo Stripe a, epi kite yon nòt sou rezèvasyon an. Aplikasyon an pa rembouse poukont li.",
     overpaidNote: "Monnen sa a resevwa plis pase balans li (peman ki te fèt anvan règ sa a). Nouvo peman ki depase balans lan refize : remèt kliyan an monnen.",
