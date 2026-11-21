@@ -10,8 +10,8 @@ import { toApiQuery } from "./public";
  * Server-side reads of the PUBLIC catalog (no token, no cookies), used to render product, category and listing pages on the server so crawlers and slow phones get real HTML.
  * The API stays the single source of truth: these functions only fetch and cache its answers.
  *
- * Caching: every answer is cached for 60 s (then served stale while it revalidates, at most one hour), tagged `catalog`. `POST /api/revalidate-catalog` (staff only) drops the tag
- * after a catalog change, so a published/edited product shows on the storefront at once instead of after the window. A failure of the API is never cached.
+ * Caching: every answer is cached for 60 s (then served stale while it revalidates, at most one hour), tagged `catalog`. `POST /api/revalidate-catalog` (staff only) marks the tag
+ * stale after a catalog change (stale-while-revalidate), so a published/edited product shows on the storefront from the second visit on instead of after the window. A failure of the API is never cached.
  *  - 404 -> `{ status: "missing" }` (a real 404 page: unknown, draft and inactive products are indistinguishable by design).
  *  - API not configured -> `{ status: "unconfigured" }` (the page falls back to loading in the browser, which reports the configuration problem).
  *  - Any other failure throws: the page answers 5xx, never a soft 404, and nothing wrong is cached.

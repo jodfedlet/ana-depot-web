@@ -5,7 +5,7 @@ import { CATALOG_TAG } from "@/lib/api/server-catalog";
 
 /**
  * `POST /api/revalidate-catalog` — staff only. Drops the server-side catalog cache (product/category/listing/sitemap data, see lib/api/server-catalog.ts) so a change made in the
- * administration shows on the storefront immediately instead of after the 60 s window.
+ * administration shows on the storefront on the next visit after the one that triggers the refresh, instead of after the 60 s window.
  *
  * Authorization is the BACKEND's: the caller's bearer token is sent to `GET /api/v1/me` and only `staff: true` proceeds (anything else, including an API that cannot be
  * reached, is refused). No cookie is read and no state is changed other than the cache, so there is nothing for a cross-site request to forge.
@@ -21,6 +21,8 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ code: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
-  revalidateTag(CATALOG_TAG, { expire: 0 });
+  // "max" = stale-while-revalidate: the next request after a catalog change is answered with the previous data while the fresh data is fetched, the one after that
+  // shows it. `{ expire: 0 }` (blocking regeneration) made the prerendered home pages and sitemap answer 500 on Cloudflare Workers (OpenNext + cacheComponents hang), see docs/cloudflare-deployment.md.
+  revalidateTag(CATALOG_TAG, "max");
   return Response.json({ revalidated: true }, { headers: { "Cache-Control": "no-store" } });
 }
