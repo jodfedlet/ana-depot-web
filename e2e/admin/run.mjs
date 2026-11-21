@@ -510,7 +510,9 @@ await run("reservations", async () => {
   await page.getByRole("button", { name: "Marquer prête à retirer" }).click();
   await dialog(page).getByRole("button", { name: "Marquer prête" }).click(); await sleep(1500);
   d = await resDetail(id);
-  check("mark ready -> READY_FOR_PICKUP, no expiry invented (no hold period configured)", d.status === "READY_FOR_PICKUP" && d.expiresAt === null);
+  // D6 (approved): the pickup deadline is the ready time plus the store's hold days (3 when the store set none), fixed at that moment
+  const heldDays = (new Date(d.expiresAt) - new Date(d.readyAt)) / 86400000;
+  check("mark ready -> READY_FOR_PICKUP with the approved pickup deadline (ready time + the effective hold period)", d.status === "READY_FOR_PICKUP" && d.expiresAt !== null && Math.abs(heldDays - ((await admin("GET", "/admin/settings/pickup")).body.effectiveHoldPeriodDays)) < 0.01, `${heldDays} days`);
 
   // the customer sees only the customer-visible note
   const web = await newPage(browser);
@@ -725,7 +727,7 @@ await run("settings", async () => {
   const origAddress = orig.location.addressLine;
   await page.goto(`${env.WEB}/fr/admin/settings`); await settle(page, 1800);
   const st = await bodyText(page);
-  check("settings overview reflects the server: pickup configured, hold period undecided, no invented policies", /Configuré/.test(st) && /Aucune durée n'est définie/.test(st) && /Décision en attente/.test(st));
+  check("settings overview reflects the server: pickup configured and the effective hold period (the approved default applies when the store set none)", /Configuré/.test(st) && /durée par défaut de \d+ jours s'applique/.test(st));
   const oldRes = (await admin("GET", `/admin/reservations?q=${state.mainRef}`)).body.items[0];
   const oldPickup = (await admin("GET", `/admin/reservations/${oldRes.id}`)).body.pickup.location.addressLine;
   await page.goto(`${env.WEB}/fr/admin/pickup-settings`); await settle(page, 1200);
