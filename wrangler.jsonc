@@ -1,0 +1,40 @@
+{
+  // Cloudflare Workers deployment of the Ana Dépôt storefront + administration (OpenNext adapter).
+  // Full guide, Cloudflare dashboard settings and the variable list: docs/cloudflare-deployment.md
+  // NO secret belongs in this file. Values are set in the Cloudflare dashboard (Settings > Build / Variables).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ana-depot-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": [
+    // Node.js APIs (required by @opennextjs/cloudflare and by the Next.js server runtime)
+    "nodejs_compat",
+    // Outbound fetch() to public URLs only (the Spring Boot API, Supabase)
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+    // Serve public/offline.html at exactly /offline.html (the service worker precaches that URL). The default would redirect it to /offline.
+    "html_handling": "none"
+  },
+  "services": [
+    // The Worker calling itself (used by the adapter for revalidation); must match "name" above
+    { "binding": "WORKER_SELF_REFERENCE", "service": "ana-depot-web" }
+  ],
+  "r2_buckets": [
+    // Next.js incremental cache. A PRIVATE bucket (manual creation, if you prefer: `npx wrangler r2 bucket create ana-depot-web-cache`).
+    // Not the product-image bucket. Holds only rendered pages and cached API answers (public catalog data). `opennextjs-cloudflare deploy` creates the bucket when it is missing.
+    { "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "ana-depot-web-cache" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" },
+      { "name": "NEXT_TAG_CACHE_DO_SHARDED", "class_name": "DOShardedTagCache" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["DOQueueHandler", "DOShardedTagCache"] }
+  ],
+  "observability": { "enabled": true }
+}

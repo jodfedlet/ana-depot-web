@@ -2,10 +2,15 @@
   "name": "ana-depot",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.6.1",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "cf:upload": "opennextjs-cloudflare upload",
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
@@ -26,6 +31,7 @@
     "e2e:pwa": "node e2e/pwa/run.mjs"
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.18",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
     "lucide-react": "^1.73.0",
@@ -44,6 +50,12 @@
     "playwright-core": "^1.65.1",
     "tailwindcss": "4.3.3",
     "typescript": "^5",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "wrangler": "^4.166.0"
+  },
+  "overrides": {
+    "@opennextjs/aws": {
+      "cookie": "0.7.2"
+    }
   }
 }

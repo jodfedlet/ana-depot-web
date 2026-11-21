@@ -43,3 +43,8 @@ next-env.d.ts
 
 # browser-suite screenshots
 /e2e/storefront/screenshots/
+
+# cloudflare (OpenNext build output, Wrangler local state, local-only variables)
+/.open-next/
+/.wrangler/
+.dev.vars*

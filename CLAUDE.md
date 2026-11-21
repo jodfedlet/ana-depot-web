@@ -9,7 +9,7 @@ The **customer storefront is connected to the real backend** (`../ana-depot-api`
 Design: `docs/design-system.md` (read before changing UI). Business decisions still open: README.
 
 ## Commands
-`npm run dev|build|lint|typecheck|test` · `node scripts/generate-sample-images.mjs` (sample artwork).
+`npm run dev|build|lint|typecheck|test` · `node scripts/generate-sample-images.mjs` (sample artwork) · Cloudflare Workers: `npm run cf:build|cf:preview|cf:deploy` (OpenNext; `docs/cloudflare-deployment.md`, read it before touching caching, `proxy.ts` or `revalidateTag`).
 
 ## Architecture
 - `src/app/[locale]/…` — every page lives under `/fr` or `/ht` (`src/proxy.ts` redirects bare URLs: cookie → Accept-Language → `fr`).
