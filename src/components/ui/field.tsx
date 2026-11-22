@@ -1,7 +1,6 @@
 "use client";
 
-import { Eye, EyeOff } from "lucide-react";
-import { useId, useState, type ComponentProps, type ReactNode } from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 import { useT } from "@/i18n/provider";
 import { cn } from "@/lib/cn";
 
@@ -71,41 +70,6 @@ export function TextField({
         className={cn(control, error ? "border-danger-fg" : "border-line-strong")}
         {...props}
       />
-    </Shell>
-  );
-}
-
-export function PasswordField({
-  label,
-  hint,
-  error,
-  className,
-  ...props
-}: FieldShellProps & Omit<ComponentProps<"input">, "className" | "type">) {
-  const t = useT();
-  const id = useId();
-  const [visible, setVisible] = useState(false);
-  return (
-    <Shell {...{ id, label, hint, error, className }}>
-      <div className="relative">
-        <input
-          id={id}
-          type={visible ? "text" : "password"}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(id, hint, error)}
-          className={cn(control, "pr-12", error ? "border-danger-fg" : "border-line-strong")}
-          {...props}
-        />
-        <button
-          type="button"
-          onClick={() => setVisible((v) => !v)}
-          aria-label={visible ? t("auth.hidePassword") : t("auth.showPassword")}
-          aria-pressed={visible}
-          className="absolute inset-y-0 right-0 grid w-11 place-items-center text-ink-soft hover:text-ink"
-        >
-          {visible ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
-        </button>
-      </div>
     </Shell>
   );
 }

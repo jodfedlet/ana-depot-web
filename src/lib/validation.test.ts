@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkPassword, isValidEmail, isValidPhone } from "./validation";
+import { isValidEmail, isValidPhone } from "./validation";
 
 describe("validation", () => {
   it("validates emails", () => {
@@ -13,9 +13,5 @@ describe("validation", () => {
     expect(isValidPhone("5+09 0000")).toBe(false);
     expect(isValidPhone("12345")).toBe(false);
     expect(isValidPhone("555-CALL-NOW")).toBe(false);
-  });
-  it("checks password length", () => {
-    expect(checkPassword("short").ok).toBe(false);
-    expect(checkPassword("long enough").ok).toBe(true);
   });
 });

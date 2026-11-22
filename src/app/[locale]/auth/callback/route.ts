@@ -1,19 +1,21 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 import { isLocale } from "@/i18n/config";
-import { safeNextPath } from "@/lib/auth/safe-next";
 import { createServerSupabase } from "@/lib/auth/supabase-server";
+import { safeNextPath } from "@/lib/safe-next-path";
 
 /**
- * Landing point of the links Supabase e-mails (sign-up verification, password recovery). It exchanges the one-time
- * `code` (PKCE) or `token_hash` for a session stored in cookies, then sends the person to the intended screen.
+ * Landing point of the links Supabase e-mails (sign-up verification, password recovery) and of the OAuth redirect. It exchanges the one-time
+ * `code` (PKCE) or `token_hash` for a session stored in cookies, then sends the person to the intended screen. This single route does the work of
+ * the Supabase UI blocks' two routes, `app/auth/confirm/route.ts` (`verifyOtp` with `token_hash`) and the social block's `app/auth/oauth/route.ts`
+ * (`exchangeCodeForSession` with `code`), under the app's `[locale]` prefix. An OAuth failure or cancellation (`?error=access_denied`, no `code`) ends on /auth/error.
  * Any failure is shown as an expired/invalid link — never as a success.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!isLocale(locale)) return new NextResponse(null, { status: 404 });
   const { searchParams } = request.nextUrl;
-  const next = safeNextPath(searchParams.get("next"), "/account");
+  const next = safeNextPath(searchParams.get("next"), "/account", request.nextUrl.origin);
   const failure = `/auth/error?reason=${next.startsWith("/auth/update-password") ? "reset" : "verify"}`;
   // RELATIVE redirect on purpose: `request.nextUrl.origin` is the server's own hostname (e.g. "localhost" under `next start`), which can differ from
   // the host the browser used ("127.0.0.1", a proxy, a custom domain). Redirecting to another host would drop the session cookie set just above.

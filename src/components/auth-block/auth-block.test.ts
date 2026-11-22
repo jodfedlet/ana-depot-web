@@ -38,13 +38,33 @@ describe("old custom auth UI is gone", () => {
 describe("auth inputs live only in the block", () => {
   it("no password input, PasswordField, or sign-in wording outside components/auth-block (except the admin/account areas never rendering one)", () => {
     const offenders = files.filter((f) => !f.startsWith(block) && /type=["']password["']|PasswordField|signInWithPassword|signUp\(|resetPasswordForEmail|updateUser\(/.test(readFileSync(f, "utf8")));
-    // lib/api/auth.ts is the single thin call layer (no UI); field.tsx defines the generic PasswordField primitive that nothing renders for auth any more.
-    expect(offenders.map((f) => path.relative(root, f)).sort()).toEqual(["src/components/ui/field.tsx", "src/lib/api/auth.ts"]);
+    // The block's own components call `supabase.auth.*` directly (as the registry source does); nothing else does.
+    expect(offenders.map((f) => path.relative(root, f)).sort()).toEqual([]);
   });
 
-  it("PasswordField is not used by any screen", () => {
-    const users = files.filter((f) => !f.endsWith("ui/field.tsx") && /<PasswordField/.test(readFileSync(f, "utf8")));
-    expect(users).toEqual([]);
+  it("there is no custom password field, auth wrapper or duplicate redirect guard any more", () => {
+    for (const gone of ["src/lib/api/auth.ts", "src/lib/auth/safe-next.ts", "src/components/auth-block/field-error.tsx", "src/components/auth-block/primitives.tsx"]) expect(existsSync(path.join(root, gone)), gone).toBe(false);
+    expect(files.filter((f) => /PasswordField/.test(readFileSync(f, "utf8")))).toEqual([]);
+  });
+
+  it("the block forms call Supabase Auth directly, like the registry source (no auth abstraction layer)", () => {
+    const calls: Record<string, string> = {
+      "login-form.tsx": "supabase.auth.signInWithPassword", "sign-up-form.tsx": "supabase.auth.signUp", "forgot-password-form.tsx": "supabase.auth.resetPasswordForEmail",
+      "update-password-form.tsx": "supabase.auth.updateUser", "social-login-form.tsx": "supabase.auth.signInWithOAuth", "sign-up-success.tsx": "supabase.auth.resend",
+    };
+    for (const [file, call] of Object.entries(calls)) expect(readFileSync(path.join(block, file), "utf8"), file).toContain(call);
+  });
+
+  it("the post-sign-in destination guard is the official safe-next-path item, used by the forms and the callback route", () => {
+    expect(readFileSync(path.join(src, "lib", "safe-next-path.ts"), "utf8")).toContain("https://supabase.com/ui/r/safe-next-path.json");
+    for (const f of ["login-form.tsx", "social-login-form.tsx"]) expect(readFileSync(path.join(block, f), "utf8"), f).toContain('from "@/lib/safe-next-path"');
+    expect(readFileSync(path.join(src, "app", "[locale]", "auth", "callback", "route.ts"), "utf8")).toContain('from "@/lib/safe-next-path"');
+  });
+
+  it("OAuth providers are off unless named in NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS (a provider must be configured in the Supabase dashboard first)", () => {
+    expect(readFileSync(path.join(src, "lib", "auth", "oauth-providers.ts"), "utf8")).toContain("NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS");
+    expect(readFileSync(path.join(block, "social-login-form.tsx"), "utf8")).toContain('provider: "google"');
+    expect(readFileSync(path.join(root, ".env.example"), "utf8")).toMatch(/^NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS=$/m);
   });
 
   it("every auth page renders through AuthPage (the unavailable-state gate) except the input-less error page", () => {
@@ -115,7 +135,7 @@ describe("the block's UI primitives are the registry's shadcn components", () =>
   });
 
   it("every block form and the auth pages build on ./ui (never on the app's own Button/Input)", () => {
-    const forms = ["login-form", "sign-up-form", "forgot-password-form", "update-password-form", "sign-up-success", "auth-unavailable", "logout-button"];
+    const forms = ["login-form", "sign-up-form", "forgot-password-form", "update-password-form", "sign-up-success", "social-login-form", "auth-unavailable", "logout-button"];
     for (const f of forms) {
       const code = readFileSync(path.join(block, `${f}.tsx`), "utf8");
       expect(code, f).toMatch(/from "\.\/ui\/(button|card)"/);

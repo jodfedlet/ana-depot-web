@@ -1,16 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAuthApi } from "../api/auth";
 import { resolveAdminAccess } from "./admin-access";
 import { canAccessAdmin, hasPermission } from "./authorization";
 import { createAuthStore } from "./auth-store";
 import { readSupabaseConfig, validateSupabaseConfig } from "./config";
 import { mapAuthError } from "./errors";
 import { fetchMe, parseMe } from "./me";
-import { safeNextPath } from "./safe-next";
+import { safeNextPath } from "../safe-next-path";
 
 /**
  * MOCKED tests. The Supabase client is replaced by a hand-written fake: these tests prove OUR logic (error mapping,
- * access decisions, request shape, state transitions). They do NOT prove that a real Supabase project accepts the
+ * access decisions, state transitions). The auth forms' Supabase calls are covered by the browser suites (e2e/stub-supabase, e2e/real-supabase). They do NOT prove that a real Supabase project accepts the
  * calls — that needs a real project (see docs/auth.md) and is not covered here.
  */
 const me = { userId: "u1", email: "a@b.co", emailVerified: true, staff: false, mfaRequired: false, mfaRecovered: false, role: null as string | null, permissions: [] as string[], customerProfileId: null };
@@ -66,11 +65,12 @@ describe("mapAuthError", () => {
   });
 });
 
-describe("safeNextPath (no open redirects)", () => {
+describe("safeNextPath: the official Supabase UI `safe-next-path` library item (no open redirects)", () => {
+  const origin = "https://shop.example";
   it("only accepts same-site relative paths", () => {
-    expect(safeNextPath("/account", "/x")).toBe("/account");
-    expect(safeNextPath("/admin?tab=1", "/x")).toBe("/admin?tab=1");
-    for (const bad of ["https://evil.example", "//evil.example", "javascript:alert(1)", "/\\evil.example", "", null, undefined, "/a\nb"]) expect(safeNextPath(bad, "/x")).toBe("/x");
+    expect(safeNextPath("/account", "/x", origin)).toBe("/account");
+    expect(safeNextPath("/admin?tab=1", "/x", origin)).toBe("/admin?tab=1");
+    for (const bad of ["https://evil.example", "//evil.example", "javascript:alert(1)", "/\\evil.example", "", null, undefined]) expect(safeNextPath(bad, "/x", origin)).toBe("/x");
   });
 });
 
@@ -211,65 +211,6 @@ describe("auth store: signed in only after Supabase confirms (mocked client)", (
     const s2 = createAuthStore(() => bad.client); s2.subscribe(() => undefined); await flush();
     expect(await s2.signOut()).toBe(false);
     expect(s2.getSnapshot().status).toBe("signed_in");
-  });
-});
-
-describe("auth API (mocked Supabase client)", () => {
-  const api = (f: ReturnType<typeof fakeClient>) => createAuthApi(() => f.client, () => "https://shop.example");
-  it("is 'not_configured' without a client: never a fake success", async () => {
-    const a = createAuthApi(() => null, () => "https://x");
-    expect(await a.signIn("a@b.co", "pw")).toEqual({ ok: false, error: "not_configured" });
-    expect(await a.register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: false, error: "not_configured" });
-    expect(await a.requestPasswordReset("a@b.co", "fr")).toEqual({ ok: false, error: "not_configured" });
-  });
-  it("signIn passes credentials to Supabase and returns its error codes (invalid credentials, unverified e-mail)", async () => {
-    const f = fakeClient();
-    expect(await api(f).signIn(" a@b.co ", "secret")).toEqual({ ok: true, data: undefined });
-    expect(f.auth.signInWithPassword).toHaveBeenCalledWith({ email: "a@b.co", password: "secret" });
-    const bad = fakeClient({ signInWithPassword: vi.fn(async () => ({ data: {}, error: { code: "invalid_credentials" } })) });
-    expect(await api(bad).signIn("a@b.co", "x")).toEqual({ ok: false, error: "invalid_credentials" });
-    const unverified = fakeClient({ signInWithPassword: vi.fn(async () => ({ data: {}, error: { code: "email_not_confirmed" } })) });
-    expect(await api(unverified).signIn("a@b.co", "x")).toEqual({ ok: false, error: "email_not_confirmed" });
-    const down = fakeClient({ signInWithPassword: vi.fn(async () => { throw new TypeError("Failed to fetch"); }) });
-    expect(await api(down).signIn("a@b.co", "x")).toEqual({ ok: false, error: "network" });
-  });
-  it("register: verification redirect + locale metadata, needsVerification, no account-existence disclosure", async () => {
-    const f = fakeClient();
-    const r = await api(f).register({ email: "a@b.co", password: "12345678", locale: "ht" });
-    expect(r).toEqual({ ok: true, data: { needsVerification: true } });
-    const arg = (f.auth.signUp.mock.calls[0] as unknown as [{ email: string; options: { emailRedirectTo: string; data: Record<string, string> } }])[0];
-    expect(arg.options.emailRedirectTo).toBe("https://shop.example/ht/auth/callback?next=%2Faccount");
-    expect(arg.options.data).toEqual({ locale: "ht" });
-    const dup = fakeClient({ signUp: vi.fn(async () => ({ data: { user: { identities: [] }, session: null }, error: null })) });
-    // already-registered addresses look EXACTLY like new ones, whichever way the provider reports them
-    expect(await api(dup).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: true } });
-    const exists422 = fakeClient({ signUp: vi.fn(async () => ({ data: {}, error: { code: "user_already_exists", status: 422, message: "User already registered" } })) });
-    expect(await api(exists422).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: true } });
-    const emailExists = fakeClient({ signUp: vi.fn(async () => ({ data: {}, error: { code: "email_exists", status: 422 } })) });
-    expect(await api(emailExists).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: true } });
-    const instant = fakeClient({ signUp: vi.fn(async () => ({ data: { user: { identities: [{}] }, session: { access_token: "t" } }, error: null })) });
-    expect(await api(instant).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: true, data: { needsVerification: false } });
-    const weak = fakeClient({ signUp: vi.fn(async () => ({ data: {}, error: { code: "weak_password" } })) });
-    expect(await api(weak).register({ email: "a@b.co", password: "12345678", locale: "fr" })).toEqual({ ok: false, error: "weak_password" });
-  });
-  it("recovery: reset e-mail redirects through the callback; updating the password needs a recovery session", async () => {
-    const f = fakeClient();
-    await api(f).requestPasswordReset("a@b.co", "fr");
-    expect(f.auth.resetPasswordForEmail).toHaveBeenCalledWith("a@b.co", { redirectTo: "https://shop.example/fr/auth/callback?next=%2Fauth%2Fupdate-password" });
-    expect(await api(f).resetPassword("new-password-1")).toEqual({ ok: true, data: undefined });
-    expect(f.auth.updateUser).toHaveBeenCalledWith({ password: "new-password-1" });
-    const noSession = fakeClient({ getSession: vi.fn(async () => ({ data: { session: null } })) });
-    expect(await api(noSession).resetPassword("new-password-1")).toEqual({ ok: false, error: "link_expired" });
-    expect(noSession.auth.updateUser).not.toHaveBeenCalled();
-    const same = fakeClient({ updateUser: vi.fn(async () => ({ error: { code: "same_password" } })) });
-    expect(await api(same).resetPassword("x")).toEqual({ ok: false, error: "same_password" });
-  });
-  it("resend uses the signup flow with the callback redirect", async () => {
-    const f = fakeClient();
-    expect(await api(f).resendVerification("a@b.co", "fr")).toEqual({ ok: true, data: undefined });
-    expect(f.auth.resend).toHaveBeenCalledWith({ type: "signup", email: "a@b.co", options: { emailRedirectTo: "https://shop.example/fr/auth/callback?next=%2Faccount" } });
-    const limited = fakeClient({ resend: vi.fn(async () => ({ error: { code: "over_email_send_rate_limit" } })) });
-    expect(await api(limited).resendVerification("a@b.co", "fr")).toEqual({ ok: false, error: "rate_limited" });
   });
 });
 

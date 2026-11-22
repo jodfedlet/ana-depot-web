@@ -13,19 +13,20 @@ session, `admin@…` meant "staff", `wrong-password` showed an error) has been *
 | Linking account ↔ reservations | **Real**: reservations made while signed in are linked by the API to the account; `/account` reads `/me/profile` and `/me/reservations` (see `storefront-integration.md`) |
 
 ## The auth UI: Supabase UI "password-based-auth-nextjs" block
-The only sign-in / sign-up / recovery UI is the **Supabase UI Library block** `password-based-auth-nextjs` (registry `https://supabase.com/library/r/password-based-auth-nextjs.json`),
+The only sign-in / sign-up / recovery UI is the **Supabase UI Library block** `password-based-auth-nextjs` (registry `https://supabase.com/ui/r/password-based-auth-nextjs.json`; docs `https://supabase.com/ui/docs/nextjs/password-based-auth`) plus the `social-auth-nextjs` block,
 **copied as source** into `src/components/auth-block/` (this is how that library is meant to be used; it is not a hosted portal and not `@supabase/auth-ui-react`, which is
 deprecated and must not be added). There are **no custom auth forms** any more and nothing sends people to a hosted login page or the Supabase dashboard.
 
 | Route (under `/fr` and `/ht`) | Block component | Notes |
 |---|---|---|
-| `/auth/login` | `LoginForm` | `?next=` (same-site, `safeNextPath`), `?status=expired|signed_out`, resend when the address is not verified; the "Continue as guest" link is rendered by the page OUTSIDE the form |
+| `/auth/login` | `LoginForm` | `?next=` (checked by the official `safe-next-path` item), `?status=expired|signed_out`, resend when the address is not verified; the "Continue as guest" link is rendered by the page OUTSIDE the form |
 | `/auth/sign-up`, `/auth/sign-up-success` | `SignUpForm`, sign-up-success page | the success screen is identical for new and already-registered addresses; resend uses the address kept in `sessionStorage` (never in a URL) |
 | `/auth/forgot-password` | `ForgotPasswordForm` | neutral confirmation for known and unknown addresses |
-| `/auth/update-password` | `UpdatePasswordForm` | needs the recovery session created by the e-mailed link; otherwise "request a new link" |
+| `/auth/update-password` | `UpdatePasswordForm` | needs the recovery session created by the e-mailed link; without one Supabase answers "session missing", shown as "link invalid or expired" |
 | `/auth/error` | (block "error" page) | failed e-mail link; shows no inputs and never says why |
-| `/auth/callback` | the block's `confirm` route, adapted | exchanges `code` (PKCE) **or** `token_hash`+`type` for the cookie session; relative redirects; failures go to `/auth/error` |
+| `/auth/callback` | the block's `confirm` route + the social block's `oauth` route, merged under `[locale]` | exchanges `code` (PKCE, OAuth) **or** `token_hash`+`type` (e-mail links) for the cookie session; relative redirects; failures and OAuth cancellation go to `/auth/error` |
 | `LogoutButton` | block `LogoutButton` | bound to the shared session store; used by the account menu |
+| (login and sign-up pages, only when enabled) | `social-auth-nextjs` `LoginForm` as `SocialLoginForm` | Google, hidden unless `NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS=google` (see OAuth status) |
 
 How the block was adapted (and why it was not installed with the registry CLI as-is): the CLI would also write the block's `middleware.ts` (Next 16 refuses it next to our `proxy.ts`, and it redirects every public page to the login, which is unusable for a storefront),
 a second set of Supabase clients (`client.ts`/`server.ts`/`middleware.ts`; the app already has the same `@supabase/ssr` clients in `lib/auth/supabase-browser.ts`, `supabase-server.ts` and `proxy.ts`) and `app/auth/*` pages outside `[locale]`.
@@ -37,8 +38,39 @@ Branding is done in two places only: (1) `src/app/globals.css` aliases shadcn's 
 (2) a few documented edits in the copied files (44px control heights, `rounded-control`/`rounded-card`/`shadow-card` tokens, `CardTitle` is the page `<h1>` in the display font). `src/components/auth-block/auth-block.test.ts` guards that these files exist with their provenance and that no hand-written look-alike returns.
 Do not re-run `npx shadcn add` for these four (it rewrites `globals.css`); update them by re-copying from the registry and re-applying the listed edits.
 
-The forms call Supabase through one thin layer, `lib/api/auth.ts` (the official `supabase.auth.*` calls: `signInWithPassword`, `signUp`, `resend`, `resetPasswordForEmail`, `updateUser`, plus `exchangeCodeForSession`/`verifyOtp` in the callback route) so that errors are mapped from Supabase error **codes**
-and sign-up never reveals whether an address exists. Strings come from the typed `auth.*` dictionaries (fr/ht); `lib/auth/errors.ts` maps the codes to those strings and Supabase's English text is never displayed. Old URLs (`/sign-in`, `/register`, `/login`, `/forgot-password`, `/reset-password`, `/verify-email`, `/admin/sign-in`)
+### Component map: official source -> this app (every deviation is listed in the file's header comment)
+| App file | Official source (registry item, file) | Deviations from the registry source |
+|---|---|---|
+| `auth-block/login-form.tsx` | `password-based-auth-nextjs`, `components/login-form.tsx` | i18n strings; error = Supabase error CODE mapped to a fr/ht message; shared browser client; locale-aware `Link`/router; `/account` instead of `/protected`. **Gaps filled:** `?status=` banners (signed out / session expired), "resend" for an unverified address (`supabase.auth.resend`) |
+| `auth-block/sign-up-form.tsx` | same, `components/sign-up-form.tsx` | i18n; `emailRedirectTo` through the locale callback; `options.data.locale` (e-mail language); **project privacy rule:** `user_already_exists` ends on the same success screen as a new address; the address is kept in `sessionStorage` for resend |
+| `auth-block/forgot-password-form.tsx` | same, `components/forgot-password-form.tsx` | i18n; `redirectTo` through the locale callback |
+| `auth-block/update-password-form.tsx` | same, `components/update-password-form.tsx` | i18n; `/account`; "session missing" shown as "link invalid or expired" |
+| `auth-block/sign-up-success.tsx` | same, `app/auth/sign-up-success/page.tsx` | translated; **gap filled:** resend (`supabase.auth.resend({ type: "signup" })`) |
+| `(store)/auth/error/page.tsx` | same, `app/auth/error/page.tsx` | never prints the raw error (no "why"); two next-step links |
+| `auth-block/logout-button.tsx` | same, `components/logout-button.tsx` | goes through the app's session store (`supabase.auth.signOut` on the shared client + client state), then the localized login page |
+| `auth-block/social-login-form.tsx` | `social-auth-nextjs`, `components/login-form.tsx` | `provider: "google"` (the field the docs say to change), i18n, redirect through the locale callback; not rendered unless enabled |
+| `[locale]/auth/callback/route.ts` | `password-based-auth-nextjs` `app/auth/confirm/route.ts` + `social-auth-nextjs` `app/auth/oauth/route.ts` | one route under `[locale]`; `code` or `token_hash`; relative redirect |
+| `lib/safe-next-path.ts` | `safe-next-path` | **verbatim** |
+| `auth-block/ui/{button,card,input,label}.tsx` | shadcn registry dependencies of the block | branding edits only (see below) |
+| `lib/auth/supabase-browser.ts`, `supabase-server.ts`, `proxy.ts` | `supabase-client-nextjs` and the block's `middleware.ts` | the app's own `@supabase/ssr` clients (same library); the block's files were **not** copied |
+
+**There is no authentication abstraction layer.** The forms call `supabase.auth.signInWithPassword`, `signUp`, `resend`, `resetPasswordForEmail`, `updateUser` and `signInWithOAuth` directly, as the registry source does. The only application code around them
+is `lib/auth/errors.ts` (maps a Supabase error `code` to a dictionary key: the localization of error text, nothing else), the session store (`lib/auth/auth-store.ts`, `use-session.ts`: client-side mirror of the Supabase session) and the server gate. There is no custom validation: the block's own
+"passwords do not match" check, native browser validation (`required`, `type=email`) and Supabase's `weak_password` answer replace it (the earlier `lib/api/auth.ts`, hand-written `safe-next.ts`, field error component, `PasswordField` and password-strength helper were deleted).
+
+### Gaps in the official library, and localization
+- The Supabase UI library has **no localization mechanism and no theme properties**: the copied components contain English literals and Tailwind classes. Language is applied by replacing the literals with calls to the app's own dictionaries (`auth.*`, one system, fr + ht); branding by the token aliases in `globals.css` and the edits listed above. Nothing was rebuilt.
+- **Limitations that remain:** the browser's native validation bubbles ("fill in this field", "include an @") are shown in the browser's language, not the page language; Haitian Creole copy still needs native review; Supabase's own English error text is never displayed (errors are mapped by code, unknown ones show a generic message).
+- **E-mail language** is configurable and done through Supabase's documented templates: the sign-up form sends `options.data.locale`, and the templates in `../ana-depot-api/dev/supabase/templates/` branch on `{{ .Data.locale }}` (fr / ht). The password-reset e-mail is sent by `resetPasswordForEmail`, which cannot carry user data, so recovery e-mails use the user's stored sign-up locale.
+- Gaps with no official screen, filled with the documented Supabase call and the smallest UI: resend confirmation (login and success page), signed-out / session-expired notices.
+
+### OAuth status
+Google is **prepared, not enabled**. `SocialLoginForm` (official `social-auth-nextjs` block, `provider: "google"`) renders on `/auth/login` and `/auth/sign-up` only when `NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS=google` was set at build time; it is empty by default because the provider is not configured in any Supabase project
+(checked on the local project: `GET /auth/v1/authorize?provider=google` answers 400). To enable it: (1) Google Cloud console: OAuth client (web), authorised redirect URI = `https://<project-ref>.supabase.co/auth/v1/callback`; (2) Supabase dashboard > Authentication > Sign In / Providers > Google: enable, paste client ID and secret
+(never in Git); (3) Authentication > URL Configuration: Redirect URLs already contain `https://<origin>/fr/auth/callback` and `/ht/auth/callback`; (4) set `NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS=google` in the web build variables and rebuild. A cancelled or failed Google sign-in returns to the callback without a `code` and ends on `/auth/error`. **Not tested against Google** (no credentials exist); the button's hand-off
+(provider, PKCE challenge, `redirect_to`) is covered by a browser check.
+
+Old URLs (`/sign-in`, `/register`, `/login`, `/forgot-password`, `/reset-password`, `/verify-email`, `/admin/sign-in`)
 only exist as redirects in `next.config.ts`. Guests never need an account.
 
 **Missing or invalid configuration** (`lib/auth/config.ts`: URL missing/malformed/non-HTTPS outside localhost, key missing/malformed, key that looks like a secret) makes every auth route render the
@@ -89,6 +121,11 @@ says "not configured" and `/admin` is denied — nothing pretends to work.
 - Consider password strength policy and CAPTCHA in the dashboard; the app maps `weak_password`, `over_*_rate_limit`, `invalid_credentials`,
   `email_not_confirmed`, `user_already_exists` to translated messages.
 
+### Checklist for a HOSTED project (nothing of this was performed: no hosted project exists yet; the local project already satisfies it)
+Authentication > Sign In / Providers: Email enabled, **Confirm email ON**, minimum password length set (the local project uses 8); other providers off unless configured.
+Authentication > URL Configuration: **Site URL** = the deployed origin; **Redirect URLs** = `https://<origin>/fr/auth/callback`, `https://<origin>/ht/auth/callback` (plus the `workers.dev` origin of a development Worker). Authentication > Emails: the confirmation and recovery templates of `../ana-depot-api/dev/supabase/templates/` (token-hash links, fr/ht).
+Separate hosted projects for development and production, each with its own URL, publishable key and redirect list; the web build variables (`NEXT_PUBLIC_SUPABASE_*`) select the project. SMTP: the built-in sender is not for production. Never put the service-role key in the web app.
+
 ### Local development with the Supabase CLI
 A ready local stack (real GoTrue, ES256 signing keys, Mailpit, templates above) lives in `../ana-depot-api/dev/supabase`; start/stop/reset and findings are in
 `../ana-depot-api/docs/local-supabase.md`. Put its API URL and publishable key in `.env.local` together with `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8080`.
@@ -133,7 +170,7 @@ Guests are never asked to register: browsing, cart, guest reservation and tracki
 ## Security decisions
 - No custom password/session code; Supabase owns credentials and refresh-token rotation.
 - Signed-in state is shown only after Supabase confirms; failures are returned as codes and translated, never as simulated success.
-- Open-redirect protection on `?next=` (`safeNextPath`) and in the callback route. The callback redirects with a **relative** `Location`: `request.nextUrl.origin` is the
+- Open-redirect protection on `?next=` (the official `safe-next-path` item) and in the callback route. The callback redirects with a **relative** `Location`: `request.nextUrl.origin` is the
   server's own hostname (`localhost` under `next start`), and redirecting to another host than the browser used drops the session cookie (found against the real stack).
 - `user_metadata` (first name) is used for **display only**; it is user-editable and never used for authorization.
 - **Account enumeration (privacy).** Our screens never say whether an address has an account: sign-up shows the same "if this address can be used, a message was sent" screen for new and
@@ -146,11 +183,12 @@ Guests are never asked to register: browsing, cart, guest reservation and tracki
 - Staff access is deny-by-default and fails closed when the backend cannot be reached.
 
 ## Tests (labelled by what they prove)
-- **Mocked / unit** (`npm test`): `src/lib/auth/auth.test.ts` (mocked Supabase client: config validation, error mapping, request shapes, store transitions, uniform sign-up) and
+- **Mocked / unit** (`npm test`): `src/lib/auth/auth.test.ts` (mocked Supabase client: config validation, error mapping, the official safe-next-path, store transitions) and
   `src/components/auth-block/auth-block.test.ts` (static guards: old forms/routes gone, no auth inputs outside the block, one Supabase client, every auth page behind the unavailable gate,
   guest link outside the form, fr/ht auth key parity and no untranslated string).
 - **Stub-based browser** (`npm run e2e:stub`, `e2e/stub-supabase/`): the built app against a tiny FAKE Supabase REST API. Used for states the real stack cannot produce on demand (HTTP 429, network failure) and fr/ht message checks. Not real Supabase.
 - **Unavailable-state browser** (`npm run e2e:unavailable`, `e2e/unavailable/`): run against a build with missing or malformed config; asserts no inputs/forms on any auth route or `/admin`, and no Auth request.
+- **REAL local-stack auth flows, no API needed** (`npm run e2e:auth-flows`, `e2e/real-supabase/auth-flows.mjs`; needs the local Supabase stack, Mailpit and `node e2e/real-supabase/stub-api.mjs`): sign-up checks, verification e-mail in fr and ht, resend, unverified sign-in, verification link, session cookie, sign-out, protected page, `?next=`, used links rejected, recovery and reset, session refresh and unrefreshable session, duplicate registration, public pages, OAuth failure redirect. The `/api/v1/me*` calls hit a stub, so the backend is **not** exercised.
 - **REAL local Supabase + real API browser** (`npm run e2e:real`): described next.
 - **REAL local-stack suite** (`npm run e2e:real`, `e2e/real-supabase/run.mjs`): drives the built app against a LOCAL Supabase stack (real GoTrue + Mailpit) and the real Spring Boot API: registration, verification
   link read from the mail catcher, unverified sign-in rejection, resend, sign-in, persistence across reload, cookie session (no token in localStorage), revoked session, sign-out, wrong password, forgot/reset

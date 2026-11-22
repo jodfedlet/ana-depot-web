@@ -23,15 +23,20 @@ const browser = await chromium.launch({ executablePath: exe, args: ["--no-sandbo
 const ctl = (p) => fetch(`${STUB}${p}`).then((r) => r.json());
 const text = (page) => page.locator("body").innerText();
 const T = {
-  fr: { bad: "L'e-mail ou le mot de passe est incorrect.", rate: "Trop de tentatives.", net: "Impossible de joindre le service de connexion.", weak: "Ce mot de passe est trop faible.", sent: "Vérifiez votre e-mail", login: "Se connecter", signUp: "Créer le compte", forgot: "Envoyer le lien", noSession: "Ce lien est invalide, a expiré ou a déjà été utilisé." },
-  ht: { bad: "Imèl la oswa modpas la pa kòrèk.", rate: "Twòp tantativ.", net: "Pa ka jwenn sèvis koneksyon an.", weak: "Modpas sa a twò fèb.", sent: "Verifye imèl ou", login: "Konekte", signUp: "Kreye kont lan", forgot: "Voye lyen an", noSession: "Lyen sa a pa valab, li ekspire oswa yo deja itilize l." },
+  fr: { bad: "L'e-mail ou le mot de passe est incorrect.", rate: "Trop de tentatives.", net: "Impossible de joindre le service de connexion.", weak: "Ce mot de passe est trop faible.", sent: "Vérifiez votre e-mail", login: "Se connecter", signUp: "Créer le compte", forgot: "Envoyer le lien", noSession: "Ce lien est invalide ou a expiré" },
+  ht: { bad: "Imèl la oswa modpas la pa kòrèk.", rate: "Twòp tantativ.", net: "Pa ka jwenn sèvis koneksyon an.", weak: "Modpas sa a twò fèb.", sent: "Verifye imèl ou", login: "Konekte", signUp: "Kreye kont lan", forgot: "Voye lyen an", noSession: "Lyen sa a pa valab oswa li ekspire" },
 };
 const fill = async (page, email, pw) => { await page.locator("input[type=email]").fill(email); if (pw) await page.locator("input[type=password]").first().fill(pw); };
 const submit = (page) => page.locator("main form button[type=submit]").click();
+// React attaches `__reactProps$…` to a DOM node when it hydrates it; text typed before that is thrown away by the controlled input, so wait for it.
+async function hydrated(page) {
+  if (!(await page.locator("main form input").count())) return;
+  await page.waitForFunction(() => Object.keys(document.querySelector("main form input")).some((k) => k.startsWith("__reactProps")), null, { timeout: 8000 }).catch(() => {});
+}
 async function open(path) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
-  await page.goto(`${WEB}${path}`); await page.waitForLoadState("networkidle");
+  await page.goto(`${WEB}${path}`); await page.waitForLoadState("networkidle"); await hydrated(page);
   return { ctx, page };
 }
 
@@ -69,7 +74,7 @@ for (const loc of ["fr", "ht"]) {
   await page.getByText(t.weak).waitFor({ timeout: 10000 }); check(`[${loc}] provider weak_password -> translated message`, true);
   const shapes = [];
   for (const email of [`new-${loc}@example.com`, "alex.sample@example.com"]) {
-    await page.goto(`${WEB}/${loc}/auth/sign-up`); await page.waitForLoadState("networkidle");
+    await page.goto(`${WEB}/${loc}/auth/sign-up`); await page.waitForLoadState("networkidle"); await hydrated(page);
     await fill(page, email, "longpassword1"); await page.locator("input[type=password]").nth(1).fill("longpassword1"); await submit(page);
     await page.waitForURL(/sign-up-success/, { timeout: 15000 });
     shapes.push((await text(page)).replace(/\s+/g, " "));

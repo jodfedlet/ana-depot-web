@@ -10,16 +10,6 @@ export function isValidPhone(v: string): boolean {
   return digits.length >= 6 && digits.length <= 15;
 }
 
-export interface PasswordCheck {
-  ok: boolean;
-  message?: string;
-}
-/** Client-side hint only; the real password policy is defined by the auth provider. */
-export function checkPassword(v: string): PasswordCheck {
-  if (v.length < 8) return { ok: false, message: "Use at least 8 characters." };
-  return { ok: true };
-}
-
 export type Errors<T extends string> = Partial<Record<T, string>>;
 
 /** Focus the first invalid control after a failed submit (a11y). */
