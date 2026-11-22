@@ -97,3 +97,38 @@ describe("auth strings", () => {
     expect(same).toEqual([]);
   });
 });
+
+describe("the block's UI primitives are the registry's shadcn components", () => {
+  it.each(["button", "card", "input", "label"])("ui/%s.tsx is the shadcn registry file and says where it comes from", (name) => {
+    const file = path.join(block, "ui", `${name}.tsx`);
+    expect(existsSync(file)).toBe(true);
+    const code = readFileSync(file, "utf8");
+    expect(code).toContain(`https://ui.shadcn.com/r/styles/new-york-v4/${name}.json`);
+    expect(code).toContain("https://supabase.com/ui/r/password-based-auth-nextjs.json");
+    expect(code).toContain('data-slot="' + (name === "label" ? "label" : name) + '"');
+  });
+
+  it("the hand-written look-alike primitives are gone", () => {
+    expect(existsSync(path.join(block, "primitives.tsx"))).toBe(false);
+    const offenders = files.filter((f) => /auth-block\/primitives|\.\/primitives["']/.test(readFileSync(f, "utf8"))).map((f) => path.relative(root, f));
+    expect(offenders).toEqual([]);
+  });
+
+  it("every block form and the auth pages build on ./ui (never on the app's own Button/Input)", () => {
+    const forms = ["login-form", "sign-up-form", "forgot-password-form", "update-password-form", "sign-up-success", "auth-unavailable", "logout-button"];
+    for (const f of forms) {
+      const code = readFileSync(path.join(block, `${f}.tsx`), "utf8");
+      expect(code, f).toMatch(/from "\.\/ui\/(button|card)"/);
+      expect(code, f).not.toMatch(/from "@\/components\/ui\/(button|field|input)"/);
+    }
+    const error = readFileSync(path.join(src, "app", "[locale]", "(store)", "auth", "error", "page.tsx"), "utf8");
+    expect(error).toContain("@/components/auth-block/ui/card");
+  });
+
+  it("the shadcn colour names resolve to Ana tokens (one palette, no second theme)", () => {
+    const css = readFileSync(path.join(src, "app", "globals.css"), "utf8");
+    for (const [name, token] of [["primary", "brand-700"], ["background", "canvas"], ["accent", "accent-100"], ["ring", "brand-600"]] as const) {
+      expect(css).toContain(`--color-${name}: var(--color-${token});`);
+    }
+  });
+});

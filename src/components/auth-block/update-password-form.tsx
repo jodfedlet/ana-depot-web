@@ -1,17 +1,22 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Link } from "@/i18n/link";
 import { useLocaleRouter } from "@/i18n/navigation";
 import { useT } from "@/i18n/provider";
 import { resetPassword } from "@/lib/api/auth";
 import type { AuthErrorCode } from "@/lib/auth/errors";
 import { checkPassword } from "@/lib/validation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, FieldError, Input, Label } from "./primitives";
+import { FieldError } from "./field-error";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 /**
- * Supabase UI block: UpdatePasswordForm. It needs the recovery session created when the e-mailed link was opened (the confirm/callback route
+ * Supabase UI "password-based-auth-nextjs" block: UpdatePasswordForm (shadcn components in ./ui). It needs the recovery session created when the e-mailed link was opened (the confirm/callback route
  * verifies the token and sets the session cookie); without one the only way forward is a new link.
  */
 export function UpdatePasswordForm() {
@@ -42,7 +47,7 @@ export function UpdatePasswordForm() {
         <CardHeader><CardTitle>{t("auth.update.title")}</CardTitle></CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-body">{t("auth.update.noSession")}</p>
-          <ButtonLink href="/auth/forgot-password" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.update.requestNew")}</ButtonLink>
+          <Button asChild className="h-auto min-h-11 w-full py-2.5 text-center"><Link href="/auth/forgot-password">{t("auth.update.requestNew")}</Link></Button>
         </CardContent>
       </Card>
     );
@@ -64,7 +69,10 @@ export function UpdatePasswordForm() {
               {passwordError ? <FieldError id="password-error">{passwordError}</FieldError> : <p id="password-hint" className="text-caption text-ink-muted">{t("auth.passwordHint")}</p>}
             </div>
             {error && <Alert tone="danger" live="assertive" title={t("auth.update.errorTitle")}>{t(`auth.errors.${error}`)}</Alert>}
-            <Button type="submit" size="lg" full loading={isLoading}>{isLoading ? t("auth.update.submitting") : t("auth.update.submit")}</Button>
+            <Button type="submit" size="lg" className="w-full" disabled={isLoading} aria-busy={isLoading || undefined}>
+              {isLoading && <Loader2 aria-hidden className="size-4 animate-spin" />}
+              {isLoading ? t("auth.update.submitting") : t("auth.update.submit")}
+            </Button>
           </div>
         </form>
       </CardContent>

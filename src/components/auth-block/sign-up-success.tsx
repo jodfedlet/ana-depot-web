@@ -1,16 +1,17 @@
 "use client";
 
-import { MailCheck } from "lucide-react";
+import { Loader2, MailCheck } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Link } from "@/i18n/link";
 import { useLocale, useT } from "@/i18n/provider";
 import { resendVerification } from "@/lib/api/auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./primitives";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { PENDING_EMAIL_KEY } from "./sign-up-form";
 
 const readPending = () => { try { return window.sessionStorage.getItem(PENDING_EMAIL_KEY); } catch { return null; } };
 
-/** Block page "sign-up-success", with the resend action the block lacks. The copy is the same for new and already-registered addresses. */
+/** Block page "sign-up-success" (shadcn components in ./ui), with the resend action the block lacks. The copy is the same for new and already-registered addresses. */
 export function SignUpSuccess() {
   const t = useT();
   const locale = useLocale();
@@ -36,13 +37,16 @@ export function SignUpSuccess() {
         <p className="text-caption text-ink-soft">{t("auth.signUpSuccess.alreadyHaveAccount")}</p>
         {email && (
           <div>
-            <Button variant="outline" full loading={state === "loading"} onClick={resend}>{state === "loading" ? t("auth.signUpSuccess.resending") : t("auth.signUpSuccess.resend")}</Button>
+            <Button type="button" variant="outline" className="w-full" disabled={state === "loading"} aria-busy={state === "loading" || undefined} onClick={resend}>
+              {state === "loading" && <Loader2 aria-hidden className="size-4 animate-spin" />}
+              {state === "loading" ? t("auth.signUpSuccess.resending") : t("auth.signUpSuccess.resend")}
+            </Button>
             <p role="status" className="text-label mt-3 min-h-5 font-normal text-ink-soft">
               {state === "sent" ? t("auth.signUpSuccess.resent") : state === "failed" ? t("auth.signUpSuccess.resendFailed") : ""}
             </p>
           </div>
         )}
-        <ButtonLink href="/auth/login" variant="ghost" full>{t("auth.signUpSuccess.backToLogin")}</ButtonLink>
+        <Button asChild variant="ghost" className="w-full"><Link href="/auth/login">{t("auth.signUpSuccess.backToLogin")}</Link></Button>
       </CardContent>
     </Card>
   );

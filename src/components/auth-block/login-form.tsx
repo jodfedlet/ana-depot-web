@@ -1,8 +1,8 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/link";
 import { useLocaleRouter } from "@/i18n/navigation";
 import { useLocale, useT } from "@/i18n/provider";
@@ -10,10 +10,13 @@ import { resendVerification, signIn } from "@/lib/api/auth";
 import type { AuthErrorCode } from "@/lib/auth/errors";
 import { safeNextPath } from "@/lib/auth/safe-next";
 import { isValidEmail } from "@/lib/validation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "./primitives";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 /**
- * Supabase UI "password-based auth" block: LoginForm. Adapted to this app: strings from the typed i18n dictionaries, locale-aware links and
+ * Supabase UI "password-based-auth-nextjs" block (supabase.com/ui/r/password-based-auth-nextjs.json): LoginForm, on the block's shadcn components (./ui). Adapted to this app: strings from the typed i18n dictionaries, locale-aware links and
  * router, errors mapped from Supabase error CODES to fr/ht messages (Supabase's English text is never displayed), the shared Supabase
  * session client (through `lib/api/auth`), our stricter `safeNextPath`, and a resend action when the address is not verified yet.
  */
@@ -77,7 +80,8 @@ export function LoginForm({ status }: { status?: "expired" | "signed_out" }) {
                 {t(`auth.errors.${error}`)}
                 {error === "email_not_confirmed" && isValidEmail(email) && (
                   <span className="mt-3 block">
-                    <Button type="button" size="sm" variant="outline" loading={resend === "loading"} onClick={handleResend}>
+                    <Button type="button" size="sm" variant="outline" disabled={resend === "loading"} aria-busy={resend === "loading" || undefined} onClick={handleResend}>
+                      {resend === "loading" && <Loader2 aria-hidden className="size-4 animate-spin" />}
                       {resend === "loading" ? t("auth.login.resending") : t("auth.login.resend")}
                     </Button>
                     {resend === "sent" && <span role="status" className="mt-2 block">{t("auth.login.resent")}</span>}
@@ -85,7 +89,10 @@ export function LoginForm({ status }: { status?: "expired" | "signed_out" }) {
                 )}
               </Alert>
             )}
-            <Button type="submit" size="lg" full loading={isLoading}>{isLoading ? t("auth.login.submitting") : t("auth.login.submit")}</Button>
+            <Button type="submit" size="lg" className="w-full" disabled={isLoading} aria-busy={isLoading || undefined}>
+              {isLoading && <Loader2 aria-hidden className="size-4 animate-spin" />}
+              {isLoading ? t("auth.login.submitting") : t("auth.login.submit")}
+            </Button>
           </div>
           <div className="text-label mt-5 text-center font-normal text-ink-soft">
             {t("auth.login.noAccount")}{" "}

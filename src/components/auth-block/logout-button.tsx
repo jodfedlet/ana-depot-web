@@ -1,18 +1,21 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useState, type ComponentProps } from "react";
-import { Button } from "@/components/ui/button";
 import { useLocaleRouter } from "@/i18n/navigation";
 import { useSession } from "@/lib/auth/use-session";
+import { Button } from "./ui/button";
 
-/** Supabase UI block: LogoutButton, bound to the app's single shared session store (same client and cookie session as everything else). */
+/** Supabase UI "password-based-auth-nextjs" block: LogoutButton (shadcn Button), bound to the app's single shared session store (same client and cookie session as everything else). */
 export function LogoutButton({ children, onSignedOut, ...props }: ComponentProps<typeof Button> & { onSignedOut?: () => void }) {
   const router = useLocaleRouter();
   const { signOut } = useSession();
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      loading={busy}
+      type="button"
+      disabled={busy}
+      aria-busy={busy || undefined}
       onClick={async () => {
         setBusy(true);
         const ok = await signOut();
@@ -23,6 +26,7 @@ export function LogoutButton({ children, onSignedOut, ...props }: ComponentProps
       }}
       {...props}
     >
+      {busy && <Loader2 aria-hidden className="size-4 animate-spin" />}
       {children}
     </Button>
   );

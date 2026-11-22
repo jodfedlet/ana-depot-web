@@ -1,17 +1,20 @@
 "use client";
 
-import { MailCheck } from "lucide-react";
+import { Loader2, MailCheck } from "lucide-react";
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/link";
 import { useLocale, useT } from "@/i18n/provider";
 import { requestPasswordReset } from "@/lib/api/auth";
 import type { AuthErrorCode } from "@/lib/auth/errors";
 import { isValidEmail } from "@/lib/validation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, FieldError, Input, Label } from "./primitives";
+import { FieldError } from "./field-error";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
-/** Supabase UI block: ForgotPasswordForm. The confirmation is identical for known and unknown addresses and never echoes the address. */
+/** Supabase UI "password-based-auth-nextjs" block: ForgotPasswordForm (shadcn components in ./ui). The confirmation is identical for known and unknown addresses and never echoes the address. */
 export function ForgotPasswordForm() {
   const t = useT();
   const locale = useLocale();
@@ -66,7 +69,10 @@ export function ForgotPasswordForm() {
               {emailError && <FieldError id="email-error">{emailError}</FieldError>}
             </div>
             {error && <Alert tone="danger" live="assertive">{t(`auth.errors.${error}`)}</Alert>}
-            <Button type="submit" size="lg" full loading={isLoading}>{isLoading ? t("auth.forgot.submitting") : t("auth.forgot.submit")}</Button>
+            <Button type="submit" size="lg" className="w-full" disabled={isLoading} aria-busy={isLoading || undefined}>
+              {isLoading && <Loader2 aria-hidden className="size-4 animate-spin" />}
+              {isLoading ? t("auth.forgot.submitting") : t("auth.forgot.submit")}
+            </Button>
           </div>
           <p className="text-label mt-5 text-center font-normal">{back}</p>
         </form>

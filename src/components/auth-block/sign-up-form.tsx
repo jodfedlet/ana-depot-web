@@ -1,21 +1,25 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/link";
 import { useLocaleRouter } from "@/i18n/navigation";
 import { useLocale, useT } from "@/i18n/provider";
 import { register } from "@/lib/api/auth";
 import type { AuthErrorCode } from "@/lib/auth/errors";
 import { checkPassword, isValidEmail } from "@/lib/validation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, FieldError, Input, Label } from "./primitives";
+import { FieldError } from "./field-error";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 /** Where the sign-up-success screen finds the address to resend to (this browser tab only; never put an e-mail address in a URL). */
 export const PENDING_EMAIL_KEY = "ana.auth.pendingEmail";
 
 /**
- * Supabase UI "password-based auth" block: SignUpForm. Privacy: an already-registered address ends on EXACTLY the same success screen as a
+ * Supabase UI "password-based-auth-nextjs" block: SignUpForm, on the block's shadcn components (./ui). Privacy: an already-registered address ends on EXACTLY the same success screen as a
  * new one (`lib/api/auth` treats "user already exists" as success), so this form never says whether an account exists.
  */
 export function SignUpForm() {
@@ -85,7 +89,10 @@ export function SignUpForm() {
               {fieldErrors.repeat && <FieldError id="repeat-error">{fieldErrors.repeat}</FieldError>}
             </div>
             {error && <Alert tone="danger" live="assertive" title={t("auth.signUp.errorTitle")}>{t(`auth.errors.${error}`)}</Alert>}
-            <Button type="submit" size="lg" full loading={isLoading}>{isLoading ? t("auth.signUp.submitting") : t("auth.signUp.submit")}</Button>
+            <Button type="submit" size="lg" className="w-full" disabled={isLoading} aria-busy={isLoading || undefined}>
+              {isLoading && <Loader2 aria-hidden className="size-4 animate-spin" />}
+              {isLoading ? t("auth.signUp.submitting") : t("auth.signUp.submit")}
+            </Button>
           </div>
           <div className="text-label mt-5 text-center font-normal text-ink-soft">
             {t("auth.signUp.haveAccount")}{" "}

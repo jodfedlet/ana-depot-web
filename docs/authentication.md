@@ -27,11 +27,18 @@ deprecated and must not be added). There are **no custom auth forms** any more a
 | `/auth/callback` | the block's `confirm` route, adapted | exchanges `code` (PKCE) **or** `token_hash`+`type` for the cookie session; relative redirects; failures go to `/auth/error` |
 | `LogoutButton` | block `LogoutButton` | bound to the shared session store; used by the account menu |
 
-How the block was adapted (and why it was not installed as-is): its `client.ts`/`server.ts`/`middleware.ts` are **not** copied because the app already has the same `@supabase/ssr`
-clients (`lib/auth/supabase-browser.ts`, `supabase-server.ts`) and `proxy.ts`, and the block middleware redirects every public page to the login (unusable for a storefront); there is **one**
-Supabase client and one cookie session. Its shadcn `Card/Input/Label/Button` are re-implemented in `components/auth-block/primitives.tsx` with our design tokens (no new UI dependencies: shadcn would add
-radix, class-variance-authority, clsx, tailwind-merge and a second theme). Strings come from the typed `auth.*` dictionaries (fr/ht), errors are mapped from Supabase error **codes**
-(`lib/auth/errors.ts`) and Supabase's English text is never displayed. Old URLs (`/sign-in`, `/register`, `/login`, `/forgot-password`, `/reset-password`, `/verify-email`, `/admin/sign-in`)
+How the block was adapted (and why it was not installed with the registry CLI as-is): the CLI would also write the block's `middleware.ts` (Next 16 refuses it next to our `proxy.ts`, and it redirects every public page to the login, which is unusable for a storefront),
+a second set of Supabase clients (`client.ts`/`server.ts`/`middleware.ts`; the app already has the same `@supabase/ssr` clients in `lib/auth/supabase-browser.ts`, `supabase-server.ts` and `proxy.ts`) and `app/auth/*` pages outside `[locale]`.
+So the block's forms, pages, logout button and confirm route were copied as source and adapted; there is **one** Supabase client and one cookie session.
+
+**The block's UI primitives are the registry's own shadcn components.** `button`, `card`, `input` and `label` are the registry dependencies of `password-based-auth-nextjs`; they are copied verbatim from
+`https://ui.shadcn.com/r/styles/new-york-v4/<name>.json` into `src/components/auth-block/ui/` (each file names its source). They bring `radix-ui`, `class-variance-authority`, `clsx` and `tailwind-merge`, and `src/lib/utils.ts` (shadcn's `cn`).
+Branding is done in two places only: (1) `src/app/globals.css` aliases shadcn's semantic colour names to Ana's tokens (`primary` = deep teal `brand-700`, `background` = warm canvas, `accent` = terracotta tint used for hover, `destructive` = danger, `ring` = `brand-600`), so there is no second theme;
+(2) a few documented edits in the copied files (44px control heights, `rounded-control`/`rounded-card`/`shadow-card` tokens, `CardTitle` is the page `<h1>` in the display font). `src/components/auth-block/auth-block.test.ts` guards that these files exist with their provenance and that no hand-written look-alike returns.
+Do not re-run `npx shadcn add` for these four (it rewrites `globals.css`); update them by re-copying from the registry and re-applying the listed edits.
+
+The forms call Supabase through one thin layer, `lib/api/auth.ts` (the official `supabase.auth.*` calls: `signInWithPassword`, `signUp`, `resend`, `resetPasswordForEmail`, `updateUser`, plus `exchangeCodeForSession`/`verifyOtp` in the callback route) so that errors are mapped from Supabase error **codes**
+and sign-up never reveals whether an address exists. Strings come from the typed `auth.*` dictionaries (fr/ht); `lib/auth/errors.ts` maps the codes to those strings and Supabase's English text is never displayed. Old URLs (`/sign-in`, `/register`, `/login`, `/forgot-password`, `/reset-password`, `/verify-email`, `/admin/sign-in`)
 only exist as redirects in `next.config.ts`. Guests never need an account.
 
 **Missing or invalid configuration** (`lib/auth/config.ts`: URL missing/malformed/non-HTTPS outside localhost, key missing/malformed, key that looks like a secret) makes every auth route render the

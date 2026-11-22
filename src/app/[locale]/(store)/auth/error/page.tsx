@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AuthShell } from "@/components/auth-block/shell";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/auth-block/primitives";
-import { ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/auth-block/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/auth-block/ui/card";
+import { Link } from "@/i18n/link";
 import { type Locale, isLocale } from "@/i18n/config";
 import { getT } from "@/i18n/server";
 
@@ -24,9 +25,9 @@ async function Content({ locale, searchParams }: { locale: Locale; searchParams:
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {reason === "reset"
-            ? <ButtonLink href="/auth/forgot-password" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.error.resetAgain")}</ButtonLink>
-            : <ButtonLink href="/auth/login" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.error.verifyAgain")}</ButtonLink>}
-          <ButtonLink href="/" variant="outline" full className="h-auto min-h-11 py-2.5 text-center">{t("auth.error.backToStore")}</ButtonLink>
+            ? <Button asChild className="h-auto min-h-11 w-full py-2.5 text-center"><Link href="/auth/forgot-password">{t("auth.error.resetAgain")}</Link></Button>
+            : <Button asChild className="h-auto min-h-11 w-full py-2.5 text-center"><Link href="/auth/login">{t("auth.error.verifyAgain")}</Link></Button>}
+          <Button asChild variant="outline" className="h-auto min-h-11 w-full py-2.5 text-center"><Link href="/">{t("auth.error.backToStore")}</Link></Button>
         </CardContent>
       </Card>
     </AuthShell>

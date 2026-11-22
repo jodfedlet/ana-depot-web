@@ -24,7 +24,7 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
     Layouts do not re-run on client navigation, so the backend must authorize every `/api/v1/admin/**` call itself. Never use `user_metadata` for authorization.
   - The one authorization boundary is `lib/auth/authorization.ts` (`canAccessAdmin`, `hasPermission`). Roles/permissions are an open business decision: do not invent them.
   - The client session mirror is `lib/auth/auth-store.ts` (`useSession()`): "loading" until Supabase confirms; never "signed in" from a raw cookie.
-  - **Auth UI = the Supabase UI "password-based-auth" block, source-copied in `src/components/auth-block/` (routes `/auth/{login,sign-up,sign-up-success,forgot-password,update-password,error,callback}`).**
+  - **Auth UI = the Supabase UI "password-based-auth" block, source-copied in `src/components/auth-block/`, its card/input/label/button are the registry's shadcn files in `auth-block/ui/` (routes `/auth/{login,sign-up,sign-up-success,forgot-password,update-password,error,callback}`).**
     Never write another sign-in/sign-up/recovery form, never add `@supabase/auth-ui-react`, never link to a hosted login or the dashboard. Invalid/missing config renders `AuthUnavailable` (no inputs).
   - Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public), `NEXT_PUBLIC_API_BASE_URL` (browser + server; all `NEXT_PUBLIC_*` are inlined at BUILD time),
     optional server-only `API_BASE_URL`. The service-role key is never used by this app.
