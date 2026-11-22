@@ -1,0 +1,41 @@
+{
+  // DEVELOPMENT Worker `ana-depot-web-dev` (OpenNext adapter). Production is wrangler.jsonc: separate Worker, separate cache bucket, separate Durable Objects.
+  // Use it with `npm run cf:build:dev` / `npm run cf:deploy:dev` (they pass `--config wrangler.dev.jsonc`).
+  // Full guide, Cloudflare dashboard settings and the variable list: docs/cloudflare-deployment.md
+  // NO secret belongs in this file. Values are set in the Cloudflare dashboard (Settings > Build / Variables).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ana-depot-web-dev",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": [
+    // Node.js APIs (required by @opennextjs/cloudflare and by the Next.js server runtime)
+    "nodejs_compat",
+    // Outbound fetch() to public URLs only (the Spring Boot API, Supabase)
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+    // Serve public/offline.html at exactly /offline.html (the service worker precaches that URL). The default would redirect it to /offline.
+    "html_handling": "none"
+  },
+  "services": [
+    // The Worker calling itself (used by the adapter for revalidation); must match "name" above
+    { "binding": "WORKER_SELF_REFERENCE", "service": "ana-depot-web-dev" }
+  ],
+  "r2_buckets": [
+    // Next.js incremental cache of the DEVELOPMENT Worker. A PRIVATE bucket, never shared with production (`ana-depot-web-cache`)
+    // and not the product-image bucket. `opennextjs-cloudflare deploy` creates the bucket when it is missing.
+    { "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "ana-depot-web-dev-cache" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" },
+      { "name": "NEXT_TAG_CACHE_DO_SHARDED", "class_name": "DOShardedTagCache" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["DOQueueHandler", "DOShardedTagCache"] }
+  ],
+  "observability": { "enabled": true }
+}

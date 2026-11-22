@@ -56,6 +56,20 @@ Every push to `main` therefore builds and deploys. Do not run `cf:deploy` from a
 ### Custom domain and `workers.dev`
 No domain is configured (none was supplied). After the first deployment add the domain under the Worker's Settings > Domains & Routes, then set the same origin in `NEXT_PUBLIC_SITE_URL`, in the API's `ANA_CORS_ALLOWED_ORIGINS` and in the Supabase redirect allow-list (below), and redeploy.
 
+### Development and production Workers (two configurations)
+
+| | Production | Development |
+|---|---|---|
+| Wrangler config | `wrangler.jsonc` | `wrangler.dev.jsonc` |
+| Worker name (must equal the dashboard Worker) | `ana-depot-web` | `ana-depot-web-dev` |
+| `WORKER_SELF_REFERENCE` service | `ana-depot-web` | `ana-depot-web-dev` |
+| R2 cache bucket (private, never shared) | `ana-depot-web-cache` | `ana-depot-web-dev-cache` |
+| Durable Objects / migrations | `DOQueueHandler`, `DOShardedTagCache`, migration `v1` | same names and `v1`; Durable Objects belong to their Worker, so the data is separate |
+| Build command | `npm run cf:build:prod` | `npm run cf:build:dev` |
+| Deploy command | `npm run cf:deploy:prod` | `npm run cf:deploy:dev` |
+
+All four scripts pass `--config <file>` to the OpenNext CLI, which forwards it to Wrangler and to the cache-populate step. The unsuffixed `cf:build`, `cf:preview`, `cf:deploy` and `cf:upload` still use `wrangler.jsonc` (production). Each Workers Builds project (one per Worker) uses its own pair of commands, its own build variables and its own branch. Both configs write to `.open-next/`, so build and deploy with the same suffix, one after the other. A `deploy` command alone fails with "Could not find compiled Open Next config" if the matching build did not run first.
+
 ## 4. Environment variables
 
 `NEXT_PUBLIC_*` values are inlined into the browser **and** server bundle at **build time**, and `SECURITY_*` are read by `next.config.ts` at build time. They go in **Settings > Build > Variables and secrets** (build variables are not visible to the running Worker). Changing one needs a new build.
