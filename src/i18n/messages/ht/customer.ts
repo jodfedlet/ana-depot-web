@@ -312,6 +312,9 @@ export const customer: typeof frCustomer = {
       verifyAgain: "Konekte pou w voye imèl verifikasyon an ankò",
       resetAgain: "Mande yon nouvo lyen pou chanje modpas",
       backToStore: "Tounen nan magazen an",
+      oauthTitle: "Koneksyon ak Google pa mache",
+      oauthDescription: "Koneksyon ak Google la te anile oswa li pa mache. Pa gen anyen ki chanje. Ou ka eseye ankò, oswa konekte ak imèl ou.",
+      oauthAgain: "Tounen nan koneksyon",
     },
     unavailable: {
       title: "Koneksyon pa disponib",

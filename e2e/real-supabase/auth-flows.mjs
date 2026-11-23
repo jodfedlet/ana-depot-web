@@ -46,7 +46,9 @@ async function hydrated(page) {
   await page.waitForFunction(() => Object.keys(document.querySelector("main form input")).some((k) => k.startsWith("__reactProps")), null, { timeout: 8000 }).catch(() => {});
 }
 const settle = async (page) => { await page.waitForLoadState("networkidle").catch(() => {}); await hydrated(page); await sleep(250); };
-const submit = (page) => page.locator("main form button[type=submit]").click();
+// the e-mail/password form is the first form on the page (a Google-enabled build adds the social block's form after it)
+const submit = (page) => page.locator("main form button[type=submit]").first().click();
+const EXPECT_OAUTH = process.env.EXPECT_OAUTH === "1"; // set when the app was built with NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS=google
 const fillAuth = async (page, { mail, pw, repeat }) => {
   if (mail !== undefined) await page.locator("input[type=email]").fill(mail);
   const pws = page.locator("input[type=password]");
@@ -95,7 +97,7 @@ await run("sign-up (fr)", async () => {
   const { ctx, page } = await newPage();
   await page.goto(`${WEB}/fr/auth/sign-up`); await settle(page);
   const t0 = await body(page);
-  check("sign-up page renders the official block's three fields (e-mail, password, repeat password) and no OAuth button by default", (await page.locator("main form input").count()) === 3 && !/google/i.test(t0));
+  check(`sign-up page renders the official block's three fields (e-mail, password, repeat password) and ${EXPECT_OAUTH ? "the Google card" : "no OAuth button by default"}`, (await page.locator("main form input").count()) === 3 && /google/i.test(t0) === EXPECT_OAUTH);
   await fillAuth(page, { mail: A, pw: PW, repeat: PW + "x" }); await submit(page);
   await page.getByText(T.fr.mismatch).waitFor({ timeout: 8000 }); check("mismatched passwords -> translated message (the block's own check), nothing sent to Supabase", (await mailsFor(A)).length === 0);
   await fillAuth(page, { pw: "123", repeat: "123" }); await submit(page);
@@ -256,7 +258,7 @@ await run("public pages and callback failures", async () => {
   await page.goto(`${WEB}/fr/auth/callback?error=access_denied&error_code=access_denied&error_description=cancelled`); await settle(page);
   check("OAuth cancellation / failure redirect (error, no code) -> /auth/error, no session", /\/fr\/auth\/error/.test(page.url()) && (await authCookies(ctx)).length === 0, page.url());
   await page.goto(`${WEB}/fr/auth/login`); await settle(page);
-  check("no OAuth provider button while NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS is empty", !/google/i.test(await body(page)));
+  check(EXPECT_OAUTH ? "the Google button shows on login (provider listed at build time)" : "no OAuth provider button while NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS is empty", /google/i.test(await body(page)) === EXPECT_OAUTH);
   await ctx.close();
 });
 

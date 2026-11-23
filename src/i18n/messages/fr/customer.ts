@@ -309,6 +309,9 @@ export const customer = {
       verifyAgain: "Se connecter pour renvoyer l'e-mail de vérification",
       resetAgain: "Demander un nouveau lien de réinitialisation",
       backToStore: "Retour à la boutique",
+      oauthTitle: "Connexion avec Google impossible",
+      oauthDescription: "La connexion avec Google a été annulée ou a échoué. Rien n'a été modifié. Vous pouvez réessayer, ou vous connecter avec votre e-mail.",
+      oauthAgain: "Revenir à la connexion",
     },
     unavailable: {
       title: "Connexion indisponible",

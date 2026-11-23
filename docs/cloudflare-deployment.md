@@ -82,6 +82,7 @@ All four scripts pass `--config <file>` to the OpenNext CLI, which forwards it t
 | `NEXT_PUBLIC_SITE_URL` | Build | yes | public https origin of the storefront (canonical URLs, sitemap, robots) |
 | `NEXT_PUBLIC_TERMS_VERSION` | Build | yes | must equal the API's `ANA_TERMS_VERSION` |
 | `NEXT_PUBLIC_TERMS_URL` | Build | no | e.g. `/info/terms` |
+| `NEXT_PUBLIC_AUTH_OAUTH_PROVIDERS` | Build | no | `google` shows the official Google sign-in block on the login and sign-up pages. Set it ONLY after Google is enabled and configured in that environment's Supabase project (docs/authentication.md, "OAuth status"); empty = no button. A text variable, never a secret (the Google client secret lives only in the Supabase dashboard). Needs a rebuild |
 | `NEXT_PUBLIC_ASSET_ORIGINS` | Build | yes in production | public image origin(s) (R2/CDN custom domain); becomes the CSP `img-src`/`connect-src` |
 | `SECURITY_HTTPS_ONLY` | Build | yes in production | `true`: HSTS, `upgrade-insecure-requests`, Secure auth cookies. Set only when every hostname serves valid HTTPS |
 | `SECURITY_CSP_REPORT_ONLY` | Build | no | `true` = observe only |
