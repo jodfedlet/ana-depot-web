@@ -18,6 +18,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "verify:supabase-ui": "node scripts/verify-supabase-ui.mjs",
     "e2e:real": "node e2e/real-supabase/run.mjs",
     "e2e:auth-flows": "node e2e/real-supabase/auth-flows.mjs",
     "e2e:stub": "node e2e/stub-supabase/run.mjs",
