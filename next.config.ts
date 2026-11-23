@@ -45,8 +45,9 @@ const nextConfig: NextConfig = {
       { source: `/:locale(fr|ht)${from}`, destination: `/:locale${to}`, permanent: false },
     ]);
   },
-  cacheComponents: true,
-  partialPrefetching: true,
+  // `cacheComponents` and `partialPrefetching` are deliberately NOT enabled: OpenNext lists Cache Components as not fully supported on Cloudflare Workers, and on Workers they broke the
+  // storefront (static pages whose cache entry expired answered 500 "Worker's code had hung"; the home page hydrated with React error #419). Caching is the classic App Router model
+  // (ISR + the data cache, see src/lib/api/server-catalog.ts). Details and evidence: docs/cloudflare-deployment.md, section 6. `scripts/check-no-cache-components.mjs` guards it at build time.
   turbopack: {
     // Pin the workspace root (a stray lockfile exists higher in the home directory).
     root: path.resolve(import.meta.dirname),

@@ -82,7 +82,9 @@ Design: `docs/design-system.md` (read before changing UI). Business decisions st
 Never present mock behaviour as real. Don't invent addresses, hours, phones, policies, prices, reviews.
 Tokens only (`globals.css`); no raw hex. Accessibility: labelled controls, 44px targets, focus visible, errors via `aria-describedby`.
 
-## Next.js 16 gotchas (`cacheComponents: true`)
+## Next.js 16 gotchas (classic caching: `cacheComponents` is OFF on purpose)
+- **Never enable `cacheComponents`/`partialPrefetching` and never use `"use cache"`:** OpenNext does not fully support them on Cloudflare Workers and they broke the deployed storefront (500 "Worker's code had hung" once a page's cache entry expired; React #419 on the home page). Catalog caching = `unstable_cache` + ISR (`lib/api/server-catalog.ts`). `npm run cf:build:dev|prod` fails if they come back; evidence in `docs/cloudflare-deployment.md` section 6. After any caching change run `npm run cf:preview`, then `npm run cf:soak -- http://localhost:8787` (7 min, past a revalidation) and `npm run cf:browser-smoke -- http://localhost:8787`.
+- (Habit kept from the earlier setup, still good practice:)
 - `searchParams`/`params`/`usePathname()`/`useSearchParams()` outside `<Suspense>` fail the build. Don't call `usePathname` in
   layout-wide components (language selector reads `window.location` on click).
 - `generateMetadata` that awaits `params` blocks routes with on-demand segments: keep root/admin layout metadata static; give

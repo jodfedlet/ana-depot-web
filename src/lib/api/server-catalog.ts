@@ -1,5 +1,5 @@
 import "server-only";
-import { cacheLife, cacheTag } from "next/cache";
+import { unstable_cache } from "next/cache";
 import type { CatalogQuery } from "../catalog-types";
 import { DEFAULT_PAGE_SIZE } from "../catalog-query";
 import { serverApiBaseUrl } from "./base-url";
@@ -10,8 +10,10 @@ import { toApiQuery } from "./public";
  * Server-side reads of the PUBLIC catalog (no token, no cookies), used to render product, category and listing pages on the server so crawlers and slow phones get real HTML.
  * The API stays the single source of truth: these functions only fetch and cache its answers.
  *
- * Caching: every answer is cached for 60 s (then served stale while it revalidates, at most one hour), tagged `catalog`. `POST /api/revalidate-catalog` (staff only) marks the tag
- * stale after a catalog change (stale-while-revalidate), so a published/edited product shows on the storefront from the second visit on instead of after the window. A failure of the API is never cached.
+ * Caching: every answer is cached for 60 s with `unstable_cache` (the data cache, tagged `catalog`) and the pages that use it are ISR pages that regenerate every 60 s. `POST /api/revalidate-catalog`
+ * (staff only) marks the tag stale after a catalog change (stale-while-revalidate), so a published/edited product shows on the storefront from the second visit on instead of after the window.
+ * A failure of the API is never cached (the function throws). This is the classic App Router caching model on purpose: the Next.js 16 `"use cache"` / Cache Components model is not
+ * supported on Cloudflare Workers by OpenNext and broke the storefront there (docs/cloudflare-deployment.md, section 6), so `cacheComponents` stays off (next.config.ts).
  *  - 404 -> `{ status: "missing" }` (a real 404 page: unknown, draft and inactive products are indistinguishable by design).
  *  - API not configured -> `{ status: "unconfigured" }` (the page falls back to loading in the browser, which reports the configuration problem).
  *  - Any other failure throws: the page answers 5xx, never a soft 404, and nothing wrong is cached.
@@ -21,17 +23,18 @@ export type Loaded<T> = { status: "ok"; data: T } | { status: "missing" } | { st
 export const CATALOG_TAG = "catalog";
 const TIMEOUT_MS = 8000;
 
-async function cachedGet(path: string): Promise<{ status: "ok"; body: unknown } | { status: "missing" } | { status: "unconfigured" }> {
-  "use cache";
-  cacheLife({ stale: 30, revalidate: 60, expire: 3600 });
-  cacheTag(CATALOG_TAG);
+type CachedAnswer = { status: "ok"; body: unknown } | { status: "missing" } | { status: "unconfigured" };
+
+async function fetchAnswer(path: string): Promise<CachedAnswer> {
   const base = serverApiBaseUrl();
   if (!base) return { status: "unconfigured" };
-  const res = await fetch(`${base.replace(/\/+$/, "")}${path}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const res = await fetch(`${base.replace(/\/+$/, "")}${path}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
   if (res.status === 404) return { status: "missing" };
   if (!res.ok) throw new Error(`catalog_fetch_failed:${res.status}`);
   return { status: "ok", body: await res.json() };
 }
+
+const cachedGet = (path: string): Promise<CachedAnswer> => unstable_cache(() => fetchAnswer(path), ["catalog", path], { revalidate: 60, tags: [CATALOG_TAG] })();
 
 async function get<T>(path: string): Promise<Loaded<T>> {
   const r = await cachedGet(path);

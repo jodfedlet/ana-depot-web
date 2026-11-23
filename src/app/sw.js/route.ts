@@ -8,6 +8,12 @@ import path from "node:path";
  *
  * The file is not cached by the browser (`no-cache`), so updates are always noticed; its scope is the whole origin.
  */
+/**
+ * Prerendered at build, on purpose: the file contents are read from disk HERE, and a Cloudflare Worker has no `src/` directory at runtime ("no such file or directory,
+ * readAll '/bundle/src/pwa/policy.js'"). Route handlers are dynamic by default in Next.js 15+, so without this the route would answer 500 (it was static only as a side effect of Cache Components).
+ */
+export const dynamic = "force-static";
+
 const read = (file: string) => fs.readFileSync(path.join(process.cwd(), "src/pwa", file), "utf8");
 
 const originOf = (value: string | undefined): string | null => {

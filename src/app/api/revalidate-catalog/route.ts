@@ -21,8 +21,8 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ code: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
-  // "max" = stale-while-revalidate: the next request after a catalog change is answered with the previous data while the fresh data is fetched, the one after that
-  // shows it. `{ expire: 0 }` (blocking regeneration) made the prerendered home pages and sitemap answer 500 on Cloudflare Workers (OpenNext + cacheComponents hang), see docs/cloudflare-deployment.md.
+  // "max" = stale-while-revalidate: the next request after a catalog change is answered with the previous data while the fresh data is fetched, the one after that shows it
+  // (verified on Cloudflare Workers with the classic caching model, docs/cloudflare-deployment.md). `{ expire: 0 }` (blocking regeneration) hung there under Cache Components.
   revalidateTag(CATALOG_TAG, "max");
   return Response.json({ revalidated: true }, { headers: { "Cache-Control": "no-store" } });
 }
